@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ElectronicService.Contracts/ElectronicService.Contracts.csproj" />
+    <Project Path="src/ElectronicService.Core/ElectronicService.Core.csproj" />
+    <Project Path="src/ElectronicService.Domain/ElectronicService.Domain.csproj" />
+    <Project Path="src/ElectronicService.Infrastructure.Postgres/ElectronicService.Infrastructure.Postgres.csproj" />
+    <Project Path="src/ElectronicService.Web/ElectronicService.Web.csproj" />
+  </Folder>
+</Solution>
