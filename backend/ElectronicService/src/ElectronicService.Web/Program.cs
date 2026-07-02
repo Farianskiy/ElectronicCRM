@@ -1,5 +1,6 @@
 using ElectronicService.Infrastructure.Postgres;
 using ElectronicService.Infrastructure.Postgres.Data;
+using ElectronicService.Core;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,6 +10,9 @@ builder.Services.AddOpenApi();
 
 // Для тестового контроллера
 builder.Services.AddControllers();
+
+// Подключение слоя Core, это handlers, команды, запросы и т.д.
+builder.Services.AddCore();
 
 // Подключение инфраструктуры Postgres
 builder.Services.AddInfrastructurePostgres(builder.Configuration);
