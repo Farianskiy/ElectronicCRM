@@ -1,3 +1,5 @@
+using ElectronicService.Infrastructure.Postgres;
+using ElectronicService.Infrastructure.Postgres.Data;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -8,7 +10,11 @@ builder.Services.AddOpenApi();
 // Для тестового контроллера
 builder.Services.AddControllers();
 
-builder.Services.AddHealthChecks();
+// Подключение инфраструктуры Postgres
+builder.Services.AddInfrastructurePostgres(builder.Configuration);
+
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<ElectronicDbContext>();
 
 var app = builder.Build();
 

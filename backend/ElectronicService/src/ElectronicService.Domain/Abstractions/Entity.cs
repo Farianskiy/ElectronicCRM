@@ -11,7 +11,7 @@ public abstract class Entity
     {
     }
 
-    public Guid Id { get; protected init; }
+    public Guid Id { get; protected set; }
 
     public override bool Equals(object? obj)
     {
