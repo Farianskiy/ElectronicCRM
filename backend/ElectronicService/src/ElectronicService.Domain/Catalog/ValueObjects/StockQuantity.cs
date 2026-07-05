@@ -6,12 +6,16 @@ namespace ElectronicService.Domain.Catalog.ValueObjects;
 
 public sealed class StockQuantity : ValueObject
 {
+    private StockQuantity()
+    {
+    }
+
     private StockQuantity(decimal value)
     {
         Value = value;
     }
 
-    public decimal Value { get; }
+    public decimal Value { get; private set; }
 
     public bool IsAvailable => Value > 0;
 

@@ -8,15 +8,19 @@ public sealed class ProductName : ValueObject
     private const int MinLength = 2;
     private const int MaxLength = 500;
 
+    private ProductName()
+    {
+    }
+
     private ProductName(string value)
     {
         Value = value;
         NormalizedValue = Normalize(value);
     }
 
-    public string Value { get; }
+    public string Value { get; private set; } = string.Empty;
 
-    public string NormalizedValue { get; }
+    public string NormalizedValue { get; private set; } = string.Empty;
 
     public static Result<ProductName, DomainError> Create(string value)
     {

@@ -1,5 +1,6 @@
 using ElectronicService.Core.Abstractions.Data;
 using ElectronicService.Core.Users;
+using ElectronicService.Infrastructure.Postgres.Catalog.Seeding;
 using ElectronicService.Infrastructure.Postgres.Data;
 using ElectronicService.Infrastructure.Postgres.Users;
 using Microsoft.EntityFrameworkCore;
@@ -37,6 +38,7 @@ public static class DependencyInjectionExtensions
 
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<CatalogDataSeeder>();
 
         return services;
     }

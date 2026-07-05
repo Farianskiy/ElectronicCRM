@@ -7,6 +7,10 @@ namespace ElectronicService.Domain.Catalog.ValueObjects;
 
 public sealed class CharacteristicValue : ValueObject
 {
+    private CharacteristicValue()
+    {
+    }
+
     private CharacteristicValue(
         CharacteristicDataType dataType,
         string? textValue,
@@ -19,13 +23,13 @@ public sealed class CharacteristicValue : ValueObject
         BooleanValue = booleanValue;
     }
 
-    public CharacteristicDataType DataType { get; }
+    public CharacteristicDataType DataType { get; private set; }
 
-    public string? TextValue { get; }
+    public string? TextValue { get; private set; }
 
-    public decimal? NumberValue { get; }
+    public decimal? NumberValue { get; private set; }
 
-    public bool? BooleanValue { get; }
+    public bool? BooleanValue { get; private set; }
 
     // Создаёт текстовое значение
     public static Result<CharacteristicValue, DomainError> CreateText(string value)

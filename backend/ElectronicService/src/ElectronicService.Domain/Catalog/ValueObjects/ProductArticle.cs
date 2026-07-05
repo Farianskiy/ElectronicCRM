@@ -7,12 +7,16 @@ public sealed class ProductArticle : ValueObject
 {
     private const int MaxLength = 100;
 
+    private ProductArticle()
+    {
+    }
+
     private ProductArticle(string value)
     {
         Value = value;
     }
 
-    public string Value { get; }
+    public string Value { get; private set; } = string.Empty;
 
     public static Result<ProductArticle, DomainError> Create(string value)
     {

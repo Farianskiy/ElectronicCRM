@@ -1,6 +1,7 @@
-using ElectronicService.Infrastructure.Postgres;
-using ElectronicService.Infrastructure.Postgres.Data;
 using ElectronicService.Core;
+using ElectronicService.Infrastructure.Postgres;
+using ElectronicService.Infrastructure.Postgres.Catalog.Seeding;
+using ElectronicService.Infrastructure.Postgres.Data;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -21,6 +22,13 @@ builder.Services.AddHealthChecks()
     .AddDbContextCheck<ElectronicDbContext>();
 
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var seeder = scope.ServiceProvider.GetRequiredService<CatalogDataSeeder>();
+
+    await seeder.SeedAsync();
+}
 
 // Minimal API endpoints
 app.MapGet("/", () => "ElectronicService is running!");
