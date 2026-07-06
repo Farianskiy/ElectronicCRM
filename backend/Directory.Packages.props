@@ -7,6 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- Паттерн Result<T, Error> для бизнес-ошибок -->
+    <PackageVersion Include="ClosedXML" Version="0.105.0" />
     <PackageVersion Include="CSharpFunctionalExtensions" Version="3.6.0" />
     <!-- База данных -->
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.7" />

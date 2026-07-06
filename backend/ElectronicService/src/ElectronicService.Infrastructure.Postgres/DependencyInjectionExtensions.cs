@@ -1,5 +1,7 @@
 using ElectronicService.Core.Abstractions.Data;
+using ElectronicService.Core.Catalog.Products.Abstractions;
 using ElectronicService.Core.Users;
+using ElectronicService.Infrastructure.Postgres.Catalog.Import;
 using ElectronicService.Infrastructure.Postgres.Catalog.Seeding;
 using ElectronicService.Infrastructure.Postgres.Data;
 using ElectronicService.Infrastructure.Postgres.Users;
@@ -8,6 +10,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using ElectronicService.Infrastructure.Postgres.Catalog.Queries;
+using ElectronicService.Core.Catalog.Import.ImportProductsFromExcel;
 
 namespace ElectronicService.Infrastructure.Postgres;
 
@@ -39,6 +43,9 @@ public static class DependencyInjectionExtensions
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<CatalogDataSeeder>();
+        services.AddScoped<ImportProductsFromExcelCommandHandler>();
+        services.AddScoped<IProductsExcelImporter, ProductExcelImportService>();
+        services.AddScoped<ICatalogProductsReader, CatalogProductsReader>();
 
         return services;
     }
