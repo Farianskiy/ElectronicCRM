@@ -4,6 +4,7 @@ using ElectronicService.Core.Catalog.Products.GetProductById;
 using ElectronicService.Core.Catalog.Products.GetProducts;
 using ElectronicService.Domain.Catalog.Characteristics;
 using ElectronicService.Infrastructure.Postgres.Data;
+using ElectronicService.Core.Catalog.Products.SearchProducts;
 using Microsoft.EntityFrameworkCore;
 
 namespace ElectronicService.Infrastructure.Postgres.Catalog.Queries;
@@ -180,6 +181,164 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
             characteristics);
     }
 
+    public async Task<CatalogProductsPageResult> SearchProductsAsync(
+    SearchProductsQuery query,
+    CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+
+        var normalizedPage = Math.Max(query.Page, 1);
+
+        var normalizedPageSize = query.PageSize <= 0
+            ? DefaultPageSize
+            : Math.Clamp(query.PageSize, 1, MaxPageSize);
+
+        var productsQuery =
+            from product in _dbContext.Products.AsNoTracking()
+            join productType in _dbContext.ProductTypes.AsNoTracking()
+                on product.ProductTypeId equals productType.Id
+            join productManufacturer in _dbContext.Manufacturers.AsNoTracking()
+                on product.ManufacturerId equals productManufacturer.Id
+            select new
+            {
+                Product = product,
+                ProductType = productType,
+                Manufacturer = productManufacturer
+            };
+
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            var normalizedSearch = NormalizeText(query.Search);
+            var searchPattern = CreateLikePattern(normalizedSearch);
+            var originalSearchPattern = CreateLikePattern(query.Search);
+
+            productsQuery = productsQuery.Where(item =>
+                EF.Functions.ILike(item.Product.Name.NormalizedValue, searchPattern)
+                || EF.Functions.ILike(item.Product.Article.Value, originalSearchPattern));
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.ProductTypeCode))
+        {
+            var normalizedProductTypeCode = NormalizeText(query.ProductTypeCode);
+
+            productsQuery = productsQuery.Where(item =>
+                item.ProductType.Code == normalizedProductTypeCode);
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.Manufacturer))
+        {
+            var normalizedManufacturer = NormalizeText(query.Manufacturer);
+            var manufacturerPattern = CreateLikePattern(normalizedManufacturer);
+
+            productsQuery = productsQuery.Where(item =>
+                EF.Functions.ILike(item.Manufacturer.NormalizedName, manufacturerPattern));
+        }
+
+        var characteristicFilters = query.Characteristics
+            .Where(filter =>
+                !string.IsNullOrWhiteSpace(filter.Code)
+                && !string.IsNullOrWhiteSpace(filter.Value))
+            .ToList();
+
+        if (characteristicFilters.Count > 0)
+        {
+            var characteristicCodes = characteristicFilters
+                .Select(filter => NormalizeText(filter.Code))
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+
+            var characteristicDefinitions = await _dbContext.CharacteristicDefinitions
+                .AsNoTracking()
+                .Where(definition => characteristicCodes.Contains(definition.Code))
+                .ToDictionaryAsync(
+                    definition => definition.Code,
+                    StringComparer.Ordinal,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            foreach (var filter in characteristicFilters)
+            {
+                var characteristicCode = NormalizeText(filter.Code);
+
+                if (!characteristicDefinitions.TryGetValue(
+                        characteristicCode,
+                        out var characteristicDefinition))
+                {
+                    productsQuery = productsQuery.Where(_ => false);
+                    break;
+                }
+
+                var rawValue = filter.Value.Trim();
+
+                if (characteristicDefinition.DataType == CharacteristicDataType.Text)
+                {
+                    productsQuery = productsQuery.Where(item =>
+                        _dbContext.ProductCharacteristics.AsNoTracking().Any(characteristic =>
+                            characteristic.ProductId == item.Product.Id
+                            && characteristic.CharacteristicDefinitionId == characteristicDefinition.Id
+                            && characteristic.Value.TextValue != null
+                            && EF.Functions.ILike(characteristic.Value.TextValue, rawValue)));
+                }
+                else if (characteristicDefinition.DataType == CharacteristicDataType.Number)
+                {
+                    if (!TryParseNumber(rawValue, out var numberValue))
+                    {
+                        productsQuery = productsQuery.Where(_ => false);
+                        break;
+                    }
+
+                    productsQuery = productsQuery.Where(item =>
+                        _dbContext.ProductCharacteristics.AsNoTracking().Any(characteristic =>
+                            characteristic.ProductId == item.Product.Id
+                            && characteristic.CharacteristicDefinitionId == characteristicDefinition.Id
+                            && characteristic.Value.NumberValue == numberValue));
+                }
+                else if (characteristicDefinition.DataType == CharacteristicDataType.Boolean)
+                {
+                    if (!TryParseBoolean(rawValue, out var booleanValue))
+                    {
+                        productsQuery = productsQuery.Where(_ => false);
+                        break;
+                    }
+
+                    productsQuery = productsQuery.Where(item =>
+                        _dbContext.ProductCharacteristics.AsNoTracking().Any(characteristic =>
+                            characteristic.ProductId == item.Product.Id
+                            && characteristic.CharacteristicDefinitionId == characteristicDefinition.Id
+                            && characteristic.Value.BooleanValue == booleanValue));
+                }
+            }
+        }
+
+        var totalCount = await productsQuery
+            .CountAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var items = await productsQuery
+            .OrderBy(item => item.Product.Name.NormalizedValue)
+            .ThenBy(item => item.Product.Article.Value)
+            .Skip((normalizedPage - 1) * normalizedPageSize)
+            .Take(normalizedPageSize)
+            .Select(item => new CatalogProductListItemResult(
+                item.Product.Id,
+                item.Product.Article.Value,
+                item.Product.Name.Value,
+                item.ProductType.Code,
+                item.ProductType.Name,
+                item.Manufacturer.Name,
+                item.Product.Price.Amount,
+                item.Product.Price.Currency,
+                item.Product.StockQuantity.Value))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return new CatalogProductsPageResult(
+            items,
+            normalizedPage,
+            normalizedPageSize,
+            totalCount);
+    }
+
     private static string FormatCharacteristicValue(
         CharacteristicDataType dataType,
         string? textValue,
@@ -212,5 +371,47 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
         return string.Create(
             CultureInfo.InvariantCulture,
             $"%{value.Trim()}%");
+    }
+
+    private static bool TryParseNumber(string value, out decimal result)
+    {
+        var normalizedValue = value
+            .Trim()
+            .Replace(" ", string.Empty, StringComparison.Ordinal)
+            .Replace(",", ".", StringComparison.Ordinal);
+
+        return decimal.TryParse(
+            normalizedValue,
+            NumberStyles.Number,
+            CultureInfo.InvariantCulture,
+            out result);
+    }
+
+    private static bool TryParseBoolean(string value, out bool result)
+    {
+        var normalizedValue = NormalizeText(value);
+
+        if (string.Equals(normalizedValue, "TRUE", StringComparison.Ordinal)
+            || string.Equals(normalizedValue, "ДА", StringComparison.Ordinal)
+            || string.Equals(normalizedValue, "ЕСТЬ", StringComparison.Ordinal)
+            || string.Equals(normalizedValue, "1", StringComparison.Ordinal)
+            || string.Equals(normalizedValue, "+", StringComparison.Ordinal))
+        {
+            result = true;
+            return true;
+        }
+
+        if (string.Equals(normalizedValue, "FALSE", StringComparison.Ordinal)
+            || string.Equals(normalizedValue, "НЕТ", StringComparison.Ordinal)
+            || string.Equals(normalizedValue, "ОТСУТСТВУЕТ", StringComparison.Ordinal)
+            || string.Equals(normalizedValue, "0", StringComparison.Ordinal)
+            || string.Equals(normalizedValue, "-", StringComparison.Ordinal))
+        {
+            result = false;
+            return true;
+        }
+
+        result = false;
+        return false;
     }
 }

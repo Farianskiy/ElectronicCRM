@@ -46,6 +46,7 @@ public static class DependencyInjectionExtensions
         services.AddScoped<ImportProductsFromExcelCommandHandler>();
         services.AddScoped<IProductsExcelImporter, ProductExcelImportService>();
         services.AddScoped<ICatalogProductsReader, CatalogProductsReader>();
+        services.AddScoped<ICatalogProductReplacementsReader,CatalogProductReplacementsReader>();
 
         return services;
     }

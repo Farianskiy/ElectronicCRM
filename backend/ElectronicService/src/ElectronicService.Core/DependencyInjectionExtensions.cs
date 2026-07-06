@@ -6,6 +6,8 @@ using ElectronicService.Core.Users.MakeUserTechnical;
 using Microsoft.Extensions.DependencyInjection;
 using ElectronicService.Core.Catalog.Products.GetProducts;
 using ElectronicService.Core.Catalog.Products.GetProductById;
+using ElectronicService.Core.Catalog.Products.SearchProducts;
+using ElectronicService.Core.Catalog.Products.GetReplacements;
 
 namespace ElectronicService.Core;
 
@@ -20,6 +22,8 @@ public static class DependencyInjectionExtensions
         services.AddScoped<BlockUserCommandHandler>();
         services.AddScoped<GetCatalogProductsQueryHandler>();
         services.AddScoped<GetCatalogProductByIdQueryHandler>();
+        services.AddScoped<SearchProductsQueryHandler>();
+        services.AddScoped<GetProductReplacementsQueryHandler>();
 
         return services;
     }
