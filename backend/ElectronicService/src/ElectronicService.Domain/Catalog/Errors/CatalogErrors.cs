@@ -71,4 +71,11 @@ public static class CatalogErrors
             "catalog.product_type_cannot_be_changed_after_characteristics_added",
             "Тип товара нельзя изменить после добавления характеристик.");
     }
+
+    public static DomainError ProductNotFound(string productId)
+    {
+        return new DomainError(
+            "catalog.product.not_found",
+            $"Товар '{productId}' не найден.");
+    }
 }

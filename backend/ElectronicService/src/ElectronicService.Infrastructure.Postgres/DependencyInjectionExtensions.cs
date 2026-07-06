@@ -12,6 +12,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ElectronicService.Infrastructure.Postgres.Catalog.Queries;
 using ElectronicService.Core.Catalog.Import.ImportProductsFromExcel;
+using ElectronicService.Infrastructure.Postgres.Catalog.Repositories;
 
 namespace ElectronicService.Infrastructure.Postgres;
 
@@ -46,7 +47,8 @@ public static class DependencyInjectionExtensions
         services.AddScoped<ImportProductsFromExcelCommandHandler>();
         services.AddScoped<IProductsExcelImporter, ProductExcelImportService>();
         services.AddScoped<ICatalogProductsReader, CatalogProductsReader>();
-        services.AddScoped<ICatalogProductReplacementsReader,CatalogProductReplacementsReader>();
+        services.AddScoped<ICatalogProductReplacementsReader, CatalogProductReplacementsReader>();
+        services.AddScoped<IProductRepository, ProductRepository>();
 
         return services;
     }

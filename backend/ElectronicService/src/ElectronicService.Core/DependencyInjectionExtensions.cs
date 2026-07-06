@@ -8,6 +8,8 @@ using ElectronicService.Core.Catalog.Products.GetProducts;
 using ElectronicService.Core.Catalog.Products.GetProductById;
 using ElectronicService.Core.Catalog.Products.SearchProducts;
 using ElectronicService.Core.Catalog.Products.GetReplacements;
+using ElectronicService.Core.Catalog.Products.UpdatePrice;
+using ElectronicService.Core.Catalog.Products.UpdateStock;
 
 namespace ElectronicService.Core;
 
@@ -24,6 +26,8 @@ public static class DependencyInjectionExtensions
         services.AddScoped<GetCatalogProductByIdQueryHandler>();
         services.AddScoped<SearchProductsQueryHandler>();
         services.AddScoped<GetProductReplacementsQueryHandler>();
+        services.AddScoped<UpdateProductPriceCommandHandler>();
+        services.AddScoped<UpdateProductStockCommandHandler>();
 
         return services;
     }

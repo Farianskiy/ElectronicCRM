@@ -90,6 +90,16 @@ public sealed class Product : AggregateRoot
             return GeneralErrors.ValueIsInvalid(nameof(manufacturerId));
         }
 
+        if (price is null)
+        {
+            return GeneralErrors.ValueIsInvalid(nameof(price));
+        }
+
+        if (stockQuantity is null)
+        {
+            return GeneralErrors.ValueIsInvalid(nameof(stockQuantity));
+        }
+
         return new Product(
             Guid.CreateVersion7(),
             articleResult.Value,
@@ -135,6 +145,11 @@ public sealed class Product : AggregateRoot
     // Метод меняет цену товара
     public UnitResult<DomainError> ChangePrice(Money price)
     {
+        if (price is null)
+        {
+            return UnitResult.Failure(GeneralErrors.ValueIsInvalid(nameof(price)));
+        }
+
         Price = price;
         UpdatedAtUtc = DateTime.UtcNow;
 
@@ -144,6 +159,11 @@ public sealed class Product : AggregateRoot
     // Метод меняет количество товара на складе
     public UnitResult<DomainError> ChangeStockQuantity(StockQuantity stockQuantity)
     {
+        if (stockQuantity is null)
+        {
+            return UnitResult.Failure(GeneralErrors.ValueIsInvalid(nameof(stockQuantity)));
+        }
+
         StockQuantity = stockQuantity;
         UpdatedAtUtc = DateTime.UtcNow;
 
