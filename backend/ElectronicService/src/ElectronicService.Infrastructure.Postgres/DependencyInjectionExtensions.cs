@@ -1,5 +1,6 @@
 using ElectronicService.Core.Abstractions.Data;
 using ElectronicService.Core.Catalog.Import.ImportProductsFromExcel;
+using ElectronicService.Core.Catalog.Metadata.Abstractions;
 using ElectronicService.Core.Catalog.Products.Abstractions;
 using ElectronicService.Core.Users;
 using ElectronicService.Infrastructure.Postgres.Catalog.Import;
@@ -50,6 +51,7 @@ public static class DependencyInjectionExtensions
         services.AddScoped<ICatalogProductReplacementsReader, CatalogProductReplacementsReader>();
         services.AddScoped<IProductRepository, ProductRepository>();
         services.AddScoped<ICatalogProductMetadataRepository, CatalogProductMetadataRepository>();
+        services.AddScoped<ICatalogMetadataReader, CatalogMetadataReader>();
 
         return services;
     }
