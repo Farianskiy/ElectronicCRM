@@ -49,6 +49,7 @@ public sealed class CatalogProductDetailsController : ControllerBase
                 characteristic.Name,
                 characteristic.DataType,
                 characteristic.Unit,
-                characteristic.Value)).ToList()));
+                characteristic.Value)).ToList(),
+            result.Aliases));
     }
 }

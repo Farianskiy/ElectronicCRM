@@ -10,4 +10,5 @@ public sealed record ProductDetailsResponse(
     decimal PriceAmount,
     string PriceCurrency,
     decimal StockQuantity,
-    IReadOnlyCollection<ProductCharacteristicResponse> Characteristics);
+    IReadOnlyCollection<ProductCharacteristicResponse> Characteristics,
+    IReadOnlyCollection<string> Aliases);

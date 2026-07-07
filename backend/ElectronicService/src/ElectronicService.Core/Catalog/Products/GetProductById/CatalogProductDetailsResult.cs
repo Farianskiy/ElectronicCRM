@@ -10,4 +10,5 @@ public sealed record CatalogProductDetailsResult(
     decimal PriceAmount,
     string PriceCurrency,
     decimal StockQuantity,
-    IReadOnlyCollection<CatalogProductCharacteristicResult> Characteristics);
+    IReadOnlyCollection<CatalogProductCharacteristicResult> Characteristics,
+    IReadOnlyCollection<string> Aliases);

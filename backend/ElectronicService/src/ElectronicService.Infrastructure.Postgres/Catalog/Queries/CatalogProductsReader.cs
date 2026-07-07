@@ -2,9 +2,9 @@ using System.Globalization;
 using ElectronicService.Core.Catalog.Products.Abstractions;
 using ElectronicService.Core.Catalog.Products.GetProductById;
 using ElectronicService.Core.Catalog.Products.GetProducts;
+using ElectronicService.Core.Catalog.Products.SearchProducts;
 using ElectronicService.Domain.Catalog.Characteristics;
 using ElectronicService.Infrastructure.Postgres.Data;
-using ElectronicService.Core.Catalog.Products.SearchProducts;
 using Microsoft.EntityFrameworkCore;
 
 namespace ElectronicService.Infrastructure.Postgres.Catalog.Queries;
@@ -56,7 +56,10 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
 
             productsQuery = productsQuery.Where(item =>
                 EF.Functions.ILike(item.Product.Name.NormalizedValue, searchPattern)
-                || EF.Functions.ILike(item.Product.Article.Value, originalSearchPattern));
+                || EF.Functions.ILike(item.Product.Article.Value, originalSearchPattern)
+                || _dbContext.ProductAliases.AsNoTracking().Any(alias =>
+                    alias.ProductId == item.Product.Id
+                    && EF.Functions.ILike(alias.NormalizedValue, searchPattern)));
         }
 
         if (!string.IsNullOrWhiteSpace(productTypeCode))
@@ -168,6 +171,14 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
                     characteristic.BooleanValue)))
             .ToList();
 
+        var aliases = await _dbContext.ProductAliases
+            .AsNoTracking()
+            .Where(alias => alias.ProductId == productId)
+            .OrderBy(alias => alias.NormalizedValue)
+            .Select(alias => alias.Value)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
         return new CatalogProductDetailsResult(
             product.Id,
             product.Article,
@@ -178,7 +189,8 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
             product.PriceAmount,
             product.PriceCurrency,
             product.StockQuantity,
-            characteristics);
+            characteristics,
+            aliases);
     }
 
     public async Task<CatalogProductsPageResult> SearchProductsAsync(
@@ -214,7 +226,10 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
 
             productsQuery = productsQuery.Where(item =>
                 EF.Functions.ILike(item.Product.Name.NormalizedValue, searchPattern)
-                || EF.Functions.ILike(item.Product.Article.Value, originalSearchPattern));
+                || EF.Functions.ILike(item.Product.Article.Value, originalSearchPattern)
+                || _dbContext.ProductAliases.AsNoTracking().Any(alias =>
+                    alias.ProductId == item.Product.Id
+                    && EF.Functions.ILike(alias.NormalizedValue, searchPattern)));
         }
 
         if (!string.IsNullOrWhiteSpace(query.ProductTypeCode))
