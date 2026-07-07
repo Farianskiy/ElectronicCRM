@@ -24,6 +24,18 @@ public sealed class ProductRepository : IProductRepository
                 cancellationToken);
     }
 
+    public Task<Product?> GetByIdWithDetailsAsync(
+        Guid productId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Products
+            .Include(product => product.Characteristics)
+            .Include(product => product.Aliases)
+            .FirstOrDefaultAsync(
+                product => product.Id == productId,
+                cancellationToken);
+    }
+
     public Task SaveChangesAsync(
         CancellationToken cancellationToken = default)
     {

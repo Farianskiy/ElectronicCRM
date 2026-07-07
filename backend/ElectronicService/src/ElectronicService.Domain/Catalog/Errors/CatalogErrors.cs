@@ -78,4 +78,18 @@ public static class CatalogErrors
             "catalog.product.not_found",
             $"Товар '{productId}' не найден.");
     }
+
+    public static DomainError ProductTypeNotFound(string productTypeId)
+    {
+        return new DomainError(
+            "catalog.product_type.not_found",
+            $"Тип товара '{productTypeId}' не найден.");
+    }
+
+    public static DomainError CharacteristicDefinitionNotFound(string code)
+    {
+        return new DomainError(
+            "catalog.characteristic_definition.not_found",
+            $"Характеристика с кодом '{code}' не найдена.");
+    }
 }

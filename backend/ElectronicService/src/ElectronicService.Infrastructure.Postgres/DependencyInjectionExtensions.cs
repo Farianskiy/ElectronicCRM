@@ -1,7 +1,10 @@
 using ElectronicService.Core.Abstractions.Data;
+using ElectronicService.Core.Catalog.Import.ImportProductsFromExcel;
 using ElectronicService.Core.Catalog.Products.Abstractions;
 using ElectronicService.Core.Users;
 using ElectronicService.Infrastructure.Postgres.Catalog.Import;
+using ElectronicService.Infrastructure.Postgres.Catalog.Queries;
+using ElectronicService.Infrastructure.Postgres.Catalog.Repositories;
 using ElectronicService.Infrastructure.Postgres.Catalog.Seeding;
 using ElectronicService.Infrastructure.Postgres.Data;
 using ElectronicService.Infrastructure.Postgres.Users;
@@ -10,9 +13,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using ElectronicService.Infrastructure.Postgres.Catalog.Queries;
-using ElectronicService.Core.Catalog.Import.ImportProductsFromExcel;
-using ElectronicService.Infrastructure.Postgres.Catalog.Repositories;
 
 namespace ElectronicService.Infrastructure.Postgres;
 
@@ -49,6 +49,7 @@ public static class DependencyInjectionExtensions
         services.AddScoped<ICatalogProductsReader, CatalogProductsReader>();
         services.AddScoped<ICatalogProductReplacementsReader, CatalogProductReplacementsReader>();
         services.AddScoped<IProductRepository, ProductRepository>();
+        services.AddScoped<ICatalogProductMetadataRepository, CatalogProductMetadataRepository>();
 
         return services;
     }

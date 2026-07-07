@@ -8,6 +8,10 @@ public interface IProductRepository
         Guid productId,
         CancellationToken cancellationToken = default);
 
+    Task<Product?> GetByIdWithDetailsAsync(
+        Guid productId,
+        CancellationToken cancellationToken = default);
+
     Task SaveChangesAsync(
         CancellationToken cancellationToken = default);
 }
