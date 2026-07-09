@@ -92,4 +92,11 @@ public static class CatalogErrors
             "catalog.characteristic_definition.not_found",
             $"Характеристика с кодом '{code}' не найдена.");
     }
+
+    public static DomainError DictionaryTermAlreadyExists(string phrase)
+    {
+        return new DomainError(
+            "catalog.dictionary_term.already_exists",
+            $"Термин словаря '{phrase}' уже существует.");
+    }
 }

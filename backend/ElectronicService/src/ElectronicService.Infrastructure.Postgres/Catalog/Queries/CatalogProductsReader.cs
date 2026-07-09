@@ -287,12 +287,15 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
 
                 if (characteristicDefinition.DataType == CharacteristicDataType.Text)
                 {
+                    var normalizedTextValue = NormalizeText(rawValue);
+                    var textValuePattern = CreateLikePattern(normalizedTextValue);
+
                     productsQuery = productsQuery.Where(item =>
                         _dbContext.ProductCharacteristics.AsNoTracking().Any(characteristic =>
                             characteristic.ProductId == item.Product.Id
                             && characteristic.CharacteristicDefinitionId == characteristicDefinition.Id
                             && characteristic.Value.TextValue != null
-                            && EF.Functions.ILike(characteristic.Value.TextValue, rawValue)));
+                            && EF.Functions.ILike(characteristic.Value.TextValue, textValuePattern)));
                 }
                 else if (characteristicDefinition.DataType == CharacteristicDataType.Number)
                 {

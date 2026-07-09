@@ -16,6 +16,11 @@ using ElectronicService.Core.Users.CreateTechnicalUser;
 using ElectronicService.Core.Users.MakeUserRegular;
 using ElectronicService.Core.Users.MakeUserTechnical;
 using Microsoft.Extensions.DependencyInjection;
+using ElectronicService.Core.Catalog.Dictionaries.GetTerms;
+using ElectronicService.Core.Catalog.Dictionaries.AddTerm;
+using ElectronicService.Core.Catalog.Assistant.AskCatalogAssistant;
+using ElectronicService.Core.Catalog.Assistant.Parsing;
+using ElectronicService.Core.Catalog.Assistant.Abstractions;
 
 namespace ElectronicService.Core;
 
@@ -40,6 +45,10 @@ public static class DependencyInjectionExtensions
         services.AddScoped<GetCatalogProductTypeCharacteristicsQueryHandler>();
         services.AddScoped<GetCatalogManufacturersQueryHandler>();
         services.AddScoped<SearchProductReplacementsQueryHandler>();
+        services.AddScoped<GetCatalogDictionaryTermsQueryHandler>();
+        services.AddScoped<AddCatalogDictionaryTermCommandHandler>();
+        services.AddScoped<AskCatalogAssistantCommandHandler>();
+        services.AddScoped<ICatalogAssistantMessageParser, RuleBasedCatalogAssistantMessageParser>();
 
         return services;
     }

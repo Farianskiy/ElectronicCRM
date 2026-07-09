@@ -1,6 +1,7 @@
 using ElectronicService.Domain.Catalog.Characteristics;
 using ElectronicService.Domain.Catalog.ProductTypes;
 using ElectronicService.Infrastructure.Postgres.Data;
+using ElectronicService.Domain.Catalog.Dictionaries;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -9,6 +10,42 @@ namespace ElectronicService.Infrastructure.Postgres.Catalog.Seeding;
 // это сервис, который будет вызываться при старте приложения, sealed означает, что от этого класса нельзя наследоваться
 public sealed class CatalogDataSeeder
 {
+    
+    // Список начальных терминов словаря, которые нужно добавить в БД, для распознования запросов пользователей, например, "ИЭК" -> "IEK"
+    private static readonly CatalogDictionaryTermSeed[] DictionaryTerms =
+    [
+        new("ИЭК", CatalogDictionaryTermKind.Manufacturer, null, "IEK", 100),
+        new("ИЕК", CatalogDictionaryTermKind.Manufacturer, null, "IEK", 100),
+        new("IEK", CatalogDictionaryTermKind.Manufacturer, null, "IEK", 100),
+
+        new("ЕКФ", CatalogDictionaryTermKind.Manufacturer, null, "EKF", 100),
+        new("EKF", CatalogDictionaryTermKind.Manufacturer, null, "EKF", 100),
+
+        new("ЧИНТ", CatalogDictionaryTermKind.Manufacturer, null, "CHINT", 100),
+        new("CHINT", CatalogDictionaryTermKind.Manufacturer, null, "CHINT", 100),
+
+        new("АВТОМАТ", CatalogDictionaryTermKind.ProductType, null, "MODULAR_CIRCUIT_BREAKER", 50),
+        new("АВТОМАТИЧЕСКИЙ ВЫКЛЮЧАТЕЛЬ", CatalogDictionaryTermKind.ProductType, null, "MODULAR_CIRCUIT_BREAKER", 100),
+
+        new("РУБИЛЬНИК", CatalogDictionaryTermKind.ProductType, null, "SWITCH_DISCONNECTOR", 100),
+        new("ВЫКЛЮЧАТЕЛЬ НАГРУЗКИ", CatalogDictionaryTermKind.ProductType, null, "LOAD_SWITCH", 100),
+
+        new("АРМАТ", CatalogDictionaryTermKind.Characteristic, "PRODUCT_SERIES", "ARMAT", 100),
+        new("ARMAT", CatalogDictionaryTermKind.Characteristic, "PRODUCT_SERIES", "ARMAT", 100),
+
+        new("ПРОКСИМА", CatalogDictionaryTermKind.Characteristic, "PRODUCT_SERIES", "PROXIMA", 100),
+        new("PROXIMA", CatalogDictionaryTermKind.Characteristic, "PRODUCT_SERIES", "PROXIMA", 100),
+
+        new("ОДНОПОЛЮСНЫЙ", CatalogDictionaryTermKind.Characteristic, "POLES", "1", 100),
+        new("ДВУХПОЛЮСНЫЙ", CatalogDictionaryTermKind.Characteristic, "POLES", "2", 100),
+        new("ТРЕХПОЛЮСНЫЙ", CatalogDictionaryTermKind.Characteristic, "POLES", "3", 100),
+        new("ЧЕТЫРЕХПОЛЮСНЫЙ", CatalogDictionaryTermKind.Characteristic, "POLES", "4", 100),
+
+        new("РЕВЕРСИВНЫЙ", CatalogDictionaryTermKind.Characteristic, "REVERSIBLE", "TRUE", 100),
+        new("С ЗАЩИТОЙ", CatalogDictionaryTermKind.Characteristic, "HAS_THERMAL_RELEASE", "TRUE", 100),
+        new("БЕЗ ЗАЩИТЫ", CatalogDictionaryTermKind.Characteristic, "HAS_THERMAL_RELEASE", "FALSE", 100)
+    ];
+
     // Это список типов товаров, которые нужно добавить в БД
     private static readonly CatalogProductTypeSeed[] ProductTypes =
     [
@@ -601,6 +638,10 @@ public sealed class CatalogDataSeeder
 
         await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
+        await SeedDictionaryTermsAsync(cancellationToken).ConfigureAwait(false);
+
+        await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
         CatalogSeedCompleted(_logger, null);
     }
 
@@ -737,5 +778,73 @@ public sealed class CatalogDataSeeder
                 throw new InvalidOperationException(addResult.Error.Message);
             }
         }
+    }
+
+    private async Task SeedDictionaryTermsAsync(CancellationToken cancellationToken)
+    {
+        var existingTerms = await _dbContext.CatalogDictionaryTerms
+            .Select(term => new
+            {
+                term.NormalizedPhrase,
+                term.Kind,
+                term.TargetCode,
+                term.TargetValue
+            })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var existingKeys = existingTerms
+            .Select(term => CreateDictionaryTermKey(
+                term.NormalizedPhrase,
+                term.Kind,
+                term.TargetCode,
+                term.TargetValue))
+            .ToHashSet(StringComparer.Ordinal);
+
+        foreach (var seed in DictionaryTerms)
+        {
+            var termResult = CatalogDictionaryTerm.Create(
+                seed.Phrase,
+                seed.Kind,
+                seed.TargetCode,
+                seed.TargetValue,
+                seed.Priority,
+                CatalogDictionaryTermStatus.Approved,
+                CatalogDictionaryTermSource.Seed);
+
+            if (termResult.IsFailure)
+            {
+                continue;
+            }
+
+            var term = termResult.Value;
+
+            var key = CreateDictionaryTermKey(
+                term.NormalizedPhrase,
+                term.Kind,
+                term.TargetCode,
+                term.TargetValue);
+
+            if (!existingKeys.Add(key))
+            {
+                continue;
+            }
+
+            _dbContext.CatalogDictionaryTerms.Add(term);
+        }
+    }
+
+    private static string CreateDictionaryTermKey(
+        string normalizedPhrase,
+        CatalogDictionaryTermKind kind,
+        string? targetCode,
+        string targetValue)
+    {
+        return string.Join(
+            "|",
+            normalizedPhrase,
+            kind.ToString(),
+            targetCode ?? string.Empty,
+            targetValue);
     }
 }

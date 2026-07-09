@@ -4,6 +4,7 @@ using ElectronicService.Domain.Catalog.Characteristics;
 using ElectronicService.Domain.Catalog.Manufacturers;
 using ElectronicService.Domain.Catalog.Products;
 using ElectronicService.Domain.Catalog.ProductTypes;
+using ElectronicService.Domain.Catalog.Dictionaries;
 
 namespace ElectronicService.Infrastructure.Postgres.Data;
 
@@ -29,6 +30,8 @@ public sealed class ElectronicDbContext : DbContext
     public DbSet<CharacteristicDefinition> CharacteristicDefinitions => Set<CharacteristicDefinition>();
 
     public DbSet<Manufacturer> Manufacturers => Set<Manufacturer>();
+
+    public DbSet<CatalogDictionaryTerm> CatalogDictionaryTerms => Set<CatalogDictionaryTerm>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
