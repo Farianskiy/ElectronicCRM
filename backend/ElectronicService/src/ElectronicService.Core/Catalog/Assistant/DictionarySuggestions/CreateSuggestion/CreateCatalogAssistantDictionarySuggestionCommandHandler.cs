@@ -4,8 +4,7 @@ using ElectronicService.Core.Users;
 using ElectronicService.Domain.Catalog.Dictionaries;
 using ElectronicService.Domain.Catalog.Errors;
 using ElectronicService.Domain.Common;
-
-// using ElectronicService.Core.Users; // поставь namespace своего IUserRepository
+using ElectronicService.Core.Abstractions;
 
 namespace ElectronicService.Core.Catalog.Assistant.DictionarySuggestions.CreateSuggestion;
 
@@ -13,13 +12,16 @@ public sealed class CreateCatalogAssistantDictionarySuggestionCommandHandler
 {
     private readonly ICatalogAssistantDictionarySuggestionRepository _suggestionRepository;
     private readonly IUserRepository _userRepository;
+    private readonly ICurrentUserProvider _currentUserProvider;
 
     public CreateCatalogAssistantDictionarySuggestionCommandHandler(
         ICatalogAssistantDictionarySuggestionRepository suggestionRepository,
-        IUserRepository userRepository)
+        IUserRepository userRepository,
+        ICurrentUserProvider currentUserProvider)
     {
         _suggestionRepository = suggestionRepository;
         _userRepository = userRepository;
+        _currentUserProvider = currentUserProvider;
     }
 
     public async Task<Result<CreateCatalogAssistantDictionarySuggestionResult, DomainError>> Handle(
@@ -28,8 +30,15 @@ public sealed class CreateCatalogAssistantDictionarySuggestionCommandHandler
     {
         ArgumentNullException.ThrowIfNull(command);
 
+        var currentUserId = _currentUserProvider.UserId;
+
+        if (!currentUserId.HasValue)
+        {
+            return CatalogErrors.CurrentUserIsRequired();
+        }
+
         var user = await _userRepository
-            .GetByIdAsync(command.CreatedByUserId, cancellationToken)
+            .GetByIdAsync(currentUserId.Value, cancellationToken)
             .ConfigureAwait(false);
 
         if (user is null || !user.CanUseAssistant())
@@ -52,7 +61,7 @@ public sealed class CreateCatalogAssistantDictionarySuggestionCommandHandler
             command.SuggestedTargetCode,
             command.SuggestedTargetValue,
             command.Confidence,
-            command.CreatedByUserId);
+            currentUserId.Value);
 
         if (suggestionResult.IsFailure)
         {

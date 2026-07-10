@@ -6,5 +6,4 @@ public sealed record CreateCatalogAssistantDictionarySuggestionCommand(
     string SuggestedKind,
     string? SuggestedTargetCode,
     string SuggestedTargetValue,
-    decimal Confidence,
-    Guid CreatedByUserId);
+    decimal Confidence);

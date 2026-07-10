@@ -28,7 +28,6 @@ public sealed class CatalogAssistantDictionarySuggestionApprovalController : Con
 
         var command = new ApproveCatalogAssistantDictionarySuggestionCommand(
             id,
-            request.ReviewedByUserId,
             request.ReviewComment);
 
         var result = await _handler

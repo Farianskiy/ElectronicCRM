@@ -1,3 +1,4 @@
+using ElectronicService.Core.Abstractions;
 using ElectronicService.Core.Abstractions.Data;
 using ElectronicService.Core.Catalog.Assistant.Abstractions;
 using ElectronicService.Core.Catalog.Assistant.DictionarySuggestions.Abstractions;
@@ -59,7 +60,8 @@ public static class DependencyInjectionExtensions
         services.AddScoped<ICatalogDictionaryRepository, CatalogDictionaryRepository>();
         services.AddScoped<ICatalogAssistantUnknownTermResolver, CatalogAssistantUnknownTermResolver>();
         services.AddScoped<ICatalogAssistantDictionarySuggestionRepository,CatalogAssistantDictionarySuggestionRepository>();
-        services.AddScoped<ICatalogAssistantDictionarySuggestionReader,CatalogAssistantDictionarySuggestionReader>();
+        services.AddScoped<ICatalogAssistantDictionarySuggestionReader, CatalogAssistantDictionarySuggestionReader>();
+        services.AddScoped<IPasswordHasher, PasswordHasher>();
 
         return services;
     }

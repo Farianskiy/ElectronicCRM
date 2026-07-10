@@ -10,6 +10,7 @@
     <PackageVersion Include="ClosedXML" Version="0.105.0" />
     <PackageVersion Include="CSharpFunctionalExtensions" Version="3.6.0" />
     <!-- База данных -->
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.9" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.7" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.7" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
@@ -30,5 +31,6 @@
     <PackageVersion Include="Meziantou.Analyzer" Version="3.0.44" />
     <PackageVersion Include="AsyncFixer" Version="2.1.0" />
     <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.24.0.138807" />
+    <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.19.1" />
   </ItemGroup>
 </Project>

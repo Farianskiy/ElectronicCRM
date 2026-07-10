@@ -13,6 +13,4 @@ public sealed class CreateCatalogAssistantDictionarySuggestionRequest
     public string SuggestedTargetValue { get; init; } = string.Empty;
 
     public decimal Confidence { get; init; }
-
-    public Guid CreatedByUserId { get; init; }
 }

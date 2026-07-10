@@ -25,6 +25,7 @@ using ElectronicService.Core.Catalog.Assistant.DictionarySuggestions.CreateSugge
 using ElectronicService.Core.Catalog.Assistant.DictionarySuggestions.GetSuggestions;
 using ElectronicService.Core.Catalog.Assistant.DictionarySuggestions.ApproveSuggestion;
 using ElectronicService.Core.Catalog.Assistant.DictionarySuggestions.RejectSuggestion;
+using ElectronicService.Core.Auth.Login;
 
 namespace ElectronicService.Core;
 
@@ -57,6 +58,7 @@ public static class DependencyInjectionExtensions
         services.AddScoped<GetCatalogAssistantDictionarySuggestionsQueryHandler>();
         services.AddScoped<ApproveCatalogAssistantDictionarySuggestionCommandHandler>();
         services.AddScoped<RejectCatalogAssistantDictionarySuggestionCommandHandler>();
+        services.AddScoped<LoginCommandHandler>();
 
         return services;
     }

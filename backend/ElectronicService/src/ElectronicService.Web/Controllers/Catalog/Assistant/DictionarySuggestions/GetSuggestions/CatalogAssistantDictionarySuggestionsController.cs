@@ -20,14 +20,12 @@ public sealed class CatalogAssistantDictionarySuggestionsController : Controller
     [ProducesResponseType(typeof(CatalogAssistantDictionarySuggestionsResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<CatalogAssistantDictionarySuggestionsResponse>> GetSuggestions(
-        [FromQuery] Guid technicalUserId,
         [FromQuery] string? status,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
         CancellationToken cancellationToken = default)
     {
         var query = new GetCatalogAssistantDictionarySuggestionsQuery(
-            technicalUserId,
             status,
             page,
             pageSize);

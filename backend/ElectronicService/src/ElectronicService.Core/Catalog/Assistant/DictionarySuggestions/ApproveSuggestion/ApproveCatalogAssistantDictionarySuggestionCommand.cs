@@ -2,5 +2,4 @@ namespace ElectronicService.Core.Catalog.Assistant.DictionarySuggestions.Approve
 
 public sealed record ApproveCatalogAssistantDictionarySuggestionCommand(
     Guid SuggestionId,
-    Guid ReviewedByUserId,
     string? ReviewComment);

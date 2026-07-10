@@ -141,4 +141,11 @@ public static class CatalogErrors
             "catalog.dictionary_suggestion.user_cannot_review",
             "Пользователь не может проверять предложения словаря.");
     }
+
+    public static DomainError CurrentUserIsRequired()
+    {
+        return new DomainError(
+            "catalog.current_user.required",
+            "Не удалось определить текущего пользователя.");
+    }
 }

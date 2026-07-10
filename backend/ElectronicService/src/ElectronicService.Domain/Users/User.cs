@@ -13,12 +13,14 @@ public sealed class User : AggregateRoot
         Guid id,
         UserDisplayName displayName,
         Email? email,
-        UserType type)
+        UserType type,
+        string? passwordHash)
         : base(id)
     {
         DisplayName = displayName;
         Email = email;
         Type = type;
+        PasswordHash = passwordHash;
         Status = UserStatus.Active;
         CreatedAtUtc = DateTime.UtcNow;
     }
@@ -46,6 +48,10 @@ public sealed class User : AggregateRoot
     public bool IsActive => Status == UserStatus.Active;
 
     public bool IsBlocked => Status == UserStatus.Blocked;
+
+    public string? PasswordHash { get; private set; }
+
+    public bool HasPassword => !string.IsNullOrWhiteSpace(PasswordHash);
 
     public bool CanUseAssistant()
     {
@@ -84,7 +90,8 @@ public sealed class User : AggregateRoot
 
     public static Result<User, DomainError> CreateRegular(
         string displayName,
-        string? email)
+        string? email,
+        string? passwordHash = null)
     {
         var displayNameResult = UserDisplayName.Create(displayName);
 
@@ -111,12 +118,14 @@ public sealed class User : AggregateRoot
             Guid.CreateVersion7(),
             displayNameResult.Value,
             userEmail,
-            UserType.Regular);
+            UserType.Regular,
+            NormalizePasswordHash(passwordHash));
     }
 
     public static Result<User, DomainError> CreateTechnical(
         string displayName,
-        string email)
+        string email,
+        string? passwordHash = null)
     {
         var displayNameResult = UserDisplayName.Create(displayName);
 
@@ -136,7 +145,8 @@ public sealed class User : AggregateRoot
             Guid.CreateVersion7(),
             displayNameResult.Value,
             emailResult.Value,
-            UserType.Technical);
+            UserType.Technical,
+            NormalizePasswordHash(passwordHash));
     }
 
     public UnitResult<DomainError> ChangeDisplayName(string displayName)
@@ -247,5 +257,33 @@ public sealed class User : AggregateRoot
         UpdatedAtUtc = DateTime.UtcNow;
 
         return UnitResult.Success<DomainError>();
+    }
+
+    public UnitResult<DomainError> ChangePasswordHash(string passwordHash)
+    {
+        if (IsBlocked)
+        {
+            return UnitResult.Failure(UserErrors.BlockedUserCannotBeChanged());
+        }
+
+        if (string.IsNullOrWhiteSpace(passwordHash))
+        {
+            return UnitResult.Failure(GeneralErrors.ValueIsInvalid(nameof(passwordHash)));
+        }
+
+        PasswordHash = passwordHash.Trim();
+        UpdatedAtUtc = DateTime.UtcNow;
+
+        return UnitResult.Success<DomainError>();
+    }
+
+    private static string? NormalizePasswordHash(string? passwordHash)
+    {
+        if (string.IsNullOrWhiteSpace(passwordHash))
+        {
+            return null;
+        }
+
+        return passwordHash.Trim();
     }
 }

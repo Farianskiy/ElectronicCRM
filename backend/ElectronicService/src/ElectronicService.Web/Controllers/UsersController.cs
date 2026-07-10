@@ -23,7 +23,8 @@ public sealed class UsersController : ControllerBase
     {
         var command = new CreateRegularUserCommand(
             request.DisplayName,
-            request.Email);
+            request.Email,
+            request.Password);
 
         var result = await handler.Handle(command, cancellationToken);
 
@@ -46,7 +47,8 @@ public sealed class UsersController : ControllerBase
     {
         var command = new CreateTechnicalUserCommand(
             request.DisplayName,
-            request.Email);
+            request.Email,
+            request.Password);
 
         var result = await handler.Handle(command, cancellationToken);
 

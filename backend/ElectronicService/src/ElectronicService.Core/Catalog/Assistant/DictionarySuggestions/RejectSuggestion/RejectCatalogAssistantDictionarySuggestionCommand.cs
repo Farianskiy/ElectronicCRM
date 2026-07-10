@@ -2,5 +2,4 @@ namespace ElectronicService.Core.Catalog.Assistant.DictionarySuggestions.RejectS
 
 public sealed record RejectCatalogAssistantDictionarySuggestionCommand(
     Guid SuggestionId,
-    Guid ReviewedByUserId,
     string? ReviewComment);

@@ -3,6 +3,7 @@ using ElectronicService.Core.Catalog.Assistant.DictionarySuggestions.Abstraction
 using ElectronicService.Domain.Catalog.Errors;
 using ElectronicService.Domain.Common;
 using ElectronicService.Core.Users;
+using ElectronicService.Core.Abstractions;
 
 namespace ElectronicService.Core.Catalog.Assistant.DictionarySuggestions.RejectSuggestion;
 
@@ -10,13 +11,16 @@ public sealed class RejectCatalogAssistantDictionarySuggestionCommandHandler
 {
     private readonly ICatalogAssistantDictionarySuggestionRepository _suggestionRepository;
     private readonly IUserRepository _userRepository;
+    private readonly ICurrentUserProvider _currentUserProvider;
 
     public RejectCatalogAssistantDictionarySuggestionCommandHandler(
         ICatalogAssistantDictionarySuggestionRepository suggestionRepository,
-        IUserRepository userRepository)
+        IUserRepository userRepository,
+        ICurrentUserProvider currentUserProvider)
     {
         _suggestionRepository = suggestionRepository;
         _userRepository = userRepository;
+        _currentUserProvider = currentUserProvider;
     }
 
     public async Task<UnitResult<DomainError>> Handle(
@@ -25,13 +29,22 @@ public sealed class RejectCatalogAssistantDictionarySuggestionCommandHandler
     {
         ArgumentNullException.ThrowIfNull(command);
 
+        var currentUserId = _currentUserProvider.UserId;
+
+        if (!currentUserId.HasValue)
+        {
+            return UnitResult.Failure<DomainError>(
+                CatalogErrors.CurrentUserIsRequired());
+        }
+
         var user = await _userRepository
-            .GetByIdAsync(command.ReviewedByUserId, cancellationToken)
+            .GetByIdAsync(currentUserId.Value, cancellationToken)
             .ConfigureAwait(false);
 
         if (user is null || !user.CanManageProductSynonyms())
         {
-            return CatalogErrors.UserCannotReviewDictionarySuggestion();
+            return UnitResult.Failure<DomainError>(
+                CatalogErrors.UserCannotReviewDictionarySuggestion());
         }
 
         var suggestion = await _suggestionRepository
@@ -44,7 +57,7 @@ public sealed class RejectCatalogAssistantDictionarySuggestionCommandHandler
         }
 
         var rejectResult = suggestion.Reject(
-            command.ReviewedByUserId,
+            currentUserId.Value,
             command.ReviewComment);
 
         if (rejectResult.IsFailure)

@@ -28,7 +28,6 @@ public sealed class CatalogAssistantDictionarySuggestionRejectionController : Co
 
         var command = new RejectCatalogAssistantDictionarySuggestionCommand(
             id,
-            request.ReviewedByUserId,
             request.ReviewComment);
 
         var result = await _handler

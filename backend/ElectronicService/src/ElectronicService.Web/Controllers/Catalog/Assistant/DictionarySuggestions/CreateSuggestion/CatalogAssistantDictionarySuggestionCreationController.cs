@@ -31,8 +31,7 @@ public sealed class CatalogAssistantDictionarySuggestionCreationController : Con
             request.SuggestedKind,
             request.SuggestedTargetCode,
             request.SuggestedTargetValue,
-            request.Confidence,
-            request.CreatedByUserId);
+            request.Confidence);
 
         var result = await _handler
             .Handle(command, cancellationToken)

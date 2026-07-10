@@ -5,6 +5,7 @@ using ElectronicService.Domain.Catalog.Dictionaries;
 using ElectronicService.Domain.Catalog.Errors;
 using ElectronicService.Domain.Common;
 using ElectronicService.Core.Users;
+using ElectronicService.Core.Abstractions;
 
 namespace ElectronicService.Core.Catalog.Assistant.DictionarySuggestions.ApproveSuggestion;
 
@@ -13,15 +14,18 @@ public sealed class ApproveCatalogAssistantDictionarySuggestionCommandHandler
     private readonly ICatalogAssistantDictionarySuggestionRepository _suggestionRepository;
     private readonly ICatalogDictionaryRepository _dictionaryRepository;
     private readonly IUserRepository _userRepository;
+    private readonly ICurrentUserProvider _currentUserProvider;
 
     public ApproveCatalogAssistantDictionarySuggestionCommandHandler(
         ICatalogAssistantDictionarySuggestionRepository suggestionRepository,
         ICatalogDictionaryRepository dictionaryRepository,
-        IUserRepository userRepository)
+        IUserRepository userRepository,
+        ICurrentUserProvider currentUserProvider)
     {
         _suggestionRepository = suggestionRepository;
         _dictionaryRepository = dictionaryRepository;
         _userRepository = userRepository;
+        _currentUserProvider = currentUserProvider;
     }
 
     public async Task<UnitResult<DomainError>> Handle(
@@ -30,13 +34,22 @@ public sealed class ApproveCatalogAssistantDictionarySuggestionCommandHandler
     {
         ArgumentNullException.ThrowIfNull(command);
 
+        var currentUserId = _currentUserProvider.UserId;
+
+        if (!currentUserId.HasValue)
+        {
+            return UnitResult.Failure<DomainError>(
+                CatalogErrors.CurrentUserIsRequired());
+        }
+
         var user = await _userRepository
-            .GetByIdAsync(command.ReviewedByUserId, cancellationToken)
+            .GetByIdAsync(currentUserId.Value, cancellationToken)
             .ConfigureAwait(false);
 
         if (user is null || !user.CanManageProductSynonyms())
         {
-            return CatalogErrors.UserCannotReviewDictionarySuggestion();
+            return UnitResult.Failure<DomainError>(
+                CatalogErrors.UserCannotReviewDictionarySuggestion());
         }
 
         var suggestion = await _suggestionRepository
@@ -74,7 +87,7 @@ public sealed class ApproveCatalogAssistantDictionarySuggestionCommandHandler
         }
 
         var approveResult = suggestion.Approve(
-            command.ReviewedByUserId,
+            currentUserId.Value,
             command.ReviewComment);
 
         if (approveResult.IsFailure)

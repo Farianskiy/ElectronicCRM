@@ -67,5 +67,9 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.HasIndex(user => user.Email)
             .IsUnique();
+
+        builder.Property(user => user.PasswordHash)
+            .HasColumnName("password_hash")
+            .HasMaxLength(500);
     }
 }

@@ -1,4 +1,5 @@
 using CSharpFunctionalExtensions;
+using ElectronicService.Core.Abstractions;
 using ElectronicService.Core.Catalog.Assistant.DictionarySuggestions.Abstractions;
 using ElectronicService.Core.Users;
 using ElectronicService.Domain.Catalog.Dictionaries;
@@ -13,13 +14,16 @@ public sealed class GetCatalogAssistantDictionarySuggestionsQueryHandler
 {
     private readonly ICatalogAssistantDictionarySuggestionReader _suggestionReader;
     private readonly IUserRepository _userRepository;
+    private readonly ICurrentUserProvider _currentUserProvider;
 
     public GetCatalogAssistantDictionarySuggestionsQueryHandler(
         ICatalogAssistantDictionarySuggestionReader suggestionReader,
-        IUserRepository userRepository)
+        IUserRepository userRepository,
+        ICurrentUserProvider currentUserProvider)
     {
         _suggestionReader = suggestionReader;
         _userRepository = userRepository;
+        _currentUserProvider = currentUserProvider;
     }
 
     public async Task<Result<CatalogAssistantDictionarySuggestionsPageResult, DomainError>> Handle(
@@ -28,8 +32,15 @@ public sealed class GetCatalogAssistantDictionarySuggestionsQueryHandler
     {
         ArgumentNullException.ThrowIfNull(query);
 
+        var currentUserId = _currentUserProvider.UserId;
+
+        if (!currentUserId.HasValue)
+        {
+            return CatalogErrors.CurrentUserIsRequired();
+        }
+
         var user = await _userRepository
-            .GetByIdAsync(query.TechnicalUserId, cancellationToken)
+            .GetByIdAsync(currentUserId.Value, cancellationToken)
             .ConfigureAwait(false);
 
         if (user is null || !user.CanManageProductSynonyms())

@@ -1,4 +1,5 @@
 using CSharpFunctionalExtensions;
+using ElectronicService.Core.Abstractions;
 using ElectronicService.Core.Abstractions.Data;
 using ElectronicService.Domain.Common;
 using ElectronicService.Domain.Users;
@@ -10,22 +11,28 @@ public sealed class CreateRegularUserCommandHandler
 {
     private readonly IUserRepository _userRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IPasswordHasher _passwordHasher;
 
     public CreateRegularUserCommandHandler(
         IUserRepository userRepository,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IPasswordHasher passwordHasher)
     {
         _userRepository = userRepository;
         _unitOfWork = unitOfWork;
+        _passwordHasher = passwordHasher;
     }
 
     public async Task<Result<Guid, DomainError>> Handle(
         CreateRegularUserCommand command,
         CancellationToken cancellationToken = default)
     {
+        var passwordHash = _passwordHasher.Hash(command.Password);
+
         var userResult = User.CreateRegular(
             command.DisplayName,
-            command.Email);
+            command.Email,
+            passwordHash);
 
         if (userResult.IsFailure)
         {
