@@ -33,6 +33,8 @@ public sealed class ElectronicDbContext : DbContext
 
     public DbSet<CatalogDictionaryTerm> CatalogDictionaryTerms => Set<CatalogDictionaryTerm>();
 
+    public DbSet<CatalogAssistantDictionarySuggestion> CatalogAssistantDictionarySuggestions => Set<CatalogAssistantDictionarySuggestion>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(

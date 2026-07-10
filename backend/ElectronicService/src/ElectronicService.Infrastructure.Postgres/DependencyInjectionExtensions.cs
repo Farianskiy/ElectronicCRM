@@ -1,5 +1,6 @@
 using ElectronicService.Core.Abstractions.Data;
 using ElectronicService.Core.Catalog.Assistant.Abstractions;
+using ElectronicService.Core.Catalog.Assistant.DictionarySuggestions.Abstractions;
 using ElectronicService.Core.Catalog.Dictionaries.Abstractions;
 using ElectronicService.Core.Catalog.Import.ImportProductsFromExcel;
 using ElectronicService.Core.Catalog.Metadata.Abstractions;
@@ -57,6 +58,8 @@ public static class DependencyInjectionExtensions
         services.AddScoped<ICatalogDictionaryReader, CatalogDictionaryReader>();
         services.AddScoped<ICatalogDictionaryRepository, CatalogDictionaryRepository>();
         services.AddScoped<ICatalogAssistantUnknownTermResolver, CatalogAssistantUnknownTermResolver>();
+        services.AddScoped<ICatalogAssistantDictionarySuggestionRepository,CatalogAssistantDictionarySuggestionRepository>();
+        services.AddScoped<ICatalogAssistantDictionarySuggestionReader,CatalogAssistantDictionarySuggestionReader>();
 
         return services;
     }

@@ -21,6 +21,10 @@ using ElectronicService.Core.Catalog.Dictionaries.AddTerm;
 using ElectronicService.Core.Catalog.Assistant.AskCatalogAssistant;
 using ElectronicService.Core.Catalog.Assistant.Parsing;
 using ElectronicService.Core.Catalog.Assistant.Abstractions;
+using ElectronicService.Core.Catalog.Assistant.DictionarySuggestions.CreateSuggestion;
+using ElectronicService.Core.Catalog.Assistant.DictionarySuggestions.GetSuggestions;
+using ElectronicService.Core.Catalog.Assistant.DictionarySuggestions.ApproveSuggestion;
+using ElectronicService.Core.Catalog.Assistant.DictionarySuggestions.RejectSuggestion;
 
 namespace ElectronicService.Core;
 
@@ -49,6 +53,10 @@ public static class DependencyInjectionExtensions
         services.AddScoped<AddCatalogDictionaryTermCommandHandler>();
         services.AddScoped<AskCatalogAssistantCommandHandler>();
         services.AddScoped<ICatalogAssistantMessageParser, RuleBasedCatalogAssistantMessageParser>();
+        services.AddScoped<CreateCatalogAssistantDictionarySuggestionCommandHandler>();
+        services.AddScoped<GetCatalogAssistantDictionarySuggestionsQueryHandler>();
+        services.AddScoped<ApproveCatalogAssistantDictionarySuggestionCommandHandler>();
+        services.AddScoped<RejectCatalogAssistantDictionarySuggestionCommandHandler>();
 
         return services;
     }

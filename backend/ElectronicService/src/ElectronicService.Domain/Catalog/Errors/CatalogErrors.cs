@@ -99,4 +99,46 @@ public static class CatalogErrors
             "catalog.dictionary_term.already_exists",
             $"Термин словаря '{phrase}' уже существует.");
     }
+
+    public static DomainError DictionarySuggestionNotFound(string suggestionId)
+    {
+        return new DomainError(
+            "catalog.dictionary_suggestion.not_found",
+            $"Предложение словаря '{suggestionId}' не найдено.");
+    }
+
+    public static DomainError OnlyTechnicalUserCanReviewDictionarySuggestions()
+    {
+        return new DomainError(
+            "catalog.dictionary_suggestion.technical_user_required",
+            "Только технический пользователь может проверять предложения словаря.");
+    }
+
+    public static DomainError OnlyTechnicalUserCanManageDictionaryTerms()
+    {
+        return new DomainError(
+            "catalog.dictionary_term.technical_user_required",
+            "Только технический пользователь может управлять словарём каталога.");
+    }
+
+    public static DomainError DictionarySuggestionAlreadyExists(string unknownPhrase)
+    {
+        return new DomainError(
+            "catalog.dictionary_suggestion.already_exists",
+            $"Предложение для слова '{unknownPhrase}' уже существует.");
+    }
+
+    public static DomainError UserCannotCreateDictionarySuggestion()
+    {
+        return new DomainError(
+            "catalog.dictionary_suggestion.user_cannot_create",
+            "Пользователь не может создавать предложения словаря.");
+    }
+
+    public static DomainError UserCannotReviewDictionarySuggestion()
+    {
+        return new DomainError(
+            "catalog.dictionary_suggestion.user_cannot_review",
+            "Пользователь не может проверять предложения словаря.");
+    }
 }

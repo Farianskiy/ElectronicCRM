@@ -4,7 +4,6 @@ using ElectronicService.Domain.Common;
 using ElectronicService.Domain.Users.Enums;
 using ElectronicService.Domain.Users.Errors;
 using ElectronicService.Domain.Users.ValueObjects;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace ElectronicService.Domain.Users;
 
