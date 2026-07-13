@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useEffect } from "react";
-import { useAuthSession } from "@/features/auth/model/useAuthSession";
+import { useAuthSession } from "../model/useAuthSession";
 
 interface RequireAuthProps {
   children: ReactNode;

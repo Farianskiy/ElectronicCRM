@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { useAuthSession } from "@/features/auth/model/useAuthSession";
 import { isTechnicalUser } from "@/shared/api/authToken";
+import { useAuthSession } from "../model/useAuthSession";
 
 interface RequireTechnicalUserProps {
   children: ReactNode;
@@ -14,7 +14,7 @@ export function RequireTechnicalUser({ children }: RequireTechnicalUserProps) {
 
   if (!isTechnicalUser(session)) {
     return (
-      <section className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-6 text-amber-100">
+      <section className="rounded-3xl border border-amber-500/30 bg-amber-500/10 p-6 text-amber-100">
         <h2 className="text-xl font-semibold">Недостаточно прав</h2>
 
         <p className="mt-2 text-sm text-amber-200">

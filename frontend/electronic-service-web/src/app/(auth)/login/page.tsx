@@ -1,12 +1,12 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
 import { useState } from "react";
 import { login } from "@/features/auth/api/login";
 import { setAuthSession } from "@/shared/api/authToken";
-import Link from "next/link";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -38,17 +38,21 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
-      <section className="w-full max-w-md rounded-2xl bg-white p-8 shadow-lg">
-        <h1 className="mb-6 text-2xl font-bold text-slate-900">
-          Вход в Electronic Service
+    <main className="flex min-h-screen items-center justify-center bg-[#0f1115] px-4 text-slate-100">
+      <section className="w-full max-w-md rounded-3xl border border-white/10 bg-white/[0.04] p-8 shadow-2xl">
+        <h1 className="text-2xl font-bold text-white">
+          Вход в Electronic CRM
         </h1>
 
-        <form onSubmit={handleSubmit} className="grid gap-4">
+        <p className="mt-2 text-sm text-slate-400">
+          Войди, чтобы работать с каталогом и assistant-ом.
+        </p>
+
+        <form onSubmit={handleSubmit} className="mt-6 grid gap-4">
           <label className="grid gap-2">
-            <span className="text-sm font-medium text-slate-700">Email</span>
+            <span className="text-sm font-medium text-slate-300">Email</span>
             <input
-              className="rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none focus:border-blue-500"
+              className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-slate-100 outline-none placeholder:text-slate-600 focus:border-teal-400"
               type="email"
               value={email}
               autoComplete="email"
@@ -57,9 +61,9 @@ export default function LoginPage() {
           </label>
 
           <label className="grid gap-2">
-            <span className="text-sm font-medium text-slate-700">Пароль</span>
+            <span className="text-sm font-medium text-slate-300">Пароль</span>
             <input
-              className="rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none focus:border-blue-500"
+              className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-slate-100 outline-none placeholder:text-slate-600 focus:border-teal-400"
               type="password"
               value={password}
               autoComplete="current-password"
@@ -68,24 +72,25 @@ export default function LoginPage() {
           </label>
 
           {loginMutation.isError && (
-            <p className="text-sm text-red-600">
+            <p className="rounded-2xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
               Не удалось войти. Проверь email и пароль.
             </p>
           )}
 
           <button
-            className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white disabled:opacity-60"
+            className="rounded-2xl bg-teal-500 px-4 py-3 font-medium text-white disabled:opacity-60"
             type="submit"
             disabled={loginMutation.isPending}
           >
             {loginMutation.isPending ? "Входим..." : "Войти"}
           </button>
         </form>
-        <p className="mt-4 text-sm text-slate-600">
-        Нет аккаунта?{" "}
-        <Link className="font-medium text-blue-600" href="/register">
+
+        <p className="mt-5 text-sm text-slate-400">
+          Нет аккаунта?{" "}
+          <Link href="/register" className="font-medium text-teal-300">
             Зарегистрироваться
-        </Link>
+          </Link>
         </p>
       </section>
     </main>

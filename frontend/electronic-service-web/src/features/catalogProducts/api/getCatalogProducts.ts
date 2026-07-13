@@ -9,11 +9,18 @@ export async function getCatalogProducts(
 ): Promise<CatalogProductsResponse> {
   const queryParams = new URLSearchParams();
 
-  if (params.searchText.trim().length > 0) {
-    queryParams.set("searchText", params.searchText.trim());
+  if (params.search.trim().length > 0) {
+    queryParams.set("search", params.search.trim());
   }
 
-  queryParams.set("onlyInStock", params.onlyInStock.toString());
+  if (params.productTypeCode && params.productTypeCode.trim().length > 0) {
+    queryParams.set("productTypeCode", params.productTypeCode.trim());
+  }
+
+  if (params.manufacturer && params.manufacturer.trim().length > 0) {
+    queryParams.set("manufacturer", params.manufacturer.trim());
+  }
+
   queryParams.set("page", params.page.toString());
   queryParams.set("pageSize", params.pageSize.toString());
 

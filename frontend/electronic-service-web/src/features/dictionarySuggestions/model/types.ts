@@ -8,17 +8,17 @@ export interface AssistantDictionarySuggestion {
   id: string;
   originalMessage: string;
   unknownPhrase: string;
-  normalizedUnknownPhrase?: string | null;
+  normalizedUnknownPhrase: string;
   suggestedKind: string;
-  suggestedTargetCode?: string | null;
+  suggestedTargetCode: string | null;
   suggestedTargetValue: string;
   confidence: number;
   status: DictionarySuggestionStatus | string;
   createdByUserId: string;
   createdAtUtc: string;
-  reviewedByUserId?: string | null;
-  reviewedAtUtc?: string | null;
-  reviewComment?: string | null;
+  reviewedByUserId: string | null;
+  reviewedAtUtc: string | null;
+  reviewComment: string | null;
 }
 
 export interface AssistantDictionarySuggestionsResponse {

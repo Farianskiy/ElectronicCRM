@@ -63,15 +63,15 @@ export function parseAuthSession(rawSession: string | null): AuthSession | null 
   }
 }
 
+export function getAuthSession(): AuthSession | null {
+  return parseAuthSession(getAuthSessionSnapshot());
+}
+
 export function setAuthSession(session: AuthSession): void {
   localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
   localStorage.setItem(ACCESS_TOKEN_KEY, session.accessToken);
 
   notifyAuthSessionChanged();
-}
-
-export function getAuthSession(): AuthSession | null {
-  return parseAuthSession(getAuthSessionSnapshot());
 }
 
 export function clearAuthSession(): void {

@@ -8,18 +8,7 @@ export interface AskCatalogAssistantRequest {
 
 export interface CatalogAssistantCharacteristic {
   code: string;
-  name?: string | null;
-  value?: string | null;
-  unit?: string | null;
-}
-
-export interface CatalogAssistantParsedRequest {
-  intent?: string;
-  productTypeCode?: string | null;
-  manufacturer?: string | null;
-  textQuery?: string | null;
-  characteristics?: CatalogAssistantCharacteristic[];
-  clarification?: CatalogAssistantClarification | null;
+  value: string;
 }
 
 export interface CatalogAssistantClarification {
@@ -31,34 +20,39 @@ export interface CatalogAssistantClarification {
   question: string;
 }
 
+export interface CatalogAssistantParsedRequest {
+  intent: string;
+  search: string | null;
+  productTypeCode: string | null;
+  manufacturer: string | null;
+  characteristics: CatalogAssistantCharacteristic[];
+  clarification: CatalogAssistantClarification | null;
+}
+
 export interface CatalogAssistantProduct {
   id: string;
-  article?: string | null;
+  article: string;
   name: string;
-  productType?: string | null;
-  productTypeName?: string | null;
-  manufacturer?: string | null;
-  manufacturerName?: string | null;
-  price?: number | null;
-  stockQuantity?: number | null;
-  score?: number | null;
-  characteristics?: CatalogAssistantCharacteristic[];
+  productTypeCode: string;
+  productTypeName: string;
+  manufacturerName: string;
+  priceAmount: number;
+  priceCurrency: string;
+  stockQuantity: number;
+}
+
+export interface CatalogAssistantReplacement extends CatalogAssistantProduct {
+  replacementScore: number;
 }
 
 export interface AskCatalogAssistantResponse {
-  answer?: string | null;
+  intent: string;
   needsClarification: boolean;
-  parsedRequest?: CatalogAssistantParsedRequest | null;
-
-  // Оставил оба варианта, чтобы frontend пережил небольшие различия в response.
-  products?: CatalogAssistantProduct[];
-  items?: CatalogAssistantProduct[];
-
-  page?: number;
-  pageSize?: number;
-  totalCount?: number;
-
-  clarification?: CatalogAssistantClarification | null;
+  answer: string;
+  parsedRequest: CatalogAssistantParsedRequest;
+  products: CatalogAssistantProduct[];
+  sourceProduct: CatalogAssistantProduct | null;
+  replacements: CatalogAssistantReplacement[];
 }
 
 export interface CreateDictionarySuggestionRequest {

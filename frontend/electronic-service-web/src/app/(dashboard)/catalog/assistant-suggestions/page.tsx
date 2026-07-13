@@ -3,16 +3,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { useState } from "react";
-import { approveDictionarySuggestion } from "@/features/assistantSuggestions/api/approveDictionarySuggestion";
-import { getDictionarySuggestions } from "@/features/assistantSuggestions/api/getDictionarySuggestions";
-import { rejectDictionarySuggestion } from "@/features/assistantSuggestions/api/rejectDictionarySuggestion";
+import { approveDictionarySuggestion } from "@/features/dictionarySuggestions/api/approveDictionarySuggestion";
+import { getDictionarySuggestions } from "@/features/dictionarySuggestions/api/getDictionarySuggestions";
+import { rejectDictionarySuggestion } from "@/features/dictionarySuggestions/api/rejectDictionarySuggestion";
 import type {
   AssistantDictionarySuggestion,
   DictionarySuggestionStatusFilter,
-} from "@/features/assistantSuggestions/model/types";
-import { RequireAuth } from "@/features/auth/ui/RequireAuth";
+} from "@/features/dictionarySuggestions/model/types";
 import { RequireTechnicalUser } from "@/features/auth/ui/RequireTechnicalUser";
-import { AppShell } from "@/widgets/appShell/AppShell";
+import { formatDate, formatPercent } from "@/shared/lib/formatters";
+import { PageHeader } from "@/shared/ui/PageHeader";
 
 const statusFilters: Array<{
   value: DictionarySuggestionStatusFilter;
@@ -44,21 +44,6 @@ function getErrorMessage(error: unknown): string {
   return "Произошла неизвестная ошибка.";
 }
 
-function formatDate(value?: string | null): string {
-  if (!value) {
-    return "—";
-  }
-
-  return new Intl.DateTimeFormat("ru-RU", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
-
-function formatConfidence(value: number): string {
-  return `${Math.round(value * 100)}%`;
-}
-
 function getStatusBadgeClass(status: string): string {
   if (status === "Approved") {
     return "bg-green-500/15 text-green-300 border-green-500/30";
@@ -73,16 +58,9 @@ function getStatusBadgeClass(status: string): string {
 
 export default function CatalogAssistantSuggestionsPage() {
   return (
-    <RequireAuth>
-      <AppShell
-        title="Предложения словаря"
-        description="Модерация неизвестных слов, найденных assistant-ом."
-      >
-        <RequireTechnicalUser>
-          <DictionarySuggestionsContent />
-        </RequireTechnicalUser>
-      </AppShell>
-    </RequireAuth>
+    <RequireTechnicalUser>
+      <DictionarySuggestionsContent />
+    </RequireTechnicalUser>
   );
 }
 
@@ -98,7 +76,7 @@ function DictionarySuggestionsContent() {
   );
 
   const suggestionsQuery = useQuery({
-    queryKey: ["assistant-dictionary-suggestions", status, page, pageSize],
+    queryKey: ["dictionary-suggestions", status, page, pageSize],
     queryFn: () =>
       getDictionarySuggestions({
         status,
@@ -111,7 +89,7 @@ function DictionarySuggestionsContent() {
     mutationFn: approveDictionarySuggestion,
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: ["assistant-dictionary-suggestions"],
+        queryKey: ["dictionary-suggestions"],
       });
     },
   });
@@ -120,7 +98,7 @@ function DictionarySuggestionsContent() {
     mutationFn: rejectDictionarySuggestion,
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: ["assistant-dictionary-suggestions"],
+        queryKey: ["dictionary-suggestions"],
       });
     },
   });
@@ -128,6 +106,13 @@ function DictionarySuggestionsContent() {
   const suggestions = suggestionsQuery.data?.items ?? [];
   const totalCount = suggestionsQuery.data?.totalCount ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+
+  const reviewIsPending = approveMutation.isPending || rejectMutation.isPending;
+
+  function handleStatusChange(nextStatus: DictionarySuggestionStatusFilter) {
+    setStatus(nextStatus);
+    setPage(1);
+  }
 
   function updateComment(suggestionId: string, value: string) {
     setReviewComments((current) => ({
@@ -154,16 +139,13 @@ function DictionarySuggestionsContent() {
     });
   }
 
-  function handleStatusChange(nextStatus: DictionarySuggestionStatusFilter) {
-    setStatus(nextStatus);
-    setPage(1);
-  }
-
-  const isReviewPending =
-    approveMutation.isPending || rejectMutation.isPending;
-
   return (
     <div className="grid gap-6">
+      <PageHeader
+        title="Предложения словаря"
+        description="Модерация неизвестных слов, найденных assistant-ом."
+      />
+
       <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
         <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
           <div>
@@ -234,7 +216,7 @@ function DictionarySuggestionsContent() {
               }
               onApprove={() => approveSuggestion(suggestion)}
               onReject={() => rejectSuggestion(suggestion)}
-              isReviewPending={isReviewPending}
+              isReviewPending={reviewIsPending}
             />
           ))}
         </section>
@@ -312,7 +294,7 @@ function SuggestionCard({
         <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-right">
           <p className="text-xs text-slate-400">Уверенность</p>
           <p className="mt-1 text-lg font-semibold text-teal-300">
-            {formatConfidence(suggestion.confidence)}
+            {formatPercent(suggestion.confidence)}
           </p>
         </div>
       </div>
@@ -322,7 +304,9 @@ function SuggestionCard({
           <p className="text-sm font-medium text-slate-400">
             Исходный запрос пользователя
           </p>
-          <p className="mt-2 text-slate-100">{suggestion.originalMessage}</p>
+          <p className="mt-2 text-slate-100">
+            {suggestion.originalMessage}
+          </p>
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
@@ -349,6 +333,7 @@ function SuggestionCard({
           <p className="mt-2 text-sm text-slate-300">
             Проверено: {formatDate(suggestion.reviewedAtUtc)}
           </p>
+
           {suggestion.reviewComment && (
             <p className="mt-2 text-slate-100">{suggestion.reviewComment}</p>
           )}
@@ -361,6 +346,7 @@ function SuggestionCard({
             <span className="text-sm font-medium text-slate-300">
               Комментарий проверки
             </span>
+
             <textarea
               value={reviewComment}
               onChange={(event) => onReviewCommentChange(event.target.value)}

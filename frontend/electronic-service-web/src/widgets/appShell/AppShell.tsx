@@ -3,12 +3,10 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { clearAuthSession, isTechnicalUser, } from "@/shared/api/authToken";
 import { useAuthSession } from "@/features/auth/model/useAuthSession";
+import { clearAuthSession, isTechnicalUser } from "@/shared/api/authToken";
 
 interface AppShellProps {
-  title: string;
-  description?: string;
   children: ReactNode;
 }
 
@@ -23,11 +21,11 @@ const technicalNavigation = [
   { href: "/catalog/assistant-suggestions", label: "Предложения словаря" },
 ];
 
-export function AppShell({ title, description, children }: AppShellProps) {
+export function AppShell({ children }: AppShellProps) {
   const router = useRouter();
   const pathname = usePathname();
   const session = useAuthSession();
-    const technical = isTechnicalUser(session);
+  const technical = isTechnicalUser(session);
 
   const navigation = technical
     ? [...regularNavigation, ...technicalNavigation]
@@ -82,41 +80,32 @@ export function AppShell({ title, description, children }: AppShellProps) {
 
       <div className="lg:pl-72">
         <header className="sticky top-0 z-20 border-b border-white/10 bg-[#111318]/90 px-6 py-4 backdrop-blur">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-white">{title}</h1>
-              {description && (
-                <p className="mt-1 text-sm text-slate-400">{description}</p>
-              )}
-            </div>
+          <div className="flex items-center justify-end gap-3">
+            <Link
+              href="/profile"
+              className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 transition hover:bg-white/[0.08]"
+            >
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-teal-500 text-sm font-bold text-white">
+                {session?.displayName?.[0]?.toUpperCase() ?? "U"}
+              </div>
 
-            <div className="flex items-center gap-3">
-              <Link
-                href="/profile"
-                className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 transition hover:bg-white/[0.08]"
-              >
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-teal-500 text-sm font-bold text-white">
-                  {session?.displayName?.[0]?.toUpperCase() ?? "U"}
-                </div>
+              <div className="hidden text-left sm:block">
+                <p className="text-sm font-semibold text-white">
+                  {session?.displayName ?? "Пользователь"}
+                </p>
+                <p className="text-xs text-slate-400">
+                  {session?.userType ?? "Unknown"}
+                </p>
+              </div>
+            </Link>
 
-                <div className="hidden text-left sm:block">
-                  <p className="text-sm font-semibold text-white">
-                    {session?.displayName ?? "Пользователь"}
-                  </p>
-                  <p className="text-xs text-slate-400">
-                    {session?.userType ?? "Unknown"}
-                  </p>
-                </div>
-              </Link>
-
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="rounded-xl bg-white/[0.06] px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/[0.12]"
-              >
-                Выйти
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="rounded-xl bg-white/[0.06] px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/[0.12]"
+            >
+              Выйти
+            </button>
           </div>
         </header>
 

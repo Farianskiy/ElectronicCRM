@@ -3,8 +3,8 @@ import { Providers } from "./providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Electronic Service",
-  description: "CRM frontend for electronic catalog",
+  title: "Electronic CRM",
+  description: "Frontend for Electronic Service catalog",
 };
 
 export default function RootLayout({

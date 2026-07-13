@@ -1,29 +1,21 @@
 export interface CatalogProductCharacteristic {
   code: string;
-  name?: string | null;
-  value?: string | null;
+  name: string;
+  dataType: string;
   unit?: string | null;
-}
-
-export interface CatalogProductAlias {
-  id?: string;
-  value?: string | null;
-  name?: string | null;
-  alias?: string | null;
+  value: string;
 }
 
 export interface CatalogProductListItem {
   id: string;
-  article?: string | null;
+  article: string;
   name: string;
-  productType?: string | null;
-  productTypeCode?: string | null;
-  productTypeName?: string | null;
-  manufacturer?: string | null;
-  manufacturerName?: string | null;
-  price?: number | null;
-  stockQuantity?: number | null;
-  isAvailable?: boolean | null;
+  productTypeCode: string;
+  productTypeName: string;
+  manufacturerName: string;
+  priceAmount: number;
+  priceCurrency: string;
+  stockQuantity: number;
 }
 
 export interface CatalogProductsResponse {
@@ -34,24 +26,37 @@ export interface CatalogProductsResponse {
 }
 
 export interface CatalogProductsSearchParams {
-  searchText: string;
-  onlyInStock: boolean;
+  search: string;
+  productTypeCode?: string | null;
+  manufacturer?: string | null;
+  page: number;
+  pageSize: number;
+}
+
+export interface SearchProductCharacteristicRequest {
+  code: string;
+  value: string;
+}
+
+export interface AdvancedCatalogProductsSearchParams {
+  search?: string | null;
+  productTypeCode?: string | null;
+  manufacturer?: string | null;
+  characteristics?: SearchProductCharacteristicRequest[];
   page: number;
   pageSize: number;
 }
 
 export interface CatalogProductDetails {
   id: string;
-  article?: string | null;
+  article: string;
   name: string;
-  productType?: string | null;
-  productTypeCode?: string | null;
-  productTypeName?: string | null;
-  manufacturer?: string | null;
-  manufacturerName?: string | null;
-  price?: number | null;
-  stockQuantity?: number | null;
-  isAvailable?: boolean | null;
-  characteristics?: CatalogProductCharacteristic[];
-  aliases?: CatalogProductAlias[];
+  productTypeCode: string;
+  productTypeName: string;
+  manufacturerName: string;
+  priceAmount: number;
+  priceCurrency: string;
+  stockQuantity: number;
+  characteristics: CatalogProductCharacteristic[];
+  aliases: string[];
 }
