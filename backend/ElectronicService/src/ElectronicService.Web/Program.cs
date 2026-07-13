@@ -12,25 +12,17 @@ using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Нативный OpenAPI .NET 9/10
 builder.Services.AddOpenApi();
 
-// MVC controllers
 builder.Services.AddControllers();
 
-// Core layer
 builder.Services.AddCore();
 
-// Infrastructure layer
 builder.Services.AddInfrastructurePostgres(builder.Configuration);
 
-// Current user provider.
-// Сейчас он умеет брать UserId из JWT claims,
-// а также из X-User-Id как dev fallback.
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserProvider, HttpContextCurrentUserProvider>();
 
-// JWT options
 builder.Services.Configure<JwtOptions>(
     builder.Configuration.GetSection("Jwt"));
 
@@ -66,6 +58,19 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("Frontend", policy =>
+    {
+        policy
+            .WithOrigins(
+                "http://localhost:3000",
+                "http://192.168.100.14:3000")
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
+
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<ElectronicDbContext>();
 
@@ -81,6 +86,8 @@ using (var scope = app.Services.CreateScope())
 app.MapGet("/", () => "ElectronicService is running!");
 
 app.MapHealthChecks("/health");
+
+app.UseCors("Frontend");
 
 app.UseAuthentication();
 app.UseAuthorization();
