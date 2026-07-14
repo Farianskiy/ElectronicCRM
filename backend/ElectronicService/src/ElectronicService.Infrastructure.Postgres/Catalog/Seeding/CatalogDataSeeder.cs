@@ -17,12 +17,50 @@ public sealed class CatalogDataSeeder
         new("ИЭК", CatalogDictionaryTermKind.Manufacturer, null, "IEK", 100),
         new("ИЕК", CatalogDictionaryTermKind.Manufacturer, null, "IEK", 100),
         new("IEK", CatalogDictionaryTermKind.Manufacturer, null, "IEK", 100),
+        new("IEK ПРОМ СЕРИЯ", CatalogDictionaryTermKind.Manufacturer, null, "IEK", 100),
 
         new("ЕКФ", CatalogDictionaryTermKind.Manufacturer, null, "EKF", 100),
         new("EKF", CatalogDictionaryTermKind.Manufacturer, null, "EKF", 100),
 
         new("ЧИНТ", CatalogDictionaryTermKind.Manufacturer, null, "CHINT", 100),
         new("CHINT", CatalogDictionaryTermKind.Manufacturer, null, "CHINT", 100),
+        new("CHINT ПРОМ СЕРИЯ", CatalogDictionaryTermKind.Manufacturer, null, "CHINT", 100),
+
+        new("ABB", CatalogDictionaryTermKind.Manufacturer, null, "ABB", 100),
+        new("АВВ", CatalogDictionaryTermKind.Manufacturer, null, "ABB", 100),
+        new("АВВ ПРОМ СЕРИЯ", CatalogDictionaryTermKind.Manufacturer, null, "ABB", 100),
+
+        new("DEKraft", CatalogDictionaryTermKind.Manufacturer, null, "DEKraft", 100),
+        new("DEKraft пром серия", CatalogDictionaryTermKind.Manufacturer, null, "DEKraft", 100),
+
+        new("КЭАЗ", CatalogDictionaryTermKind.Manufacturer, null, "КЭАЗ", 100),
+        new("KEAZ", CatalogDictionaryTermKind.Manufacturer, null, "КЭАЗ", 100),
+
+        new("ТДМ", CatalogDictionaryTermKind.Manufacturer, null, "ТДМ", 100),
+        new("TDM", CatalogDictionaryTermKind.Manufacturer, null, "ТДМ", 100),
+
+        new("DKC", CatalogDictionaryTermKind.Manufacturer, null, "DKC", 100),
+        new("ДКС", CatalogDictionaryTermKind.Manufacturer, null, "DKC", 100),
+
+        new("Legrand", CatalogDictionaryTermKind.Manufacturer, null, "Legrand", 100),
+        new("Legrand пром серия", CatalogDictionaryTermKind.Manufacturer, null, "Legrand", 100),
+
+        new("LSIS", CatalogDictionaryTermKind.Manufacturer, null, "LSIS", 100),
+        new("LSIS ПРОМ СЕРИЯ", CatalogDictionaryTermKind.Manufacturer, null, "LSIS", 100),
+
+        new("Schneider Electric", CatalogDictionaryTermKind.Manufacturer, null, "Schneider Electric", 100),
+        new("Шнайдер", CatalogDictionaryTermKind.Manufacturer, null, "Schneider Electric", 100),
+        new("Шнайдер CVS", CatalogDictionaryTermKind.Manufacturer, null, "Schneider Electric", 100),
+        new("Шнайдер EZC", CatalogDictionaryTermKind.Manufacturer, null, "Schneider Electric", 100),
+        new("Шнайдер пром", CatalogDictionaryTermKind.Manufacturer, null, "Schneider Electric", 100),
+
+        new("Systeme El", CatalogDictionaryTermKind.Manufacturer, null, "Systeme El", 100),
+        new("Systeme Electric", CatalogDictionaryTermKind.Manufacturer, null, "Systeme El", 100),
+
+        new("C&S Electric", CatalogDictionaryTermKind.Manufacturer, null, "C&S Electric", 100),
+        new("C&S", CatalogDictionaryTermKind.Manufacturer, null, "C&S Electric", 100),
+
+        new("Hyundai", CatalogDictionaryTermKind.Manufacturer, null, "Hyundai", 100),
 
         new("АВТОМАТ", CatalogDictionaryTermKind.ProductType, null, "MODULAR_CIRCUIT_BREAKER", 50),
         new("АВТОМАТИЧЕСКИЙ ВЫКЛЮЧАТЕЛЬ", CatalogDictionaryTermKind.ProductType, null, "MODULAR_CIRCUIT_BREAKER", 100),
