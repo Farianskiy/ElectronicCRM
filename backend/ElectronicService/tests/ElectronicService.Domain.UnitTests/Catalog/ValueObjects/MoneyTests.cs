@@ -84,4 +84,16 @@ public sealed class MoneyTests
             CultureInfo.CurrentCulture = previousCulture;
         }
     }
+
+    [Fact]
+    public void ZeroReturnsZeroRubles()
+    {
+        // Act
+        var money = Money.Zero();
+
+        // Assert
+        Assert.Equal(0m, money.Amount);
+        Assert.Equal("RUB", money.Currency);
+    }
+
 }

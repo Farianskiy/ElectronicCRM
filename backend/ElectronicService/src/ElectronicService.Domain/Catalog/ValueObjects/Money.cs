@@ -43,9 +43,11 @@ public sealed class Money : ValueObject
         return new Money(amount, normalizedCurrency);
     }
 
-    public static Money Zero(string currency = "RUB")
+    public static Money Zero()
     {
-        return new Money(0, currency.Trim().ToUpperInvariant());
+        return new Money(
+            0m,
+            "RUB");
     }
 
     public override string ToString()
