@@ -5,17 +5,17 @@ using Microsoft.AspNetCore.Mvc;
 namespace ElectronicService.Web.Controllers.Catalog.Import;
 
 [ApiController]
-[Route("api/catalog/import")]
-public sealed class CatalogImportController : ControllerBase
+[Route("api/catalog/import/excel")]
+public sealed class CatalogExcelImportController : ControllerBase
 {
     private readonly ImportProductsFromExcelCommandHandler _handler;
 
-    public CatalogImportController(ImportProductsFromExcelCommandHandler handler)
+    public CatalogExcelImportController(ImportProductsFromExcelCommandHandler handler)
     {
         _handler = handler;
     }
 
-    [HttpPost("excel")]
+    [HttpPost]
     [Consumes("multipart/form-data")]
     [ProducesResponseType(typeof(ImportProductsFromExcelResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]

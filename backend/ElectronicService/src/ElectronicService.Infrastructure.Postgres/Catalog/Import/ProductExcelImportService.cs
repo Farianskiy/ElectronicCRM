@@ -1,8 +1,10 @@
 using System.Globalization;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
-using System.Linq;
 using ClosedXML.Excel;
+using ElectronicService.Core.Catalog.Import.ImportProductsFromExcel;
+using ElectronicService.Core.Catalog.Import.PreviewProductsExcelImport;
 using ElectronicService.Domain.Catalog.Characteristics;
 using ElectronicService.Domain.Catalog.Manufacturers;
 using ElectronicService.Domain.Catalog.Products;
@@ -11,7 +13,6 @@ using ElectronicService.Domain.Catalog.ValueObjects;
 using ElectronicService.Infrastructure.Postgres.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using ElectronicService.Core.Catalog.Import.ImportProductsFromExcel;
 
 namespace ElectronicService.Infrastructure.Postgres.Catalog.Import;
 
@@ -25,6 +26,8 @@ public sealed class ProductExcelImportService : IProductsExcelImporter
 
     private readonly ElectronicDbContext _dbContext;
     private readonly ILogger<ProductExcelImportService> _logger;
+    
+    private const int PreviewRowsLimit = 100;
 
     public ProductExcelImportService(
         ElectronicDbContext dbContext,
@@ -102,15 +105,13 @@ public sealed class ProductExcelImportService : IProductsExcelImporter
                     continue;
                 }
 
-                var manufacturerName = GetRequiredCellValue(row, headerMap, profile.ManufacturerColumn);
+                var rawManufacturerName = GetRequiredCellValue(row, headerMap, profile.ManufacturerColumn);
 
-                if (string.IsNullOrWhiteSpace(manufacturerName))
-                {
-                    manufacturerName = "Не указан";
-                }
+                var manufacturerNormalization = ManufacturerImportNormalizer.NormalizeManufacturerName(
+                    rawManufacturerName);
 
                 var manufacturer = GetOrCreateManufacturer(
-                    manufacturerName,
+                    manufacturerNormalization.NormalizedName,
                     manufacturersByNormalizedName);
 
                 var article = GetArticle(row, headerMap, profile, name);
@@ -224,6 +225,276 @@ public sealed class ProductExcelImportService : IProductsExcelImporter
             totalRows,
             importedRows,
             skippedRows,
+            errors);
+    }
+
+    public async Task<PreviewProductsExcelImportResult> PreviewAsync(
+        Stream fileStream,
+        string fileName,
+        CancellationToken cancellationToken = default)
+    {
+        var profile = ExcelImportProfileResolver.Resolve(fileName);
+
+        var errors = new List<string>();
+
+        var productType = await _dbContext.ProductTypes
+            .Include(type => type.Characteristics)
+            .FirstOrDefaultAsync(
+                type => type.Code == profile.ProductTypeCode,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        if (productType is null)
+        {
+            throw new InvalidOperationException(
+                string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"Product type '{profile.ProductTypeCode}' was not found."));
+        }
+
+        var characteristicDefinitions = await _dbContext.CharacteristicDefinitions
+            .ToDictionaryAsync(
+                characteristic => characteristic.Code,
+                StringComparer.Ordinal,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        var manufacturersByNormalizedName = await _dbContext.Manufacturers
+            .ToDictionaryAsync(
+                manufacturer => manufacturer.NormalizedName,
+                StringComparer.Ordinal,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        var existingArticlesList = await _dbContext.Products
+            .Select(product => product.Article.Value)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var existingArticles = existingArticlesList.ToHashSet(StringComparer.Ordinal);
+
+        using var workbook = new XLWorkbook(fileStream);
+
+        var worksheet = workbook.Worksheets.First();
+
+        var headerMap = BuildHeaderMap(worksheet);
+
+        var lastRowNumber = worksheet.LastRowUsed()?.RowNumber() ?? 1;
+
+        var totalRows = 0;
+        var createRows = 0;
+        var duplicateRows = 0;
+        var errorRows = 0;
+        var normalizedManufacturerRows = 0;
+        var newManufacturerRows = 0;
+
+        var previewRows = new List<PreviewProductsExcelImportRow>();
+        var manufacturerNormalizations = new Dictionary<string, int>(StringComparer.Ordinal);
+
+        for (var rowNumber = 2; rowNumber <= lastRowNumber; rowNumber++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            totalRows++;
+
+            var row = worksheet.Row(rowNumber);
+
+            var rowErrors = new List<string>();
+            var warnings = new List<string>();
+            var characteristics = new Dictionary<string, string>(StringComparer.Ordinal);
+
+            string? name = null;
+            string? article = null;
+            var rawManufacturerName = string.Empty;
+            var normalizedManufacturerName = string.Empty;
+            var manufacturerAction = "Unknown";
+            var action = "Error";
+
+            try
+            {
+                name = GetRequiredCellValue(row, headerMap, profile.NameColumn);
+
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    rowErrors.Add("Наименование не заполнено.");
+                }
+
+                rawManufacturerName = GetRequiredCellValue(row, headerMap, profile.ManufacturerColumn);
+
+                var manufacturerNormalization = ManufacturerImportNormalizer.NormalizeManufacturerName(
+                    rawManufacturerName);
+
+                normalizedManufacturerName = manufacturerNormalization.NormalizedName;
+
+                if (manufacturerNormalization.WasChanged)
+                {
+                    normalizedManufacturerRows++;
+
+                    warnings.Add(
+                        string.Create(
+                            CultureInfo.InvariantCulture,
+                            $"Производитель будет нормализован: '{manufacturerNormalization.RawName}' -> '{manufacturerNormalization.NormalizedName}'."));
+
+                    var manufacturerNormalizationKey = string.Create(
+                        CultureInfo.InvariantCulture,
+                        $"{manufacturerNormalization.RawName}|{manufacturerNormalization.NormalizedName}");
+
+                    if (!manufacturerNormalizations.TryAdd(manufacturerNormalizationKey, 1))
+                    {
+                        manufacturerNormalizations[manufacturerNormalizationKey]++;
+                    }
+                }
+
+                var normalizedManufacturerLookupKey = NormalizeText(normalizedManufacturerName);
+
+                if (manufacturersByNormalizedName.ContainsKey(normalizedManufacturerLookupKey))
+                {
+                    manufacturerAction = "UseExisting";
+                }
+                else
+                {
+                    manufacturerAction = "CreateNew";
+                    newManufacturerRows++;
+
+                    warnings.Add(
+                        string.Create(
+                            CultureInfo.InvariantCulture,
+                            $"Будет создан новый производитель: '{normalizedManufacturerName}'."));
+                }
+
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    article = GetArticle(row, headerMap, profile, name);
+
+                    if (existingArticles.Contains(article))
+                    {
+                        action = "Duplicate";
+                        duplicateRows++;
+
+                        warnings.Add(
+                            string.Create(
+                                CultureInfo.InvariantCulture,
+                                $"Товар с артикулом '{article}' уже существует и будет пропущен."));
+                    }
+                }
+
+                AddPreviewDefaultCharacteristics(
+                    characteristics,
+                    productType,
+                    characteristicDefinitions,
+                    profile,
+                    rowErrors);
+
+                AddPreviewCharacteristicsFromRow(
+                    characteristics,
+                    productType,
+                    characteristicDefinitions,
+                    row,
+                    headerMap,
+                    profile,
+                    rowErrors);
+
+                var existingCharacteristicDefinitionIds = characteristics.Keys
+                    .Where(characteristicDefinitions.ContainsKey)
+                    .Select(characteristicCode => characteristicDefinitions[characteristicCode].Id)
+                    .ToHashSet();
+
+                var missingRequiredCharacteristicId = productType
+                    .FindMissingRequiredCharacteristicId(existingCharacteristicDefinitionIds);
+
+                if (missingRequiredCharacteristicId is not null)
+                {
+                    var missingCharacteristicDefinition = characteristicDefinitions.Values
+                        .FirstOrDefault(characteristic =>
+                            characteristic.Id == missingRequiredCharacteristicId.Value);
+
+                    if (missingCharacteristicDefinition is null)
+                    {
+                        rowErrors.Add(
+                            string.Create(
+                                CultureInfo.InvariantCulture,
+                                $"Обязательная характеристика '{missingRequiredCharacteristicId.Value}' не заполнена."));
+                    }
+                    else
+                    {
+                        rowErrors.Add(
+                            string.Create(
+                                CultureInfo.InvariantCulture,
+                                $"Обязательная характеристика '{missingCharacteristicDefinition.Name}' ({missingCharacteristicDefinition.Code}) не заполнена."));
+                    }
+                }
+
+                if (rowErrors.Count > 0)
+                {
+                    action = "Error";
+                    errorRows++;
+                }
+                else if (!string.Equals(action, "Duplicate", StringComparison.Ordinal))
+                {
+                    action = "Create";
+                    createRows++;
+                }
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                rowErrors.Add(exception.Message);
+                action = "Error";
+                errorRows++;
+            }
+
+            if (previewRows.Count < PreviewRowsLimit)
+            {
+                previewRows.Add(new PreviewProductsExcelImportRow(
+                    rowNumber,
+                    action,
+                    article,
+                    name,
+                    profile.ProductTypeCode,
+                    rawManufacturerName,
+                    normalizedManufacturerName,
+                    manufacturerAction,
+                    characteristics,
+                    warnings,
+                    rowErrors));
+            }
+        }
+
+        var manufacturerNormalizationResults = manufacturerNormalizations
+            .Select(item =>
+            {
+                var parts = item.Key.Split('|', 2);
+
+                return new PreviewProductsExcelImportManufacturerNormalization(
+                    parts[0],
+                    parts.Length > 1 ? parts[1] : string.Empty,
+                    item.Value);
+            })
+            .OrderByDescending(item => item.RowsCount)
+            .ThenBy(item => item.RawName, StringComparer.Ordinal)
+            .ToList();
+
+        if (totalRows > PreviewRowsLimit)
+        {
+            errors.Add(
+                string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"Preview response contains first {PreviewRowsLimit} rows. Total rows: {totalRows}."));
+        }
+
+        return new PreviewProductsExcelImportResult(
+            fileName,
+            profile.ProductTypeCode,
+            productType.Name,
+            totalRows,
+            createRows,
+            duplicateRows,
+            errorRows,
+            normalizedManufacturerRows,
+            newManufacturerRows,
+            PreviewRowsLimit,
+            totalRows > PreviewRowsLimit,
+            manufacturerNormalizationResults,
+            previewRows,
             errors);
     }
 
@@ -435,6 +706,132 @@ public sealed class ProductExcelImportService : IProductsExcelImporter
                 characteristicDefinitions,
                 "CABINET_KIND",
                 cabinetKind);
+        }
+    }
+
+    private static void AddPreviewDefaultCharacteristics(
+    Dictionary<string, string> characteristics,
+    ProductType productType,
+    IReadOnlyDictionary<string, CharacteristicDefinition> characteristicDefinitions,
+    ExcelImportProfile profile,
+    List<string> errors)
+{
+    if (!string.IsNullOrWhiteSpace(profile.DefaultCabinetKind))
+    {
+        AddPreviewCharacteristic(
+            characteristics,
+            productType,
+            characteristicDefinitions,
+            "CABINET_KIND",
+            profile.DefaultCabinetKind,
+            errors);
+    }
+
+    if (!string.IsNullOrWhiteSpace(profile.DefaultProductSeries))
+    {
+        AddPreviewCharacteristic(
+            characteristics,
+            productType,
+            characteristicDefinitions,
+            "PRODUCT_SERIES",
+            profile.DefaultProductSeries,
+            errors);
+    }
+}
+
+    private static void AddPreviewCharacteristicsFromRow(
+        Dictionary<string, string> characteristics,
+        ProductType productType,
+        Dictionary<string, CharacteristicDefinition> characteristicDefinitions,
+        IXLRow row,
+        Dictionary<string, int> headerMap,
+        ExcelImportProfile profile,
+        List<string> errors)
+    {
+        foreach (var columnMapItem in profile.CharacteristicColumnMap)
+        {
+            var excelColumnName = columnMapItem.Key;
+            var characteristicCode = columnMapItem.Value;
+
+            var rawValue = GetOptionalCellValue(row, headerMap, excelColumnName);
+
+            if (string.IsNullOrWhiteSpace(rawValue))
+            {
+                continue;
+            }
+
+            AddPreviewCharacteristic(
+                characteristics,
+                productType,
+                characteristicDefinitions,
+                characteristicCode,
+                rawValue,
+                errors);
+        }
+
+        if (string.Equals(
+                profile.ProductTypeCode,
+                "MODULAR_DISTRIBUTION_CABINET",
+                StringComparison.Ordinal)
+            && !characteristics.ContainsKey("CABINET_KIND"))
+        {
+            var mountingMethod = GetOptionalCellValue(row, headerMap, "Способ установки");
+
+            var cabinetKind = ResolveModularDistributionCabinetKind(mountingMethod);
+
+            AddPreviewCharacteristic(
+                characteristics,
+                productType,
+                characteristicDefinitions,
+                "CABINET_KIND",
+                cabinetKind,
+                errors);
+        }
+    }
+
+    private static void AddPreviewCharacteristic(
+        Dictionary<string, string> characteristics,
+        ProductType productType,
+        IReadOnlyDictionary<string, CharacteristicDefinition> characteristicDefinitions,
+        string characteristicCode,
+        string rawValue,
+        List<string> errors)
+    {
+        if (!characteristicDefinitions.TryGetValue(characteristicCode, out var definition))
+        {
+            errors.Add(
+                string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"Characteristic '{characteristicCode}' was not found."));
+
+            return;
+        }
+
+        if (!productType.AllowsCharacteristic(definition.Id))
+        {
+            errors.Add(
+                string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"Characteristic '{characteristicCode}' is not allowed for product type '{productType.Code}'."));
+
+            return;
+        }
+
+        try
+        {
+            var valueResult = CreateCharacteristicValue(characteristicCode, definition, rawValue);
+
+            if (valueResult.IsFailure)
+            {
+                errors.Add(valueResult.Error.Message);
+                return;
+            }
+
+            characteristics[characteristicCode] = rawValue;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            errors.Add(exception.Message);
         }
     }
 

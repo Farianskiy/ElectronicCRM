@@ -26,6 +26,8 @@ using ElectronicService.Core.Catalog.Assistant.DictionarySuggestions.GetSuggesti
 using ElectronicService.Core.Catalog.Assistant.DictionarySuggestions.ApproveSuggestion;
 using ElectronicService.Core.Catalog.Assistant.DictionarySuggestions.RejectSuggestion;
 using ElectronicService.Core.Auth.Login;
+using ElectronicService.Core.Catalog.Import.ImportProductsFromExcel;
+using ElectronicService.Core.Catalog.Import.PreviewProductsExcelImport;
 
 namespace ElectronicService.Core;
 
@@ -59,6 +61,8 @@ public static class DependencyInjectionExtensions
         services.AddScoped<ApproveCatalogAssistantDictionarySuggestionCommandHandler>();
         services.AddScoped<RejectCatalogAssistantDictionarySuggestionCommandHandler>();
         services.AddScoped<LoginCommandHandler>();
+        services.AddScoped<ImportProductsFromExcelCommandHandler>();
+        services.AddScoped<PreviewProductsExcelImportCommandHandler>();
 
         return services;
     }
