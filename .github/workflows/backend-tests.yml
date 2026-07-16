@@ -1,0 +1,81 @@
+name: Backend CI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-tests.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_NOLOGO: "1"
+  NUGET_XMLDOC_MODE: skip
+
+jobs:
+  build-and-test:
+    name: Build and test backend
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    defaults:
+      run:
+        shell: bash
+        working-directory: backend/ElectronicService
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Display .NET information
+        run: dotnet --info
+
+      - name: Verify Docker for Testcontainers
+        run: docker info
+
+      - name: Restore dependencies
+        run: dotnet restore ElectronicService.slnx
+
+      - name: Build solution
+        run: >
+          dotnet build ElectronicService.slnx
+          --configuration Release
+          --no-restore
+
+      - name: Run all tests
+        run: >
+          dotnet test ElectronicService.slnx
+          --configuration Release
+          --no-build
+          --logger "console;verbosity=normal"
+          --logger "trx;LogFilePrefix=backend-tests"
+          --results-directory TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: backend-test-results-${{ github.run_number }}
+          path: backend/ElectronicService/TestResults
+          if-no-files-found: warn
+          retention-days: 14

@@ -1,0 +1,8 @@
+
+# .NET build and test artifacts
+**/bin/
+**/obj/
+**/TestResults/
+*.trx
+*.coverage
+*.coveragexml
