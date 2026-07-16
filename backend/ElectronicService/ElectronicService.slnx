@@ -12,5 +12,6 @@
     <Project Path="tests/ElectronicService.Infrastructure.IntegrationTests/ElectronicService.Infrastructure.IntegrationTests.csproj" />
     <Project Path="tests/ElectronicService.Infrastructure.UnitTests/ElectronicService.Infrastructure.UnitTests.csproj" />
     <Project Path="tests/ElectronicService.TestCommon/ElectronicService.TestCommon.csproj" />
+    <Project Path="tests/ElectronicService.Web.IntegrationTests/ElectronicService.Web.IntegrationTests.csproj" />
   </Folder>
 </Solution>

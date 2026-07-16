@@ -8,9 +8,12 @@ public sealed class SearchProductsRequest
 
     public string? Manufacturer { get; init; }
 
-    public IReadOnlyCollection<SearchProductCharacteristicRequest>? Characteristics { get; init; }
+    public IReadOnlyCollection<SearchProductCharacteristicRequest>?
+        Characteristics { get; init; }
 
-    public int Page { get; init; } = 1;
+    public int Page { get; init; }
 
-    public int PageSize { get; init; } = 20;
+    public int PageSize { get; init; }
+
+    public bool? OnlyInStock { get; init; }
 }

@@ -101,3 +101,14 @@ if (!app.Environment.IsProduction())
 }
 
 await app.RunAsync();
+
+/// <summary>
+/// Открывает тип точки входа ASP.NET Core для WebApplicationFactory
+/// в integration-тестах.
+/// </summary>
+public partial class Program
+{
+    protected Program()
+    {
+    }
+}

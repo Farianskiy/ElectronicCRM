@@ -9,50 +9,71 @@ namespace ElectronicService.Web.Controllers.Catalog.Products;
 [Route("api/catalog/products/search")]
 public sealed class CatalogProductSearchController : ControllerBase
 {
-    private readonly SearchProductsQueryHandler _searchProductsQueryHandler;
+    private readonly SearchProductsQueryHandler
+        _searchProductsQueryHandler;
 
-    public CatalogProductSearchController(SearchProductsQueryHandler searchProductsQueryHandler)
+    public CatalogProductSearchController(
+        SearchProductsQueryHandler searchProductsQueryHandler)
     {
-        _searchProductsQueryHandler = searchProductsQueryHandler;
+        _searchProductsQueryHandler =
+            searchProductsQueryHandler;
     }
 
     [HttpPost]
-    [ProducesResponseType(typeof(ProductsListResponse), StatusCodes.Status200OK)]
-    public async Task<ActionResult<ProductsListResponse>> SearchProducts(
-        SearchProductsRequest request,
-        CancellationToken cancellationToken = default)
+    [ProducesResponseType(
+        typeof(ProductsListResponse),
+        StatusCodes.Status200OK)]
+    public async Task<ActionResult<ProductsListResponse>>
+        SearchProducts(
+            [FromBody] SearchProductsRequest request,
+            CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var query = new SearchProductsQuery(
-            request.Search,
-            request.ProductTypeCode,
-            request.Manufacturer,
+        var characteristicFilters =
             request.Characteristics?
-                .Select(characteristic => new SearchProductCharacteristicFilter(
-                    characteristic.Code,
-                    characteristic.Value))
-                .ToList() ?? [],
-            request.Page,
-            request.PageSize);
+                .Select(characteristic =>
+                    new SearchProductCharacteristicFilter(
+                        characteristic.Code,
+                        characteristic.Value))
+                .ToList()
+            ?? [];
+
+        var query = new SearchProductsQuery(
+            Search: request.Search,
+            ProductTypeCode: request.ProductTypeCode,
+            Manufacturer: request.Manufacturer,
+            Characteristics: characteristicFilters,
+            Page: request.Page,
+            PageSize: request.PageSize,
+            OnlyInStock: request.OnlyInStock);
 
         var result = await _searchProductsQueryHandler
-            .Handle(query, cancellationToken)
+            .Handle(
+                query,
+                cancellationToken)
             .ConfigureAwait(false);
 
-        return Ok(new ProductsListResponse(
-            result.Items.Select(item => new ProductListItemResponse(
-                item.Id,
-                item.Article,
-                item.Name,
-                item.ProductTypeCode,
-                item.ProductTypeName,
-                item.ManufacturerName,
-                item.PriceAmount,
-                item.PriceCurrency,
-                item.StockQuantity)).ToList(),
+        var responseItems = result.Items
+            .Select(item =>
+                new ProductListItemResponse(
+                    item.Id,
+                    item.Article,
+                    item.Name,
+                    item.ProductTypeCode,
+                    item.ProductTypeName,
+                    item.ManufacturerName,
+                    item.PriceAmount,
+                    item.PriceCurrency,
+                    item.StockQuantity))
+            .ToList();
+
+        var response = new ProductsListResponse(
+            responseItems,
             result.Page,
             result.PageSize,
-            result.TotalCount));
+            result.TotalCount);
+
+        return Ok(response);
     }
 }
