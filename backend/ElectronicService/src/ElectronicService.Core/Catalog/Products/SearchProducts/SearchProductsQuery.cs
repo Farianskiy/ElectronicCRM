@@ -6,4 +6,5 @@ public sealed record SearchProductsQuery(
     string? Manufacturer,
     IReadOnlyCollection<SearchProductCharacteristicFilter> Characteristics,
     int Page,
-    int PageSize);
+    int PageSize,
+    bool? OnlyInStock = null);

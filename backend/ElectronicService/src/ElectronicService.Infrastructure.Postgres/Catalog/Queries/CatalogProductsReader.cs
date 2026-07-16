@@ -249,6 +249,17 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
                 EF.Functions.ILike(item.Manufacturer.NormalizedName, manufacturerPattern));
         }
 
+        if (query.OnlyInStock is true)
+        {
+            productsQuery = productsQuery.Where(item =>
+                item.Product.StockQuantity.Value > 0);
+        }
+        else if (query.OnlyInStock is false)
+        {
+            productsQuery = productsQuery.Where(item =>
+                item.Product.StockQuantity.Value == 0);
+        }
+
         var characteristicFilters = query.Characteristics
             .Where(filter =>
                 !string.IsNullOrWhiteSpace(filter.Code)

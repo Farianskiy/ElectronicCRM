@@ -75,6 +75,13 @@ public sealed class ProductExcelImportService : IProductsExcelImporter
                 cancellationToken)
             .ConfigureAwait(false);
 
+        var existingArticlesList = await _dbContext.Products
+            .Select(product => product.Article.Value)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var knownArticles = existingArticlesList.ToHashSet(StringComparer.Ordinal);
+
         using var workbook = new XLWorkbook(fileStream);
 
         var worksheet = workbook.Worksheets.First();
@@ -116,11 +123,7 @@ public sealed class ProductExcelImportService : IProductsExcelImporter
 
                 var article = GetArticle(row, headerMap, profile, name);
 
-                var productExists = await _dbContext.Products
-                    .AnyAsync(product => product.Article.Value == article, cancellationToken)
-                    .ConfigureAwait(false);
-
-                if (productExists)
+                if (knownArticles.Contains(article))
                 {
                     skippedRows++;
                     continue;
@@ -198,6 +201,7 @@ public sealed class ProductExcelImportService : IProductsExcelImporter
                     .AddAsync(product, cancellationToken)
                     .ConfigureAwait(false);
 
+                knownArticles.Add(article);
                 importedRows++;
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
@@ -433,6 +437,11 @@ public sealed class ProductExcelImportService : IProductsExcelImporter
                 {
                     action = "Create";
                     createRows++;
+
+                    if (article is not null)
+                    {
+                        existingArticles.Add(article);
+                    }
                 }
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
