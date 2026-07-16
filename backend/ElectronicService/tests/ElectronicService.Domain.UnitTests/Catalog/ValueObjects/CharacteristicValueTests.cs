@@ -5,6 +5,7 @@ namespace ElectronicService.Domain.UnitTests.Catalog.ValueObjects;
 
 public sealed class CharacteristicValueTests
 {
+    // Проверяет создание текстового значения характеристики и очистку пробелов.
     [Fact]
     public void CreateTextTrimsValueAndSetsTextType()
     {
@@ -17,6 +18,7 @@ public sealed class CharacteristicValueTests
         Assert.Equal("C", result.Value.ToString());
     }
 
+    // Проверяет запрет пустого текстового значения характеристики.
     [Fact]
     public void CreateTextReturnsRequiredErrorForBlankValue()
     {
@@ -26,6 +28,7 @@ public sealed class CharacteristicValueTests
         Assert.Equal("general.value_is_required", result.Error.Code);
     }
 
+    // Проверяет создание числового значения и отсутствие значений других типов.
     [Fact]
     public void CreateNumberSetsOnlyNumberValue()
     {
@@ -40,6 +43,7 @@ public sealed class CharacteristicValueTests
         Assert.Equal("16.5", result.Value.ToString());
     }
 
+    // Проверяет создание логического значения и отсутствие значений других типов.
     [Fact]
     public void CreateBooleanSetsOnlyBooleanValue()
     {
@@ -54,6 +58,7 @@ public sealed class CharacteristicValueTests
         Assert.Equal("True", result.Value.ToString());
     }
 
+    // Проверяет сравнение текстовых характеристик без учёта регистра.
     [Fact]
     public void TextEqualityIgnoresLetterCase()
     {

@@ -7,6 +7,7 @@ namespace ElectronicService.Domain.UnitTests.Catalog.Products;
 
 public sealed class ProductTests
 {
+    // Проверяет создание корректного доступного товара и его начальное состояние.
     [Fact]
     public void CreateBuildsValidAvailableProduct()
     {
@@ -44,6 +45,7 @@ public sealed class ProductTests
         Assert.Empty(result.Value.Aliases);
     }
 
+    // Проверяет запрет пустого идентификатора типа товара.
     [Fact]
     public void CreateRejectsEmptyProductTypeId()
     {
@@ -59,6 +61,7 @@ public sealed class ProductTests
         Assert.Equal("general.value_is_invalid", result.Error.Code);
     }
 
+    // Проверяет запрет пустого идентификатора производителя.
     [Fact]
     public void CreateRejectsEmptyManufacturerId()
     {
@@ -74,6 +77,7 @@ public sealed class ProductTests
         Assert.Equal("general.value_is_invalid", result.Error.Code);
     }
 
+    // Проверяет обязательность цены при создании товара.
     [Fact]
     public void CreateRejectsNullPrice()
     {
@@ -89,6 +93,7 @@ public sealed class ProductTests
         Assert.Equal("general.value_is_invalid", result.Error.Code);
     }
 
+    // Проверяет переименование товара и установку времени изменения.
     [Fact]
     public void RenameChangesNameAndUpdatedTimestamp()
     {
@@ -101,6 +106,7 @@ public sealed class ProductTests
         Assert.NotNull(product.UpdatedAtUtc);
     }
 
+    // Проверяет сохранение старого названия при невалидном переименовании.
     [Fact]
     public void RenameKeepsOldNameWhenNewNameIsInvalid()
     {
@@ -114,6 +120,7 @@ public sealed class ProductTests
         Assert.Null(product.UpdatedAtUtc);
     }
 
+    // Проверяет изменение артикула и установку времени изменения.
     [Fact]
     public void ChangeArticleChangesArticleAndUpdatedTimestamp()
     {
@@ -126,6 +133,7 @@ public sealed class ProductTests
         Assert.NotNull(product.UpdatedAtUtc);
     }
 
+    // Проверяет замену цены товара.
     [Fact]
     public void ChangePriceChangesPrice()
     {
@@ -140,6 +148,7 @@ public sealed class ProductTests
         Assert.NotNull(product.UpdatedAtUtc);
     }
 
+    // Проверяет изменение остатка и вычисляемой доступности товара.
     [Fact]
     public void ChangeStockQuantityChangesAvailability()
     {
@@ -154,6 +163,7 @@ public sealed class ProductTests
         Assert.NotNull(product.UpdatedAtUtc);
     }
 
+    // Проверяет добавление разрешённой характеристики к товару.
     [Fact]
     public void SetCharacteristicAddsAllowedValue()
     {
@@ -180,6 +190,7 @@ public sealed class ProductTests
         Assert.NotNull(product.UpdatedAtUtc);
     }
 
+    // Проверяет обновление существующей характеристики без создания дубликата.
     [Fact]
     public void SetCharacteristicUpdatesExistingValueWithoutDuplicate()
     {
@@ -212,6 +223,7 @@ public sealed class ProductTests
         Assert.Equal(25m, characteristic.Value.NumberValue);
     }
 
+    // Проверяет запрет изменения товара через другой тип товара.
     [Fact]
     public void SetCharacteristicRejectsProductTypeWithDifferentId()
     {
@@ -233,6 +245,7 @@ public sealed class ProductTests
         Assert.Empty(product.Characteristics);
     }
 
+    // Проверяет запрет характеристики, не разрешённой для типа товара.
     [Fact]
     public void SetCharacteristicRejectsDefinitionNotAllowedForType()
     {
@@ -253,6 +266,7 @@ public sealed class ProductTests
         Assert.Empty(product.Characteristics);
     }
 
+    // Проверяет запрет значения с неподходящим типом данных.
     [Fact]
     public void SetCharacteristicRejectsValueWithWrongDataType()
     {
@@ -277,6 +291,7 @@ public sealed class ProductTests
         Assert.Empty(product.Characteristics);
     }
 
+    // Проверяет удаление необязательной характеристики товара.
     [Fact]
     public void RemoveCharacteristicRemovesOptionalCharacteristic()
     {
@@ -304,6 +319,7 @@ public sealed class ProductTests
         Assert.Empty(product.Characteristics);
     }
 
+    // Проверяет запрет удаления обязательной характеристики.
     [Fact]
     public void RemoveCharacteristicRejectsRequiredCharacteristic()
     {
@@ -332,6 +348,7 @@ public sealed class ProductTests
         Assert.Single(product.Characteristics);
     }
 
+    // Проверяет ошибку при отсутствии обязательной характеристики.
     [Fact]
     public void ValidateRequiredCharacteristicsReturnsMissingError()
     {
@@ -354,6 +371,7 @@ public sealed class ProductTests
             result.Error.Code);
     }
 
+    // Проверяет успешную валидацию заполненных обязательных характеристик.
     [Fact]
     public void ValidateRequiredCharacteristicsReturnsSuccessWhenAllPresent()
     {
@@ -378,6 +396,7 @@ public sealed class ProductTests
         Assert.True(result.IsSuccess);
     }
 
+    // Проверяет добавление, очистку и нормализацию алиаса товара.
     [Fact]
     public void AddAliasStoresTrimmedAndNormalizedAlias()
     {
@@ -393,6 +412,7 @@ public sealed class ProductTests
         Assert.Equal("АВТОМАТ ЕЛКА", alias.NormalizedValue);
     }
 
+    // Проверяет запрет алиасов-дубликатов после нормализации.
     [Fact]
     public void AddAliasRejectsNormalizedDuplicate()
     {

@@ -6,6 +6,7 @@ namespace ElectronicService.Domain.UnitTests.Catalog.Characteristics;
 
 public sealed class CharacteristicDefinitionTests
 {
+    // Проверяет нормализацию кода и очистку текстовых полей определения характеристики.
     [Fact]
     public void CreateNormalizesCodeAndTrimsTextFields()
     {
@@ -21,6 +22,7 @@ public sealed class CharacteristicDefinitionTests
         Assert.Equal("А", result.Value.Unit);
     }
 
+    // Проверяет запрет неопределённого типа данных характеристики.
     [Fact]
     public void CreateReturnsInvalidErrorForNoneDataType()
     {
@@ -33,6 +35,7 @@ public sealed class CharacteristicDefinitionTests
         Assert.Equal("general.value_is_invalid", result.Error.Code);
     }
 
+    // Проверяет принятие значения, тип которого совпадает с определением характеристики.
     [Fact]
     public void ValidateValueReturnsSuccessForMatchingType()
     {
@@ -45,6 +48,7 @@ public sealed class CharacteristicDefinitionTests
         Assert.True(result.IsSuccess);
     }
 
+    // Проверяет ошибку при несовпадении типов определения и значения характеристики.
     [Fact]
     public void ValidateValueReturnsTypeMismatchForDifferentType()
     {
@@ -60,6 +64,7 @@ public sealed class CharacteristicDefinitionTests
             result.Error.Code);
     }
 
+    // Проверяет успешное переименование определения характеристики.
     [Fact]
     public void RenameChangesDefinitionName()
     {
@@ -71,6 +76,7 @@ public sealed class CharacteristicDefinitionTests
         Assert.Equal("Ток автомата", definition.Name);
     }
 
+    // Проверяет удаление единицы измерения передачей пустой строки.
     [Fact]
     public void ChangeUnitConvertsBlankUnitToNull()
     {
@@ -82,6 +88,7 @@ public sealed class CharacteristicDefinitionTests
         Assert.Null(definition.Unit);
     }
 
+    // Проверяет, что слишком длинная единица измерения не изменяет объект.
     [Fact]
     public void ChangeUnitDoesNotChangeUnitWhenNewUnitIsTooLong()
     {

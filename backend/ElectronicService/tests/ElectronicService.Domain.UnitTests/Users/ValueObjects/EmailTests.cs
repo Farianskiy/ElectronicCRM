@@ -4,6 +4,7 @@ namespace ElectronicService.Domain.UnitTests.Users.ValueObjects;
 
 public sealed class EmailTests
 {
+    // Проверяет очистку и нормализацию корректного email.
     [Fact]
     public void CreateTrimsAndNormalizesValidEmail()
     {
@@ -14,6 +15,7 @@ public sealed class EmailTests
         Assert.Equal("FER@EXAMPLE.COM", result.Value.ToString());
     }
 
+    // Проверяет обязательность email при его передаче.
     [Theory]
     [InlineData("")]
     [InlineData(" ")]
@@ -25,6 +27,7 @@ public sealed class EmailTests
         Assert.Equal("general.value_is_required", result.Error.Code);
     }
 
+    // Проверяет отклонение основных некорректных форматов email.
     [Theory]
     [InlineData("ferexample.com")]
     [InlineData("@example.com")]
@@ -39,6 +42,7 @@ public sealed class EmailTests
         Assert.Equal("general.value_is_invalid", result.Error.Code);
     }
 
+    // Проверяет максимальную длину email.
     [Fact]
     public void CreateReturnsTooLongErrorWhenEmailExceedsLimit()
     {
@@ -50,6 +54,7 @@ public sealed class EmailTests
         Assert.Equal("general.value_is_too_long", result.Error.Code);
     }
 
+    // Проверяет регистронезависимое сравнение email.
     [Fact]
     public void EqualityIgnoresCaseBecauseEmailIsNormalized()
     {

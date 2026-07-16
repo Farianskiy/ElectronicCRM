@@ -4,6 +4,7 @@ namespace ElectronicService.Domain.UnitTests.Catalog.Manufacturers;
 
 public sealed class ManufacturerTests
 {
+    // Проверяет создание производителя и построение его нормализованного имени.
     [Fact]
     public void CreateTrimsNameAndBuildsNormalizedName()
     {
@@ -15,6 +16,7 @@ public sealed class ManufacturerTests
         Assert.Equal("АКЭЛ ЕЛКА", result.Value.NormalizedName);
     }
 
+    // Проверяет обязательность названия производителя.
     [Fact]
     public void CreateReturnsRequiredErrorForBlankName()
     {
@@ -24,6 +26,7 @@ public sealed class ManufacturerTests
         Assert.Equal("general.value_is_required", result.Error.Code);
     }
 
+    // Проверяет максимальную длину названия производителя.
     [Fact]
     public void CreateReturnsTooLongErrorWhenNameExceedsLimit()
     {
@@ -33,6 +36,7 @@ public sealed class ManufacturerTests
         Assert.Equal("general.value_is_too_long", result.Error.Code);
     }
 
+    // Проверяет успешное переименование производителя и обновление нормализованного имени.
     [Fact]
     public void RenameChangesNameAndNormalizedName()
     {
@@ -45,6 +49,7 @@ public sealed class ManufacturerTests
         Assert.Equal("IEK", manufacturer.NormalizedName);
     }
 
+    // Проверяет, что невалидное переименование не изменяет состояние производителя.
     [Fact]
     public void RenameDoesNotChangeManufacturerWhenNewNameIsInvalid()
     {

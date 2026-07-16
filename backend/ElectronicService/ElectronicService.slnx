@@ -7,7 +7,9 @@
     <Project Path="src/ElectronicService.Web/ElectronicService.Web.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/ElectronicService.Core.UnitTests/ElectronicService.Core.UnitTests.csproj" />
     <Project Path="tests/ElectronicService.Domain.UnitTests/ElectronicService.Domain.UnitTests.csproj" />
+    <Project Path="tests/ElectronicService.Infrastructure.IntegrationTests/ElectronicService.Infrastructure.IntegrationTests.csproj" />
     <Project Path="tests/ElectronicService.Infrastructure.UnitTests/ElectronicService.Infrastructure.UnitTests.csproj" />
     <Project Path="tests/ElectronicService.TestCommon/ElectronicService.TestCommon.csproj" />
   </Folder>

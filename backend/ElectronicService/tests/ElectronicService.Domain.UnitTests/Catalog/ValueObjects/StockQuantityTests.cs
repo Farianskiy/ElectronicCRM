@@ -4,6 +4,7 @@ namespace ElectronicService.Domain.UnitTests.Catalog.ValueObjects;
 
 public sealed class StockQuantityTests
 {
+    // Проверяет, что положительный остаток создаётся и считается доступным.
     [Fact]
     public void CreateReturnsAvailableQuantityForPositiveValue()
     {
@@ -14,6 +15,7 @@ public sealed class StockQuantityTests
         Assert.True(result.Value.IsAvailable);
     }
 
+    // Проверяет, что нулевой остаток допустим, но товар считается недоступным.
     [Fact]
     public void CreateReturnsUnavailableQuantityForZero()
     {
@@ -23,6 +25,7 @@ public sealed class StockQuantityTests
         Assert.False(result.Value.IsAvailable);
     }
 
+    // Проверяет запрет отрицательного складского остатка.
     [Fact]
     public void CreateReturnsInvalidErrorForNegativeValue()
     {
@@ -32,6 +35,7 @@ public sealed class StockQuantityTests
         Assert.Equal("general.value_is_invalid", result.Error.Code);
     }
 
+    // Проверяет фабричный метод создания нулевого остатка.
     [Fact]
     public void ZeroCreatesUnavailableQuantity()
     {
@@ -41,6 +45,7 @@ public sealed class StockQuantityTests
         Assert.False(quantity.IsAvailable);
     }
 
+    // Проверяет равенство складских остатков по числовому значению.
     [Fact]
     public void EqualityUsesNumericValue()
     {

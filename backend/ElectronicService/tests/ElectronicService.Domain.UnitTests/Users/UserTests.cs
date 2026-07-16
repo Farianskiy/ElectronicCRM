@@ -4,6 +4,7 @@ namespace ElectronicService.Domain.UnitTests.Users;
 
 public sealed class UserTests
 {
+    // Проверяет начальное состояние и полномочия обычного пользователя.
     [Fact]
     public void CreateRegularBuildsActiveRegularUser()
     {
@@ -28,6 +29,7 @@ public sealed class UserTests
         Assert.False(result.Value.CanUpdateStockBalance());
     }
 
+    // Проверяет создание обычного пользователя без email и пароля.
     [Fact]
     public void CreateRegularAllowsMissingEmailAndPassword()
     {
@@ -41,6 +43,7 @@ public sealed class UserTests
         Assert.False(result.Value.HasPassword);
     }
 
+    // Проверяет полномочия активного технического пользователя.
     [Fact]
     public void CreateTechnicalBuildsUserWithTechnicalPermissions()
     {
@@ -57,6 +60,7 @@ public sealed class UserTests
         Assert.True(user.CanManageProductSynonyms());
     }
 
+    // Проверяет запрет создания технического пользователя с некорректным email.
     [Fact]
     public void CreateTechnicalRejectsInvalidEmail()
     {
@@ -68,6 +72,7 @@ public sealed class UserTests
         Assert.Equal("general.value_is_invalid", result.Error.Code);
     }
 
+    // Проверяет повышение обычного пользователя до технического.
     [Fact]
     public void MakeTechnicalChangesRoleAndEmail()
     {
@@ -82,6 +87,7 @@ public sealed class UserTests
         Assert.NotNull(user.UpdatedAtUtc);
     }
 
+    // Проверяет запрет повторного повышения технического пользователя.
     [Fact]
     public void MakeTechnicalRejectsAlreadyTechnicalUser()
     {
@@ -93,6 +99,7 @@ public sealed class UserTests
         Assert.Equal("user.already_technical", result.Error.Code);
     }
 
+    // Проверяет понижение технического пользователя до обычного.
     [Fact]
     public void MakeRegularChangesTechnicalUserRole()
     {
@@ -106,6 +113,7 @@ public sealed class UserTests
         Assert.False(user.CanUpdateProductPrice());
     }
 
+    // Проверяет отключение всех полномочий после блокировки.
     [Fact]
     public void BlockDisablesAllBusinessPermissions()
     {
@@ -125,6 +133,7 @@ public sealed class UserTests
         Assert.False(user.CanManageProductSynonyms());
     }
 
+    // Проверяет запрет повторной блокировки пользователя.
     [Fact]
     public void BlockRejectsAlreadyBlockedUser()
     {
@@ -138,6 +147,7 @@ public sealed class UserTests
         Assert.Equal("user.already_blocked", result.Error.Code);
     }
 
+    // Проверяет запрет изменения данных и роли заблокированного пользователя.
     [Fact]
     public void BlockedUserCannotBeChanged()
     {
@@ -167,6 +177,7 @@ public sealed class UserTests
         Assert.True(user.IsTechnical);
     }
 
+    // Проверяет повторную активацию заблокированного пользователя.
     [Fact]
     public void ActivateRestoresActiveState()
     {
@@ -182,6 +193,7 @@ public sealed class UserTests
         Assert.True(user.CanUseAssistant());
     }
 
+    // Проверяет изменение и нормализацию email пользователя.
     [Fact]
     public void ChangeEmailNormalizesNewEmail()
     {
@@ -193,6 +205,7 @@ public sealed class UserTests
         Assert.Equal("NEW@EXAMPLE.COM", user.Email?.Value);
     }
 
+    // Проверяет изменение и очистку хеша пароля.
     [Fact]
     public void ChangePasswordHashTrimsNewHash()
     {
@@ -205,6 +218,7 @@ public sealed class UserTests
         Assert.Equal("new-password-hash", user.PasswordHash);
     }
 
+    // Проверяет запрет пустого хеша пароля.
     [Fact]
     public void ChangePasswordHashRejectsBlankValue()
     {

@@ -4,6 +4,7 @@ namespace ElectronicService.Domain.UnitTests.Catalog.ValueObjects;
 
 public sealed class ProductNameTests
 {
+    // Проверяет очистку названия товара и построение нормализованного значения.
     [Fact]
     public void CreateTrimsAndNormalizesValidName()
     {
@@ -14,6 +15,7 @@ public sealed class ProductNameTests
         Assert.Equal("АВТОМАТ ЕЛКА", result.Value.NormalizedValue);
     }
 
+    // Проверяет, что пустое название товара отклоняется.
     [Theory]
     [InlineData("")]
     [InlineData(" ")]
@@ -25,6 +27,7 @@ public sealed class ProductNameTests
         Assert.Equal("general.value_is_required", result.Error.Code);
     }
 
+    // Проверяет минимальную длину названия товара.
     [Fact]
     public void CreateReturnsTooShortErrorForOneCharacter()
     {
@@ -34,6 +37,7 @@ public sealed class ProductNameTests
         Assert.Equal("general.value_is_too_short", result.Error.Code);
     }
 
+    // Проверяет максимальную длину названия товара.
     [Fact]
     public void CreateReturnsTooLongErrorWhenNameExceedsLimit()
     {
@@ -43,6 +47,7 @@ public sealed class ProductNameTests
         Assert.Equal("general.value_is_too_long", result.Error.Code);
     }
 
+    // Проверяет сравнение названий по нормализованному значению без учёта регистра и различия Ё/Е.
     [Fact]
     public void EqualityUsesNormalizedValue()
     {

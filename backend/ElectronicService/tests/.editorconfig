@@ -1,8 +1,0 @@
-[*.cs]
-
-# xUnit создаёт публичные экземплярные методы как точки входа тестов.
-# Эти правила полезны для production-кода, но дают ложные срабатывания в тестах.
-dotnet_diagnostic.CA1515.severity = none
-dotnet_diagnostic.CA1707.severity = none
-dotnet_diagnostic.CA1822.severity = none
-dotnet_diagnostic.S2325.severity = none

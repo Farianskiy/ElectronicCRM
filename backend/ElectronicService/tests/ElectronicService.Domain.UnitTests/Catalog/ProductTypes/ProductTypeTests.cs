@@ -6,6 +6,7 @@ namespace ElectronicService.Domain.UnitTests.Catalog.ProductTypes;
 
 public sealed class ProductTypeTests
 {
+    // Проверяет создание типа товара с нормализованным кодом и очищенным названием.
     [Fact]
     public void CreateNormalizesCodeAndTrimsName()
     {
@@ -18,6 +19,7 @@ public sealed class ProductTypeTests
         Assert.Equal("Модульный автомат", result.Value.Name);
     }
 
+    // Проверяет сохранение всех настроек характеристики внутри типа товара.
     [Fact]
     public void AddCharacteristicStoresAllConfiguration()
     {
@@ -47,6 +49,7 @@ public sealed class ProductTypeTests
         Assert.Equal(150, relation.ReplacementWeight);
     }
 
+    // Проверяет запрет повторного добавления одной характеристики к типу товара.
     [Fact]
     public void AddCharacteristicRejectsDuplicateDefinition()
     {
@@ -70,6 +73,7 @@ public sealed class ProductTypeTests
         Assert.Single(productType.Characteristics);
     }
 
+    // Проверяет обязательность режима сравнения для характеристики, участвующей в подборе аналогов.
     [Fact]
     public void AddCharacteristicRejectsNoneModeWhenUsedForReplacement()
     {
@@ -89,6 +93,7 @@ public sealed class ProductTypeTests
         Assert.Empty(productType.Characteristics);
     }
 
+    // Проверяет запрет отрицательного веса характеристики при подборе аналогов.
     [Fact]
     public void AddCharacteristicRejectsNegativeReplacementWeight()
     {
@@ -107,6 +112,7 @@ public sealed class ProductTypeTests
         Assert.Equal("general.value_is_invalid", result.Error.Code);
     }
 
+    // Проверяет обнаружение отсутствующей обязательной характеристики.
     [Fact]
     public void RequiredCharacteristicCanBeFoundWhenMissing()
     {
@@ -126,6 +132,7 @@ public sealed class ProductTypeTests
         Assert.True(productType.IsCharacteristicRequired(definition.Id));
     }
 
+    // Проверяет отсутствие ошибки, когда все обязательные характеристики присутствуют.
     [Fact]
     public void FindMissingRequiredCharacteristicReturnsNullWhenAllArePresent()
     {
@@ -148,6 +155,7 @@ public sealed class ProductTypeTests
         Assert.Null(missingId);
     }
 
+    // Проверяет изменение настроек участия характеристики в подборе аналогов.
     [Fact]
     public void ConfigureReplacementUpdatesRelation()
     {

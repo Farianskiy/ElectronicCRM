@@ -80,7 +80,9 @@ public sealed class CatalogProductReplacementsReader : ICatalogProductReplacemen
             join manufacturer in _dbContext.Manufacturers.AsNoTracking()
                 on product.ManufacturerId equals manufacturer.Id
             where product.ProductTypeId == targetProduct.ProductTypeId
-                  && product.Id != targetProduct.Id
+                && product.Id != targetProduct.Id
+                && (!query.OnlyInStock
+                    || product.StockQuantity.Value > 0)
             select new CandidateProductSnapshot(
                 product.Id,
                 product.Article.Value,
@@ -91,12 +93,6 @@ public sealed class CatalogProductReplacementsReader : ICatalogProductReplacemen
                 product.Price.Amount,
                 product.Price.Currency,
                 product.StockQuantity.Value);
-
-        if (query.OnlyInStock)
-        {
-            candidatesQuery = candidatesQuery.Where(candidate =>
-                candidate.StockQuantity > 0);
-        }
 
         var candidates = await candidatesQuery
             .ToListAsync(cancellationToken)

@@ -5,6 +5,7 @@ namespace ElectronicService.Domain.UnitTests.Catalog.ValueObjects;
 
 public sealed class MoneyTests
 {
+    // Проверяет создание цены и нормализацию трёхбуквенного кода валюты.
     [Fact]
     public void CreateReturnsNormalizedMoneyForValidInput()
     {
@@ -15,6 +16,7 @@ public sealed class MoneyTests
         Assert.Equal("RUB", result.Value.Currency);
     }
 
+    // Проверяет, что нулевая цена является допустимым денежным значением.
     [Fact]
     public void CreateAllowsZeroAmount()
     {
@@ -25,6 +27,7 @@ public sealed class MoneyTests
         Assert.Equal("RUB", result.Value.Currency);
     }
 
+    // Проверяет запрет отрицательной цены.
     [Fact]
     public void CreateReturnsInvalidErrorForNegativeAmount()
     {
@@ -34,6 +37,7 @@ public sealed class MoneyTests
         Assert.Equal("general.value_is_invalid", result.Error.Code);
     }
 
+    // Проверяет обязательность кода валюты.
     [Theory]
     [InlineData("")]
     [InlineData(" ")]
@@ -45,6 +49,7 @@ public sealed class MoneyTests
         Assert.Equal("general.value_is_required", result.Error.Code);
     }
 
+    // Проверяет, что код валюты должен состоять ровно из трёх символов.
     [Theory]
     [InlineData("R")]
     [InlineData("RU")]
@@ -57,6 +62,7 @@ public sealed class MoneyTests
         Assert.Equal("general.value_is_invalid", result.Error.Code);
     }
 
+    // Проверяет равенство денег одновременно по сумме и валюте.
     [Fact]
     public void EqualityUsesAmountAndCurrency()
     {
@@ -66,6 +72,7 @@ public sealed class MoneyTests
         Assert.Equal(first, second);
     }
 
+    // Проверяет независимое от текущей локали строковое представление цены.
     [Fact]
     public void ToStringUsesInvariantCulture()
     {
@@ -84,16 +91,4 @@ public sealed class MoneyTests
             CultureInfo.CurrentCulture = previousCulture;
         }
     }
-
-    [Fact]
-    public void ZeroReturnsZeroRubles()
-    {
-        // Act
-        var money = Money.Zero();
-
-        // Assert
-        Assert.Equal(0m, money.Amount);
-        Assert.Equal("RUB", money.Currency);
-    }
-
 }

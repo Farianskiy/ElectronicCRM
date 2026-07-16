@@ -4,6 +4,7 @@ namespace ElectronicService.Domain.UnitTests.Catalog.ValueObjects;
 
 public sealed class ProductArticleTests
 {
+    // Проверяет, что корректный артикул создаётся и очищается от внешних пробелов.
     [Fact]
     public void CreateReturnsTrimmedArticleForValidValue()
     {
@@ -19,6 +20,7 @@ public sealed class ProductArticleTests
         Assert.Equal("NB1-63-1P-C10", result.Value.ToString());
     }
 
+    // Проверяет, что пустой артикул отклоняется как обязательное значение.
     [Theory]
     [InlineData("")]
     [InlineData(" ")]
@@ -31,6 +33,7 @@ public sealed class ProductArticleTests
         Assert.Equal("general.value_is_required", result.Error.Code);
     }
 
+    // Проверяет, что null вместо артикула возвращает доменную ошибку обязательного значения.
     [Fact]
     public void CreateReturnsRequiredErrorForNullValue()
     {
@@ -40,6 +43,7 @@ public sealed class ProductArticleTests
         Assert.Equal("general.value_is_required", result.Error.Code);
     }
 
+    // Проверяет ограничение максимальной длины артикула в 100 символов.
     [Fact]
     public void CreateReturnsTooLongErrorWhenArticleExceedsLimit()
     {
@@ -51,6 +55,7 @@ public sealed class ProductArticleTests
         Assert.Equal("general.value_is_too_long", result.Error.Code);
     }
 
+    // Проверяет, что артикулы сравниваются без учёта регистра символов.
     [Fact]
     public void EqualityIgnoresLetterCase()
     {

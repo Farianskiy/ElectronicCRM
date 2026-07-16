@@ -365,12 +365,18 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
     {
         return dataType switch
         {
-            CharacteristicDataType.Text => textValue ?? string.Empty,
+            CharacteristicDataType.Text =>
+                textValue ?? string.Empty,
 
-            CharacteristicDataType.Number => numberValue?.ToString(
-                CultureInfo.InvariantCulture) ?? string.Empty,
+            CharacteristicDataType.Number =>
+                numberValue is null
+                    ? string.Empty
+                    : numberValue.Value.ToString(
+                        "0.####",
+                        CultureInfo.InvariantCulture),
 
-            CharacteristicDataType.Boolean => booleanValue is true ? "Да" : "Нет",
+            CharacteristicDataType.Boolean =>
+                booleanValue is true ? "Да" : "Нет",
 
             _ => string.Empty
         };

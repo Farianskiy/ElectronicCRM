@@ -4,6 +4,7 @@ namespace ElectronicService.Infrastructure.UnitTests.Catalog.Import;
 
 public sealed class ManufacturerImportNormalizerTests
 {
+    // Проверяет, что пустое или отсутствующее название производителя заменяется на «Не указан».
     [Theory]
     [InlineData(null)]
     [InlineData("")]
@@ -20,6 +21,7 @@ public sealed class ManufacturerImportNormalizerTests
         Assert.True(result.WasChanged);
     }
 
+    // Проверяет все утверждённые алиасы производителей и ожидаемое каноническое название.
     [Theory]
     // CHINT
     [InlineData("CHINT", "CHINT", false)]
@@ -63,6 +65,7 @@ public sealed class ManufacturerImportNormalizerTests
         Assert.Equal(expectedWasChanged, result.WasChanged);
     }
 
+    // Проверяет, что неизвестный производитель только очищается от внешних пробелов и не переименовывается.
     [Fact]
     public void NormalizeManufacturerNamePreservesUnknownTrimmedName()
     {
@@ -79,6 +82,7 @@ public sealed class ManufacturerImportNormalizerTests
         Assert.False(result.WasChanged);
     }
 
+    // Проверяет, что суффикс «пром серия» удаляется только у известных брендов из словаря.
     [Fact]
     public void NormalizeManufacturerNameDoesNotRemoveIndustrialSuffixFromUnknownBrand()
     {

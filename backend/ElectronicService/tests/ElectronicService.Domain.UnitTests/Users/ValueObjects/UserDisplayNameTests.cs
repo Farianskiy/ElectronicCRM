@@ -4,6 +4,7 @@ namespace ElectronicService.Domain.UnitTests.Users.ValueObjects;
 
 public sealed class UserDisplayNameTests
 {
+    // Проверяет очистку корректного отображаемого имени пользователя.
     [Fact]
     public void CreateTrimsValidDisplayName()
     {
@@ -13,6 +14,7 @@ public sealed class UserDisplayNameTests
         Assert.Equal("Fer", result.Value.Value);
     }
 
+    // Проверяет обязательность отображаемого имени.
     [Theory]
     [InlineData("")]
     [InlineData(" ")]
@@ -24,6 +26,7 @@ public sealed class UserDisplayNameTests
         Assert.Equal("general.value_is_required", result.Error.Code);
     }
 
+    // Проверяет минимальную длину отображаемого имени.
     [Fact]
     public void CreateReturnsTooShortErrorForOneCharacter()
     {
@@ -33,6 +36,7 @@ public sealed class UserDisplayNameTests
         Assert.Equal("general.value_is_too_short", result.Error.Code);
     }
 
+    // Проверяет максимальную длину отображаемого имени.
     [Fact]
     public void CreateReturnsTooLongErrorWhenNameExceedsLimit()
     {
