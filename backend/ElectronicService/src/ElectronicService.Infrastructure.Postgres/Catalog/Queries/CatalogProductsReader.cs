@@ -225,11 +225,41 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
             var originalSearchPattern = CreateLikePattern(query.Search);
 
             productsQuery = productsQuery.Where(item =>
-                EF.Functions.ILike(item.Product.Name.NormalizedValue, searchPattern)
-                || EF.Functions.ILike(item.Product.Article.Value, originalSearchPattern)
-                || _dbContext.ProductAliases.AsNoTracking().Any(alias =>
-                    alias.ProductId == item.Product.Id
-                    && EF.Functions.ILike(alias.NormalizedValue, searchPattern)));
+                // Наименование товара.
+                EF.Functions.ILike(
+                    item.Product.Name.NormalizedValue,
+                    searchPattern)
+
+                // Артикул товара.
+                || EF.Functions.ILike(
+                    item.Product.Article.Value,
+                    originalSearchPattern)
+
+                // Человекочитаемое название типа:
+                // "Силовой автомат", "Выключатель нагрузки".
+                || EF.Functions.ILike(
+                    item.ProductType.Name,
+                    originalSearchPattern)
+
+                // Технический код типа:
+                // POWER_CIRCUIT_BREAKER, LOAD_SWITCH.
+                || EF.Functions.ILike(
+                    item.ProductType.Code,
+                    searchPattern)
+
+                // Нормализованное название производителя.
+                || EF.Functions.ILike(
+                    item.Manufacturer.NormalizedName,
+                    searchPattern)
+
+                // Дополнительные названия товара.
+                || _dbContext.ProductAliases
+                    .AsNoTracking()
+                    .Any(alias =>
+                        alias.ProductId == item.Product.Id
+                        && EF.Functions.ILike(
+                            alias.NormalizedValue,
+                            searchPattern)));
         }
 
         if (!string.IsNullOrWhiteSpace(query.ProductTypeCode))

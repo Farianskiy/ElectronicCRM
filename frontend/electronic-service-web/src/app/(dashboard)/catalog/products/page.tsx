@@ -3,12 +3,20 @@
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import Link from "next/link";
-import type { FormEvent } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { useState } from "react";
 import { searchCatalogProducts } from "@/features/catalogProducts/api/searchCatalogProducts";
-import type { CatalogProductListItem } from "@/features/catalogProducts/model/types";
 import { formatPrice } from "@/shared/lib/formatters";
 import { PageHeader } from "@/shared/ui/PageHeader";
+import { getCatalogManufacturers } from "@/features/catalogMetadata/api/getCatalogManufacturers";
+import { getCatalogProductTypeCharacteristics } from "@/features/catalogMetadata/api/getCatalogProductTypeCharacteristics";
+import { getCatalogProductTypes } from "@/features/catalogMetadata/api/getCatalogProductTypes";
+import type { CatalogProductTypeCharacteristicMetadata } from "@/features/catalogMetadata/model/types";
+import type {
+  CatalogProductListItem,
+  SearchProductCharacteristicRequest,
+} from "@/features/catalogProducts/model/types";
+import { AppSelect } from "@/shared/ui/AppSelect";
 
 function getErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
@@ -59,15 +67,11 @@ function ProductRow({ product }: { product: CatalogProductListItem }) {
 
       <td className="px-4 py-4 text-slate-300">{product.article}</td>
 
-      <td className="px-4 py-4 text-slate-300">
-        {product.manufacturerName}
-      </td>
+      <td className="px-4 py-4 text-slate-300">{product.manufacturerName}</td>
 
       <td className="px-4 py-4 text-slate-300">
         <p>{product.productTypeName}</p>
-        <p className="mt-1 text-xs text-slate-500">
-          {product.productTypeCode}
-        </p>
+        <p className="mt-1 text-xs text-slate-500">{product.productTypeCode}</p>
       </td>
 
       <td className="px-4 py-4 text-slate-300">
@@ -90,29 +94,158 @@ function ProductRow({ product }: { product: CatalogProductListItem }) {
   );
 }
 
+interface AppliedCatalogFilters {
+  search: string | null;
+  productTypeCode: string | null;
+  manufacturer: string | null;
+  characteristics: SearchProductCharacteristicRequest[];
+  onlyInStock: boolean | null;
+}
+
+const initialAppliedFilters: AppliedCatalogFilters = {
+  search: null,
+  productTypeCode: null,
+  manufacturer: null,
+  characteristics: [],
+  onlyInStock: null,
+};
+
+interface SelectContainerProps {
+  children: ReactNode;
+}
+
+function SelectContainer({ children }: SelectContainerProps) {
+  return (
+    <div className="relative">
+      {children}
+
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 20 20"
+        fill="none"
+        className="pointer-events-none absolute right-4 top-1/2 size-4 -translate-y-1/2 text-slate-400"
+      >
+        <path
+          d="m6 8 4 4 4-4"
+          stroke="currentColor"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </div>
+  );
+}
+
+interface CharacteristicFilterFieldProps {
+  characteristic: CatalogProductTypeCharacteristicMetadata;
+  value: string;
+  onChange: (value: string) => void;
+}
+
+function CharacteristicFilterField({
+  characteristic,
+  value,
+  onChange,
+}: CharacteristicFilterFieldProps) {
+  const label = characteristic.unit
+    ? `${characteristic.name}, ${characteristic.unit}`
+    : characteristic.name;
+
+  if (characteristic.dataType === "Boolean") {
+    return (
+      <label className="grid gap-2">
+        <span className="text-sm font-medium text-slate-300">{label}</span>
+
+        <AppSelect
+          ariaLabel={label}
+          value={value}
+          onChange={onChange}
+          options={[
+            {
+              value: "",
+              label: "Любое значение",
+            },
+            {
+              value: "true",
+              label: "Да",
+            },
+            {
+              value: "false",
+              label: "Нет",
+            },
+          ]}
+        />
+      </label>
+    );
+  }
+
+  return (
+    <label className="grid gap-2">
+      <span className="text-sm font-medium text-slate-300">{label}</span>
+
+      <input
+        type={characteristic.dataType === "Number" ? "number" : "text"}
+        step={characteristic.dataType === "Number" ? "any" : undefined}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={
+          characteristic.dataType === "Number"
+            ? "Введите число"
+            : "Введите значение"
+        }
+        className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-slate-100 outline-none placeholder:text-slate-600 focus:border-teal-400"
+      />
+    </label>
+  );
+}
+
 export default function CatalogProductsPage() {
   const [search, setSearch] = useState("");
-  const [appliedSearch, setAppliedSearch] = useState("");
+  const [productTypeCode, setProductTypeCode] = useState("");
+  const [manufacturer, setManufacturer] = useState("");
   const [onlyInStock, setOnlyInStock] = useState(false);
-  const [appliedOnlyInStock, setAppliedOnlyInStock] = useState(false);
+
+  const [characteristicValues, setCharacteristicValues] = useState<
+    Record<string, string>
+  >({});
+
+  const [appliedFilters, setAppliedFilters] = useState<AppliedCatalogFilters>(
+    initialAppliedFilters,
+  );
+
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(20);
+  const pageSize = 20;
+
+  const productTypesQuery = useQuery({
+    queryKey: ["catalog-product-types"],
+    queryFn: getCatalogProductTypes,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const manufacturersQuery = useQuery({
+    queryKey: ["catalog-manufacturers"],
+    queryFn: getCatalogManufacturers,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const characteristicsQuery = useQuery({
+    queryKey: ["catalog-product-type-characteristics", productTypeCode],
+    queryFn: () => getCatalogProductTypeCharacteristics(productTypeCode),
+    enabled: productTypeCode.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const filterableCharacteristics =
+    characteristicsQuery.data?.filter(
+      (characteristic) => characteristic.isFilterable,
+    ) ?? [];
 
   const productsQuery = useQuery({
-    queryKey: [
-      "catalog-products",
-      appliedSearch,
-      appliedOnlyInStock,
-      page,
-      pageSize,
-    ],
+    queryKey: ["catalog-products", appliedFilters, page, pageSize],
     queryFn: () =>
       searchCatalogProducts({
-        search: appliedSearch,
-        productTypeCode: null,
-        manufacturer: null,
-        characteristics: [],
-        onlyInStock: appliedOnlyInStock ? true : null,
+        ...appliedFilters,
         page,
         pageSize,
       }),
@@ -126,17 +259,47 @@ export default function CatalogProductsPage() {
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    const characteristics = filterableCharacteristics
+      .map((characteristic) => ({
+        code: characteristic.code,
+        value: characteristicValues[characteristic.code]?.trim() ?? "",
+      }))
+      .filter((characteristic) => characteristic.value.length > 0);
+
+    setAppliedFilters({
+      search: search.trim() || null,
+      productTypeCode: productTypeCode || null,
+      manufacturer: manufacturer || null,
+      characteristics,
+      onlyInStock: onlyInStock ? true : null,
+    });
+
     setPage(1);
-    setAppliedSearch(search);
-    setAppliedOnlyInStock(onlyInStock);
   }
 
   function handleReset() {
     setSearch("");
-    setAppliedSearch("");
+    setProductTypeCode("");
+    setManufacturer("");
     setOnlyInStock(false);
-    setAppliedOnlyInStock(false);
+    setCharacteristicValues({});
+    setAppliedFilters(initialAppliedFilters);
     setPage(1);
+  }
+
+  function handleCharacteristicChange(
+    characteristicCode: string,
+    value: string,
+  ) {
+    setCharacteristicValues((currentValues) => ({
+      ...currentValues,
+      [characteristicCode]: value,
+    }));
+  }
+
+  function handleProductTypeChange(nextProductTypeCode: string) {
+    setProductTypeCode(nextProductTypeCode);
+    setCharacteristicValues({});
   }
 
   return (
@@ -147,46 +310,138 @@ export default function CatalogProductsPage() {
       />
 
       <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
-        <form
-          onSubmit={handleSearch}
-          className="grid gap-4 lg:grid-cols-[1fr_auto_auto]"
-        >
+        <form onSubmit={handleSearch} className="grid gap-5">
           <label className="grid gap-2">
             <span className="text-sm font-medium text-slate-300">
               Поиск товара
             </span>
+
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Например: автомат иэк армат 1п 16а"
+              placeholder="Название, артикул, тип или производитель"
               className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-slate-100 outline-none placeholder:text-slate-600 focus:border-teal-400"
             />
           </label>
 
-          <label className="flex items-center gap-3 self-end rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
-            <input
-              type="checkbox"
-              checked={onlyInStock}
-              onChange={(event) => setOnlyInStock(event.target.checked)}
-            />
-            <span className="text-sm text-slate-300">Только в наличии</span>
-          </label>
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="grid gap-2">
+              <span className="text-sm font-medium text-slate-300">
+                Тип товара
+              </span>
 
-          <div className="flex items-end gap-3">
-            <button
-              type="submit"
-              className="rounded-2xl bg-teal-500 px-5 py-3 text-sm font-medium text-white transition hover:bg-teal-400"
-            >
-              Найти
-            </button>
+              <AppSelect
+                ariaLabel="Тип товара"
+                value={productTypeCode}
+                disabled={productTypesQuery.isLoading}
+                onChange={handleProductTypeChange}
+                options={[
+                  {
+                    value: "",
+                    label: productTypesQuery.isLoading
+                      ? "Загружаем типы..."
+                      : "Все типы",
+                    disabled: productTypesQuery.isLoading,
+                  },
+                  ...(productTypesQuery.data ?? []).map((productType) => ({
+                    value: productType.code,
+                    label: productType.name,
+                  })),
+                ]}
+              />
+            </label>
 
-            <button
-              type="button"
-              onClick={handleReset}
-              className="rounded-2xl bg-white/[0.06] px-5 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/[0.1]"
-            >
-              Сбросить
-            </button>
+            <label className="grid gap-2">
+              <span className="text-sm font-medium text-slate-300">
+                Производитель
+              </span>
+
+              <AppSelect
+                ariaLabel="Производитель"
+                value={manufacturer}
+                disabled={manufacturersQuery.isLoading}
+                onChange={setManufacturer}
+                options={[
+                  {
+                    value: "",
+                    label: manufacturersQuery.isLoading
+                      ? "Загружаем производителей..."
+                      : "Все производители",
+                    disabled: manufacturersQuery.isLoading,
+                  },
+                  ...(manufacturersQuery.data ?? []).map(
+                    (manufacturerItem) => ({
+                      value: manufacturerItem.name,
+                      label: manufacturerItem.name,
+                    }),
+                  ),
+                ]}
+              />
+            </label>
+          </div>
+
+          {productTypeCode && (
+            <section className="rounded-2xl border border-white/10 bg-black/20 p-4">
+              <h3 className="text-sm font-semibold text-white">
+                Характеристики
+              </h3>
+
+              {characteristicsQuery.isLoading ? (
+                <p className="mt-3 text-sm text-slate-400">
+                  Загружаем характеристики...
+                </p>
+              ) : characteristicsQuery.isError ? (
+                <p className="mt-3 rounded-2xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
+                  {getErrorMessage(characteristicsQuery.error)}
+                </p>
+              ) : filterableCharacteristics.length === 0 ? (
+                <p className="mt-3 text-sm text-slate-400">
+                  Для этого типа нет характеристик, разрешённых для фильтрации.
+                </p>
+              ) : (
+                <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {filterableCharacteristics.map((characteristic) => (
+                    <CharacteristicFilterField
+                      key={characteristic.id}
+                      characteristic={characteristic}
+                      value={characteristicValues[characteristic.code] ?? ""}
+                      onChange={(value) =>
+                        handleCharacteristicChange(characteristic.code, value)
+                      }
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
+          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+            <label className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
+              <input
+                type="checkbox"
+                checked={onlyInStock}
+                onChange={(event) => setOnlyInStock(event.target.checked)}
+              />
+
+              <span className="text-sm text-slate-300">Только в наличии</span>
+            </label>
+
+            <div className="flex gap-3">
+              <button
+                type="submit"
+                className="rounded-2xl bg-teal-500 px-5 py-3 text-sm font-medium text-white transition hover:bg-teal-400"
+              >
+                Найти
+              </button>
+
+              <button
+                type="button"
+                onClick={handleReset}
+                className="rounded-2xl bg-white/[0.06] px-5 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/[0.1]"
+              >
+                Сбросить
+              </button>
+            </div>
           </div>
         </form>
       </section>
