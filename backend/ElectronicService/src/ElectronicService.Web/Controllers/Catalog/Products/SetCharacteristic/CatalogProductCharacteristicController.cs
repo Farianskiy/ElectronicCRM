@@ -1,9 +1,11 @@
 using ElectronicService.Contracts.Catalog.Products.Management;
 using ElectronicService.Core.Catalog.Products.SetCharacteristic;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ElectronicService.Web.Controllers.Catalog.Products.SetCharacteristic;
 
+[Authorize(Roles = "Technical")]
 [ApiController]
 [Route("api/catalog/products/{id:guid}/characteristics")]
 public sealed class CatalogProductCharacteristicController : ControllerBase

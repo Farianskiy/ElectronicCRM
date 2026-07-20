@@ -1,9 +1,11 @@
 using ElectronicService.Contracts.Catalog.Products.Management;
 using ElectronicService.Core.Catalog.Products.AddAlias;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ElectronicService.Web.Controllers.Catalog.Products.AddAlias;
 
+[Authorize(Roles = "Technical")]
 [ApiController]
 [Route("api/catalog/products/{id:guid}/aliases")]
 public sealed class CatalogProductAliasController : ControllerBase

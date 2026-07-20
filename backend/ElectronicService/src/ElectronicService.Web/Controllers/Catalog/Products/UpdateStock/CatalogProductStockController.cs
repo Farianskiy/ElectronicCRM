@@ -1,9 +1,11 @@
 using ElectronicService.Contracts.Catalog.Products.Management;
 using ElectronicService.Core.Catalog.Products.UpdateStock;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ElectronicService.Web.Controllers.Catalog.Products;
 
+[Authorize(Roles = "Technical")]
 [ApiController]
 [Route("api/catalog/products/{id:guid}/stock")]
 public sealed class CatalogProductStockController : ControllerBase

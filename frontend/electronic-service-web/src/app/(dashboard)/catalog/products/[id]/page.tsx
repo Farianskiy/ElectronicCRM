@@ -4,8 +4,12 @@ import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useState } from "react";
+import { useAuthSession } from "@/features/auth/model/useAuthSession";
 import { getCatalogProductDetails } from "@/features/catalogProducts/api/getCatalogProductDetails";
 import type { CatalogProductCharacteristic } from "@/features/catalogProducts/model/types";
+import { TechnicalProductEditor } from "@/features/catalogProducts/ui/TechnicalProductEditor";
+import { isTechnicalUser } from "@/shared/api/authToken";
 import { formatPrice } from "@/shared/lib/formatters";
 import { PageHeader } from "@/shared/ui/PageHeader";
 
@@ -57,6 +61,11 @@ export default function CatalogProductDetailsPage() {
   const params = useParams();
   const productId = getProductIdFromParams(params);
 
+  const session = useAuthSession();
+  const canEditProduct = isTechnicalUser(session);
+
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
+
   const productQuery = useQuery({
     queryKey: ["catalog-product-details", productId],
     queryFn: () => getCatalogProductDetails(productId),
@@ -107,19 +116,34 @@ export default function CatalogProductDetailsPage() {
                 </p>
               </div>
 
-              <span
-                className={
-                  product.stockQuantity > 0
-                    ? "w-fit rounded-full bg-green-500/15 px-4 py-2 text-sm font-medium text-green-300"
-                    : "w-fit rounded-full bg-red-500/15 px-4 py-2 text-sm font-medium text-red-300"
-                }
-              >
-                {product.stockQuantity > 0 ? "В наличии" : "Нет в наличии"}
-              </span>
+              <div className="flex flex-wrap items-center gap-3">
+                <span
+                  className={
+                    product.stockQuantity > 0
+                      ? "w-fit rounded-full bg-green-500/15 px-4 py-2 text-sm font-medium text-green-300"
+                      : "w-fit rounded-full bg-red-500/15 px-4 py-2 text-sm font-medium text-red-300"
+                  }
+                >
+                  {product.stockQuantity > 0 ? "В наличии" : "Нет в наличии"}
+                </span>
+
+                {canEditProduct && (
+                  <button
+                    type="button"
+                    onClick={() => setIsEditorOpen((current) => !current)}
+                    className="rounded-2xl border border-teal-500/30 bg-teal-500/10 px-4 py-2 text-sm font-medium text-teal-200 transition hover:bg-teal-500/20"
+                  >
+                    {isEditorOpen ? "Закрыть редактор" : "Редактировать товар"}
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="mt-6 grid gap-4 md:grid-cols-4">
-              <InfoCard label="Производитель" value={product.manufacturerName} />
+              <InfoCard
+                label="Производитель"
+                value={product.manufacturerName}
+              />
               <InfoCard label="Тип товара" value={product.productTypeName} />
               <InfoCard label="Код типа" value={product.productTypeCode} />
               <InfoCard
@@ -129,6 +153,10 @@ export default function CatalogProductDetailsPage() {
               <InfoCard label="Остаток" value={`${product.stockQuantity}`} />
             </div>
           </section>
+
+          {canEditProduct && isEditorOpen && (
+            <TechnicalProductEditor product={product} />
+          )}
 
           <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
             <h2 className="text-xl font-semibold text-white">Характеристики</h2>
@@ -168,9 +196,7 @@ export default function CatalogProductDetailsPage() {
             </h2>
 
             {product.aliases.length === 0 ? (
-              <p className="mt-4 text-sm text-slate-400">
-                Alias-ы не указаны.
-              </p>
+              <p className="mt-4 text-sm text-slate-400">Alias-ы не указаны.</p>
             ) : (
               <div className="mt-5 flex flex-wrap gap-2">
                 {product.aliases.map((alias) => (
