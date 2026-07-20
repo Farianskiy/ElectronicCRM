@@ -75,19 +75,24 @@ public sealed class AskCatalogAssistantCommandHandler
     }
 
     private async Task<CatalogAssistantResult> SearchProductsAsync(
-        CatalogAssistantParsedRequest parsedRequest,
-        AskCatalogAssistantCommand command,
-        CancellationToken cancellationToken)
+    CatalogAssistantParsedRequest parsedRequest,
+    AskCatalogAssistantCommand command,
+    CancellationToken cancellationToken)
     {
+        bool? onlyInStockFilter = command.OnlyInStock
+            ? true
+            : null;
+
         var products = await _catalogProductsReader
             .SearchProductsAsync(
                 new SearchProductsQuery(
-                    parsedRequest.Search,
-                    parsedRequest.ProductTypeCode,
-                    parsedRequest.Manufacturer,
-                    parsedRequest.Characteristics,
-                    command.Page,
-                    command.PageSize),
+                    Search: parsedRequest.Search,
+                    ProductTypeCode: parsedRequest.ProductTypeCode,
+                    Manufacturer: parsedRequest.Manufacturer,
+                    Characteristics: parsedRequest.Characteristics,
+                    Page: command.Page,
+                    PageSize: command.PageSize,
+                    OnlyInStock: onlyInStockFilter),
                 cancellationToken)
             .ConfigureAwait(false);
 

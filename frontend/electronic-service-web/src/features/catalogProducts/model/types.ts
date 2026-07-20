@@ -43,6 +43,7 @@ export interface AdvancedCatalogProductsSearchParams {
   productTypeCode?: string | null;
   manufacturer?: string | null;
   characteristics?: SearchProductCharacteristicRequest[];
+  onlyInStock?: boolean | null;
   page: number;
   pageSize: number;
 }

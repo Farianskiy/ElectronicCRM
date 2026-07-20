@@ -5,7 +5,7 @@ import axios from "axios";
 import Link from "next/link";
 import type { FormEvent } from "react";
 import { useState } from "react";
-import { getCatalogProducts } from "@/features/catalogProducts/api/getCatalogProducts";
+import { searchCatalogProducts } from "@/features/catalogProducts/api/searchCatalogProducts";
 import type { CatalogProductListItem } from "@/features/catalogProducts/model/types";
 import { formatPrice } from "@/shared/lib/formatters";
 import { PageHeader } from "@/shared/ui/PageHeader";
@@ -99,20 +99,26 @@ export default function CatalogProductsPage() {
   const [pageSize] = useState(20);
 
   const productsQuery = useQuery({
-    queryKey: ["catalog-products", appliedSearch, page, pageSize],
+    queryKey: [
+      "catalog-products",
+      appliedSearch,
+      appliedOnlyInStock,
+      page,
+      pageSize,
+    ],
     queryFn: () =>
-      getCatalogProducts({
+      searchCatalogProducts({
         search: appliedSearch,
+        productTypeCode: null,
+        manufacturer: null,
+        characteristics: [],
+        onlyInStock: appliedOnlyInStock ? true : null,
         page,
         pageSize,
       }),
   });
 
-  const rawProducts = productsQuery.data?.items ?? [];
-
-  const products = appliedOnlyInStock
-    ? rawProducts.filter((product) => product.stockQuantity > 0)
-    : rawProducts;
+  const products = productsQuery.data?.items ?? [];
 
   const totalCount = productsQuery.data?.totalCount ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
