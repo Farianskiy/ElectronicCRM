@@ -9,6 +9,7 @@ import { updateCatalogProductStock } from "../api/updateCatalogProductStock";
 import type { CatalogProductDetails } from "../model/types";
 import { TechnicalProductAliasesEditor } from "./TechnicalProductAliasesEditor";
 import { TechnicalProductCharacteristicsEditor } from "./TechnicalProductCharacteristicsEditor";
+import { TechnicalProductGeneralInformationEditor } from "./TechnicalProductGeneralInformationEditor";
 
 interface TechnicalProductEditorProps {
   product: CatalogProductDetails;
@@ -187,6 +188,10 @@ export function TechnicalProductEditor({
         </div>
       )}
 
+      <div className="mt-6">
+        <TechnicalProductGeneralInformationEditor product={product} />
+      </div>
+
       <div className="mt-6 grid gap-5 lg:grid-cols-2">
         <form
           onSubmit={handlePriceSubmit}
@@ -210,7 +215,7 @@ export function TechnicalProductEditor({
             </label>
 
             <label className="grid gap-2">
-              <span className="text-sm text-slate-300">Валюта</span>
+              <span className="text-sm text-slate-100">Валюта</span>
 
               <input
                 value={priceCurrency}

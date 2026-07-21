@@ -28,6 +28,9 @@ using ElectronicService.Core.Catalog.Assistant.DictionarySuggestions.RejectSugge
 using ElectronicService.Core.Auth.Login;
 using ElectronicService.Core.Catalog.Import.ImportProductsFromExcel;
 using ElectronicService.Core.Catalog.Import.PreviewProductsExcelImport;
+using ElectronicService.Core.Catalog.Products.RemoveAlias;
+using ElectronicService.Core.Catalog.Products.RemoveCharacteristic;
+using ElectronicService.Core.Catalog.Products.UpdateGeneralInformation;
 
 namespace ElectronicService.Core;
 
@@ -63,6 +66,10 @@ public static class DependencyInjectionExtensions
         services.AddScoped<LoginCommandHandler>();
         services.AddScoped<ImportProductsFromExcelCommandHandler>();
         services.AddScoped<PreviewProductsExcelImportCommandHandler>();
+        services.AddScoped<UpdateProductGeneralInformationCommandHandler>();
+        services.AddScoped<RemoveProductCharacteristicCommandHandler>();
+        services.AddScoped<RemoveProductAliasCommandHandler>();
+
 
         return services;
     }

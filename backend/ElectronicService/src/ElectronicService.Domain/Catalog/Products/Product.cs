@@ -142,6 +142,43 @@ public sealed class Product : AggregateRoot
         return UnitResult.Success<DomainError>();
     }
 
+    // Изменяет основные данные товара одной атомарной операцией.
+    public UnitResult<DomainError> UpdateGeneralInformation(
+        string name,
+        string article,
+        Guid manufacturerId)
+    {
+        // Сначала валидируем все новые значения.
+        // Пока проверка не закончена, состояние Product не меняется.
+        var nameResult = ProductName.Create(name);
+
+        if (nameResult.IsFailure)
+        {
+            return UnitResult.Failure(nameResult.Error);
+        }
+
+        var articleResult = ProductArticle.Create(article);
+
+        if (articleResult.IsFailure)
+        {
+            return UnitResult.Failure(articleResult.Error);
+        }
+
+        if (manufacturerId == Guid.Empty)
+        {
+            return UnitResult.Failure(
+                GeneralErrors.ValueIsInvalid(nameof(manufacturerId)));
+        }
+
+        // Все параметры корректны — теперь меняем состояние агрегата.
+        Name = nameResult.Value;
+        Article = articleResult.Value;
+        ManufacturerId = manufacturerId;
+        UpdatedAtUtc = DateTime.UtcNow;
+
+        return UnitResult.Success<DomainError>();
+    }
+
     // Метод меняет цену товара
     public UnitResult<DomainError> ChangePrice(Money price)
     {
@@ -237,7 +274,7 @@ public sealed class Product : AggregateRoot
 
         if (productType.IsCharacteristicRequired(characteristicDefinitionId))
         {
-            return UnitResult.Failure(GeneralErrors.ValueIsInvalid(nameof(characteristicDefinitionId)));
+            return UnitResult.Failure(CatalogErrors.RequiredCharacteristicCannotBeRemoved(characteristicDefinitionId));
         }
 
         var characteristic = _characteristics
@@ -278,6 +315,29 @@ public sealed class Product : AggregateRoot
         }
 
         _aliases.Add(aliasResult.Value);
+        UpdatedAtUtc = DateTime.UtcNow;
+
+        return UnitResult.Success<DomainError>();
+    }
+
+    public UnitResult<DomainError> RemoveAlias(Guid aliasId)
+    {
+        if (aliasId == Guid.Empty)
+        {
+            return UnitResult.Failure(
+                GeneralErrors.ValueIsInvalid(nameof(aliasId)));
+        }
+
+        var alias = _aliases.FirstOrDefault(
+            existingAlias => existingAlias.Id == aliasId);
+
+        if (alias is null)
+        {
+            return UnitResult.Failure(
+                CatalogErrors.ProductAliasNotFound(aliasId));
+        }
+
+        _aliases.Remove(alias);
         UpdatedAtUtc = DateTime.UtcNow;
 
         return UnitResult.Success<DomainError>();

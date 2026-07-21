@@ -10,6 +10,7 @@ import type {
 } from "@/features/catalogMetadata/model/types";
 import { AppSelect } from "@/shared/ui/AppSelect";
 import { setCatalogProductCharacteristic } from "../api/setCatalogProductCharacteristic";
+import { removeCatalogProductCharacteristic } from "../api/removeCatalogProductCharacteristic";
 import type { CatalogProductDetails } from "../model/types";
 
 interface TechnicalProductCharacteristicsEditorProps {
@@ -118,6 +119,11 @@ export function TechnicalProductCharacteristicsEditor({
 
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  const [
+    characteristicCodePendingRemoval,
+    setCharacteristicCodePendingRemoval,
+  ] = useState<string | null>(null);
+
   const metadataQuery = useQuery({
     queryKey: ["catalog-product-type-characteristics", product.productTypeCode],
     queryFn: () =>
@@ -136,7 +142,7 @@ export function TechnicalProductCharacteristicsEditor({
     });
   }, [metadataQuery.data]);
 
-  const mutation = useMutation({
+  const saveMutation = useMutation({
     mutationFn: async (request: { code: string; value: string }) => {
       await setCatalogProductCharacteristic(product.id, request);
     },
@@ -167,12 +173,51 @@ export function TechnicalProductCharacteristicsEditor({
     },
   });
 
+  const removeMutation = useMutation({
+    mutationFn: async (request: { code: string; name: string }) => {
+      await removeCatalogProductCharacteristic(product.id, request.code);
+    },
+
+    onSuccess: async (_data, removedCharacteristic) => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["catalog-product-details", product.id],
+        }),
+
+        queryClient.invalidateQueries({
+          queryKey: ["catalog-products"],
+        }),
+      ]);
+
+      setDraftValues((currentValues) => {
+        const nextValues = {
+          ...currentValues,
+        };
+
+        delete nextValues[removedCharacteristic.code];
+
+        return nextValues;
+      });
+
+      setCharacteristicCodePendingRemoval(null);
+      setValidationError(null);
+
+      setSuccessMessage(
+        `Характеристика «${removedCharacteristic.name}» удалена.`,
+      );
+    },
+  });
+
   function handleValueChange(characteristicCode: string, value: string): void {
     setDraftValues((currentValues) => ({
       ...currentValues,
       [characteristicCode]: value,
     }));
 
+    saveMutation.reset();
+    removeMutation.reset();
+
+    setCharacteristicCodePendingRemoval(null);
     setValidationError(null);
     setSuccessMessage(null);
   }
@@ -180,7 +225,7 @@ export function TechnicalProductCharacteristicsEditor({
   function handleSave(
     characteristic: CatalogProductTypeCharacteristicMetadata,
   ): void {
-    mutation.reset();
+    saveMutation.reset();
     setValidationError(null);
     setSuccessMessage(null);
 
@@ -199,11 +244,13 @@ export function TechnicalProductCharacteristicsEditor({
       return;
     }
 
-    mutation.mutate({
+    saveMutation.mutate({
       code: characteristic.code,
       value: normalizedValue,
     });
   }
+
+  const mutationError = saveMutation.error ?? removeMutation.error;
 
   return (
     <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
@@ -234,9 +281,9 @@ export function TechnicalProductCharacteristicsEditor({
         </div>
       )}
 
-      {mutation.isError && (
+      {mutationError && (
         <div className="mt-5 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
-          {getErrorMessage(mutation.error)}
+          {getErrorMessage(mutationError)}
         </div>
       )}
 
@@ -266,9 +313,24 @@ export function TechnicalProductCharacteristicsEditor({
               ? normalizeBooleanValue(rawValue)
               : rawValue;
 
+          const hasSavedValue = Object.prototype.hasOwnProperty.call(
+            savedValues,
+            characteristic.code,
+          );
+
+          const isAwaitingRemovalConfirmation =
+            characteristicCodePendingRemoval === characteristic.code;
+
+          const isRemoving =
+            removeMutation.isPending &&
+            removeMutation.variables?.code === characteristic.code;
+
+          const operationsArePending =
+            saveMutation.isPending || removeMutation.isPending;
+
           const isSaving =
-            mutation.isPending &&
-            mutation.variables?.code === characteristic.code;
+            saveMutation.isPending &&
+            saveMutation.variables?.code === characteristic.code;
 
           const label = characteristic.unit
             ? `${characteristic.name}, ${characteristic.unit}`
@@ -336,14 +398,75 @@ export function TechnicalProductCharacteristicsEditor({
                 />
               )}
 
-              <button
-                type="button"
-                disabled={isSaving}
-                onClick={() => handleSave(characteristic)}
-                className="rounded-2xl bg-teal-500 px-5 py-3 text-sm font-medium text-white transition hover:bg-teal-400 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {isSaving ? "Сохраняем..." : "Сохранить"}
-              </button>
+              <div className="flex flex-wrap gap-2 lg:justify-end">
+                <button
+                  type="button"
+                  disabled={operationsArePending}
+                  onClick={() => {
+                    setCharacteristicCodePendingRemoval(null);
+                    removeMutation.reset();
+                    handleSave(characteristic);
+                  }}
+                  className="rounded-2xl bg-teal-500 px-5 py-3 text-sm font-medium text-white transition hover:bg-teal-400 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isSaving
+                    ? "Сохраняем..."
+                    : hasSavedValue
+                      ? "Сохранить"
+                      : "Добавить"}
+                </button>
+
+                {hasSavedValue && !characteristic.isRequired && (
+                  <>
+                    {isAwaitingRemovalConfirmation ? (
+                      <>
+                        <button
+                          type="button"
+                          disabled={operationsArePending}
+                          onClick={() =>
+                            removeMutation.mutate({
+                              code: characteristic.code,
+                              name: characteristic.name,
+                            })
+                          }
+                          className="rounded-2xl bg-red-500 px-4 py-3 text-sm font-medium text-white transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {isRemoving ? "Удаляем..." : "Подтвердить"}
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={operationsArePending}
+                          onClick={() =>
+                            setCharacteristicCodePendingRemoval(null)
+                          }
+                          className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-medium text-slate-300 transition hover:bg-white/[0.08]"
+                        >
+                          Отмена
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={operationsArePending}
+                        onClick={() => {
+                          saveMutation.reset();
+                          removeMutation.reset();
+                          setValidationError(null);
+                          setSuccessMessage(null);
+
+                          setCharacteristicCodePendingRemoval(
+                            characteristic.code,
+                          );
+                        }}
+                        className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Удалить
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           );
         })}

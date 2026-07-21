@@ -38,18 +38,33 @@ public sealed class CatalogProductDetailsController : ControllerBase
             result.Id,
             result.Article,
             result.Name,
+
+            result.ProductTypeId,
             result.ProductTypeCode,
             result.ProductTypeName,
+
+            result.ManufacturerId,
             result.ManufacturerName,
+
             result.PriceAmount,
             result.PriceCurrency,
             result.StockQuantity,
-            result.Characteristics.Select(characteristic => new ProductCharacteristicResponse(
-                characteristic.Code,
-                characteristic.Name,
-                characteristic.DataType,
-                characteristic.Unit,
-                characteristic.Value)).ToList(),
-            result.Aliases));
+
+            result.Characteristics
+                .Select(characteristic =>
+                    new ProductCharacteristicResponse(
+                        characteristic.Code,
+                        characteristic.Name,
+                        characteristic.DataType,
+                        characteristic.Unit,
+                        characteristic.Value))
+                .ToList(),
+
+            result.Aliases
+                .Select(alias =>
+                    new ProductAliasResponse(
+                        alias.Id,
+                        alias.Value))
+                .ToList()));
     }
 }

@@ -2,6 +2,7 @@ using ElectronicService.Core.Catalog.Products.Abstractions;
 using ElectronicService.Domain.Catalog.Characteristics;
 using ElectronicService.Domain.Catalog.ProductTypes;
 using ElectronicService.Infrastructure.Postgres.Data;
+using ElectronicService.Domain.Catalog.Manufacturers;
 using Microsoft.EntityFrameworkCore;
 
 namespace ElectronicService.Infrastructure.Postgres.Catalog.Repositories;
@@ -37,6 +38,17 @@ public sealed class CatalogProductMetadataRepository : ICatalogProductMetadataRe
             .AsNoTracking()
             .FirstOrDefaultAsync(
                 definition => definition.Code == normalizedCode,
+                cancellationToken);
+    }
+
+    public Task<Manufacturer?> GetManufacturerByIdAsync(
+        Guid manufacturerId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Manufacturers
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                manufacturer => manufacturer.Id == manufacturerId,
                 cancellationToken);
     }
 

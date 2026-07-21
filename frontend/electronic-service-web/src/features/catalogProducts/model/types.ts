@@ -48,16 +48,27 @@ export interface AdvancedCatalogProductsSearchParams {
   pageSize: number;
 }
 
+export interface CatalogProductAlias {
+  id: string;
+  value: string;
+}
+
 export interface CatalogProductDetails {
   id: string;
   article: string;
   name: string;
+
+  productTypeId: string;
   productTypeCode: string;
   productTypeName: string;
+
+  manufacturerId: string;
   manufacturerName: string;
+
   priceAmount: number;
   priceCurrency: string;
   stockQuantity: number;
+
   characteristics: CatalogProductCharacteristic[];
-  aliases: string[];
+  aliases: CatalogProductAlias[];
 }

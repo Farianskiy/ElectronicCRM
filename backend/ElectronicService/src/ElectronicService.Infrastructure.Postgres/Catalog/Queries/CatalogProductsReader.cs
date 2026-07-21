@@ -124,9 +124,14 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
                 productEntity.Id,
                 Article = productEntity.Article.Value,
                 Name = productEntity.Name.Value,
+
+                ProductTypeId = productType.Id,
                 ProductTypeCode = productType.Code,
                 ProductTypeName = productType.Name,
+
+                ManufacturerId = manufacturer.Id,
                 ManufacturerName = manufacturer.Name,
+
                 PriceAmount = productEntity.Price.Amount,
                 PriceCurrency = productEntity.Price.Currency,
                 StockQuantity = productEntity.StockQuantity.Value
@@ -175,7 +180,9 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
             .AsNoTracking()
             .Where(alias => alias.ProductId == productId)
             .OrderBy(alias => alias.NormalizedValue)
-            .Select(alias => alias.Value)
+            .Select(alias => new CatalogProductAliasResult(
+                alias.Id,
+                alias.Value))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
@@ -183,9 +190,14 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
             product.Id,
             product.Article,
             product.Name,
+
+            product.ProductTypeId,
             product.ProductTypeCode,
             product.ProductTypeName,
+
+            product.ManufacturerId,
             product.ManufacturerName,
+
             product.PriceAmount,
             product.PriceCurrency,
             product.StockQuantity,

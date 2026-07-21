@@ -148,4 +148,27 @@ public static class CatalogErrors
             "catalog.current_user.required",
             "Не удалось определить текущего пользователя.");
     }
+
+    public static DomainError ManufacturerNotFound(Guid manufacturerId)
+    {
+        return new DomainError(
+            "catalog.manufacturer.not_found",
+            $"Производитель '{manufacturerId}' не найден.");
+    }
+
+    public static DomainError ProductAliasNotFound(Guid aliasId)
+    {
+        return new DomainError(
+            "catalog.product_alias.not_found",
+            $"Альтернативное название '{aliasId}' не найдено.");
+    }
+
+    public static DomainError RequiredCharacteristicCannotBeRemoved(
+        Guid characteristicDefinitionId)
+    {
+        return new DomainError(
+            "catalog.required_characteristic.cannot_be_removed",
+            $"Обязательную характеристику " +
+            $"'{characteristicDefinitionId}' удалить нельзя.");
+    }
 }

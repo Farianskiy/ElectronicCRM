@@ -201,10 +201,10 @@ export default function CatalogProductDetailsPage() {
               <div className="mt-5 flex flex-wrap gap-2">
                 {product.aliases.map((alias) => (
                   <span
-                    key={alias}
+                    key={alias.id}
                     className="rounded-full bg-teal-500/15 px-3 py-1 text-sm font-medium text-teal-300"
                   >
-                    {alias}
+                    {alias.value}
                   </span>
                 ))}
               </div>

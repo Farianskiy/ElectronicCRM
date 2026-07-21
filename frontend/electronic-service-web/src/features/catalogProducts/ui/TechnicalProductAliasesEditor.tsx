@@ -5,6 +5,7 @@ import axios from "axios";
 import type { FormEvent } from "react";
 import { useState } from "react";
 import { addCatalogProductAlias } from "../api/addCatalogProductAlias";
+import { removeCatalogProductAlias } from "../api/removeCatalogProductAlias";
 import type { CatalogProductDetails } from "../model/types";
 
 interface TechnicalProductAliasesEditorProps {
@@ -32,7 +33,7 @@ function getErrorMessage(error: unknown): string {
     return error.message;
   }
 
-  return "Не удалось добавить альтернативное название.";
+  return "Не удалось изменить альтернативные названия.";
 }
 
 export function TechnicalProductAliasesEditor({
@@ -41,10 +42,28 @@ export function TechnicalProductAliasesEditor({
   const queryClient = useQueryClient();
 
   const [alias, setAlias] = useState("");
+
+  const [aliasIdPendingRemoval, setAliasIdPendingRemoval] = useState<
+    string | null
+  >(null);
+
   const [validationError, setValidationError] = useState<string | null>(null);
+
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const mutation = useMutation({
+  async function refreshProduct(): Promise<void> {
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: ["catalog-product-details", product.id],
+      }),
+
+      queryClient.invalidateQueries({
+        queryKey: ["catalog-products"],
+      }),
+    ]);
+  }
+
+  const addMutation = useMutation({
     mutationFn: async (value: string) => {
       await addCatalogProductAlias(product.id, {
         alias: value,
@@ -52,26 +71,36 @@ export function TechnicalProductAliasesEditor({
     },
 
     onSuccess: async (_data, savedAlias) => {
+      await refreshProduct();
+
       setAlias("");
+      setAliasIdPendingRemoval(null);
       setValidationError(null);
       setSuccessMessage(`Альтернативное название «${savedAlias}» добавлено.`);
+    },
+  });
 
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: ["catalog-product-details", product.id],
-        }),
+  const removeMutation = useMutation({
+    mutationFn: async (request: { aliasId: string; aliasValue: string }) => {
+      await removeCatalogProductAlias(product.id, request.aliasId);
+    },
 
-        queryClient.invalidateQueries({
-          queryKey: ["catalog-products"],
-        }),
-      ]);
+    onSuccess: async (_data, removedAlias) => {
+      await refreshProduct();
+
+      setAliasIdPendingRemoval(null);
+      setValidationError(null);
+      setSuccessMessage(
+        `Альтернативное название «${removedAlias.aliasValue}» удалено.`,
+      );
     },
   });
 
   function handleSubmit(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
 
-    mutation.reset();
+    addMutation.reset();
+    removeMutation.reset();
     setValidationError(null);
     setSuccessMessage(null);
 
@@ -83,8 +112,10 @@ export function TechnicalProductAliasesEditor({
       return;
     }
 
-    mutation.mutate(normalizedAlias);
+    addMutation.mutate(normalizedAlias);
   }
+
+  const mutationError = addMutation.error ?? removeMutation.error;
 
   return (
     <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
@@ -92,20 +123,78 @@ export function TechnicalProductAliasesEditor({
         <h3 className="font-semibold text-white">Альтернативные названия</h3>
 
         <p className="mt-2 text-sm text-slate-400">
-          Alias участвует в поиске товара.
+          Alias участвует в поиске товара. Удаление начинает действовать сразу
+          после подтверждения.
         </p>
       </div>
 
-      {product.aliases.length > 0 && (
-        <div className="mt-4 flex flex-wrap gap-2">
-          {product.aliases.map((productAlias) => (
-            <span
-              key={productAlias}
-              className="rounded-full bg-teal-500/15 px-3 py-1 text-sm font-medium text-teal-300"
-            >
-              {productAlias}
-            </span>
-          ))}
+      {product.aliases.length === 0 ? (
+        <p className="mt-4 text-sm text-slate-500">
+          Альтернативные названия пока не добавлены.
+        </p>
+      ) : (
+        <div className="mt-4 grid gap-2">
+          {product.aliases.map((productAlias) => {
+            const isAwaitingConfirmation =
+              aliasIdPendingRemoval === productAlias.id;
+
+            const isRemoving =
+              removeMutation.isPending &&
+              removeMutation.variables?.aliasId === productAlias.id;
+
+            return (
+              <div
+                key={productAlias.id}
+                className="flex flex-col justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3 sm:flex-row sm:items-center"
+              >
+                <span className="min-w-0 break-words text-sm font-medium text-teal-300">
+                  {productAlias.value}
+                </span>
+
+                {isAwaitingConfirmation ? (
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={isRemoving}
+                      onClick={() =>
+                        removeMutation.mutate({
+                          aliasId: productAlias.id,
+                          aliasValue: productAlias.value,
+                        })
+                      }
+                      className="rounded-xl bg-red-500 px-3 py-2 text-xs font-medium text-white transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isRemoving ? "Удаляем..." : "Подтвердить удаление"}
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={isRemoving}
+                      onClick={() => setAliasIdPendingRemoval(null)}
+                      className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-medium text-slate-300 transition hover:bg-white/[0.08]"
+                    >
+                      Отмена
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={addMutation.isPending || removeMutation.isPending}
+                    onClick={() => {
+                      addMutation.reset();
+                      removeMutation.reset();
+                      setValidationError(null);
+                      setSuccessMessage(null);
+                      setAliasIdPendingRemoval(productAlias.id);
+                    }}
+                    className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Удалить
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -115,9 +204,9 @@ export function TechnicalProductAliasesEditor({
         </div>
       )}
 
-      {mutation.isError && (
+      {mutationError && (
         <div className="mt-5 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
-          {getErrorMessage(mutation.error)}
+          {getErrorMessage(mutationError)}
         </div>
       )}
 
@@ -137,6 +226,7 @@ export function TechnicalProductAliasesEditor({
             setAlias(event.target.value);
             setValidationError(null);
             setSuccessMessage(null);
+            setAliasIdPendingRemoval(null);
           }}
           placeholder="Например: NSX400F 4P 400A"
           className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-slate-100 outline-none placeholder:text-slate-600 focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20"
@@ -144,10 +234,10 @@ export function TechnicalProductAliasesEditor({
 
         <button
           type="submit"
-          disabled={mutation.isPending}
+          disabled={addMutation.isPending || removeMutation.isPending}
           className="rounded-2xl bg-teal-500 px-5 py-3 text-sm font-medium text-white transition hover:bg-teal-400 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {mutation.isPending ? "Добавляем..." : "Добавить alias"}
+          {addMutation.isPending ? "Добавляем..." : "Добавить alias"}
         </button>
       </form>
     </div>
