@@ -93,6 +93,51 @@ public static class CatalogErrors
             $"Характеристика с кодом '{code}' не найдена.");
     }
 
+    public static DomainError CharacteristicDefinitionNotFound(
+    Guid characteristicDefinitionId)
+    {
+        return new DomainError(
+            "catalog.characteristic_definition.not_found",
+            $"Характеристика " +
+            $"'{characteristicDefinitionId}' не найдена.");
+    }
+
+    public static DomainError ProductTypeCharacteristicNotFound(
+    Guid productTypeId,
+    Guid characteristicDefinitionId)
+    {
+        return new DomainError(
+            "catalog.product_type_characteristic.not_found",
+            $"Характеристика '{characteristicDefinitionId}' " +
+            $"не добавлена к типу товара '{productTypeId}'.");
+    }
+
+    public static DomainError CharacteristicCannotBeMadeRequired(
+        Guid characteristicDefinitionId,
+        int productsWithoutValueCount)
+    {
+        return new DomainError(
+            "catalog.product_type_characteristic.cannot_be_required",
+            $"Характеристику '{characteristicDefinitionId}' " +
+            $"нельзя сделать обязательной: " +
+            $"{productsWithoutValueCount} товаров " +
+            $"не имеют значения.");
+    }
+
+    public static DomainError
+    ProductTypeCharacteristicCannotBeRemoved(
+        Guid productTypeId,
+        Guid characteristicDefinitionId,
+        int productsWithValueCount)
+    {
+        return new DomainError(
+            "catalog.product_type_characteristic.cannot_be_removed",
+            $"Характеристику '{characteristicDefinitionId}' " +
+            $"нельзя удалить из типа товара " +
+            $"'{productTypeId}': она заполнена у " +
+            $"{productsWithValueCount} товаров.");
+    }
+
     public static DomainError DictionaryTermAlreadyExists(string phrase)
     {
         return new DomainError(

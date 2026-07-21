@@ -31,6 +31,14 @@ using ElectronicService.Core.Catalog.Import.PreviewProductsExcelImport;
 using ElectronicService.Core.Catalog.Products.RemoveAlias;
 using ElectronicService.Core.Catalog.Products.RemoveCharacteristic;
 using ElectronicService.Core.Catalog.Products.UpdateGeneralInformation;
+using ElectronicService.Core.Catalog.ProductTypes.GetCharacteristicSchema;
+using ElectronicService.Core.Catalog.ProductTypes.AddOptionalCharacteristic;
+using ElectronicService.Core.Catalog.ProductTypes.GetAvailableCharacteristicDefinitions;
+using ElectronicService.Core.Catalog.ProductTypes.SetCharacteristicRequired;
+using ElectronicService.Core.Catalog.ProductTypes.RemoveCharacteristic;
+using ElectronicService.Core.Catalog.CharacteristicDefinitions.CreateDefinition;
+using ElectronicService.Core.Catalog.CharacteristicDefinitions.GetDefinitions;
+using ElectronicService.Core.Catalog.CharacteristicDefinitions.UpdateDefinition;
 
 namespace ElectronicService.Core;
 
@@ -69,6 +77,14 @@ public static class DependencyInjectionExtensions
         services.AddScoped<UpdateProductGeneralInformationCommandHandler>();
         services.AddScoped<RemoveProductCharacteristicCommandHandler>();
         services.AddScoped<RemoveProductAliasCommandHandler>();
+        services.AddScoped<GetCatalogProductTypeCharacteristicSchemaQueryHandler>();
+        services.AddScoped<GetAvailableCharacteristicDefinitionsQueryHandler>();
+        services.AddScoped<AddOptionalCharacteristicToProductTypeCommandHandler>();
+        services.AddScoped<SetProductTypeCharacteristicRequiredCommandHandler>();
+        services.AddScoped<RemoveCharacteristicFromProductTypeCommandHandler>();
+        services.AddScoped<GetCatalogCharacteristicDefinitionsQueryHandler>();
+        services.AddScoped<CreateCharacteristicDefinitionCommandHandler>();
+        services.AddScoped<UpdateCharacteristicDefinitionCommandHandler>();
 
 
         return services;

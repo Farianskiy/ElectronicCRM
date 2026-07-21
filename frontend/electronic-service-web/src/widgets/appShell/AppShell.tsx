@@ -18,7 +18,18 @@ const regularNavigation = [
 ];
 
 const technicalNavigation = [
-  { href: "/catalog/assistant-suggestions", label: "Предложения словаря" },
+  {
+    href: "/catalog/characteristics",
+    label: "Характеристики каталога",
+  },
+  {
+    href: "/catalog/product-types",
+    label: "Схемы типов товаров",
+  },
+  {
+    href: "/catalog/assistant-suggestions",
+    label: "Предложения словаря",
+  },
 ];
 
 export function AppShell({ children }: AppShellProps) {
@@ -40,17 +51,17 @@ export function AppShell({ children }: AppShellProps) {
     <div className="min-h-screen bg-[#0f1115] text-slate-100">
       <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-white/10 bg-[#111318] p-5 lg:block">
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-          <p className="text-sm font-semibold text-teal-300">
-            Electronic CRM
-          </p>
-          <p className="mt-1 text-xs text-slate-400">
-            Каталог и assistant
-          </p>
+          <p className="text-sm font-semibold text-teal-300">Electronic CRM</p>
+          <p className="mt-1 text-xs text-slate-400">Каталог и assistant</p>
         </div>
 
         <nav className="mt-6 grid gap-1">
           {navigation.map((item) => {
-            const isActive = pathname === item.href;
+            const isActive =
+              item.href === "/"
+                ? pathname === "/"
+                : pathname === item.href ||
+                  pathname.startsWith(`${item.href}/`);
 
             return (
               <Link

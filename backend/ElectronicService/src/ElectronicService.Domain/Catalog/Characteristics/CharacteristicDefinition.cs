@@ -136,6 +136,51 @@ public sealed class CharacteristicDefinition : AggregateRoot
         return UnitResult.Success<DomainError>();
     }
 
+    public UnitResult<DomainError> UpdateDetails(
+    string name,
+    string? unit)
+    {
+        /*
+         * Сначала проверяем оба значения.
+         * Состояние сущности изменяется только после
+         * успешного завершения всей валидации.
+         */
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return UnitResult.Failure(
+                GeneralErrors.ValueIsRequired(nameof(name)));
+        }
+
+        var normalizedName = name.Trim();
+
+        var normalizedUnit =
+            string.IsNullOrWhiteSpace(unit)
+                ? null
+                : unit.Trim();
+
+        if (normalizedName.Length > NameMaxLength)
+        {
+            return UnitResult.Failure(
+                GeneralErrors.ValueIsTooLong(
+                    nameof(name),
+                    NameMaxLength));
+        }
+
+        if (normalizedUnit is not null
+            && normalizedUnit.Length > UnitMaxLength)
+        {
+            return UnitResult.Failure(
+                GeneralErrors.ValueIsTooLong(
+                    nameof(unit),
+                    UnitMaxLength));
+        }
+
+        Name = normalizedName;
+        Unit = normalizedUnit;
+
+        return UnitResult.Success<DomainError>();
+    }
+
     private static string NormalizeCode(string code)
     {
         return code

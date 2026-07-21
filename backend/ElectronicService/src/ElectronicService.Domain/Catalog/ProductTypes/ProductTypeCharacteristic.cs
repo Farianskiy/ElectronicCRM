@@ -98,6 +98,11 @@ public sealed class ProductTypeCharacteristic : Abstractions.Entity
         matchMode = Optional
         weight = 10
     */
+    public void SetRequired(bool isRequired)
+    {
+        IsRequired = isRequired;
+    }
+
     public UnitResult<DomainError> ConfigureReplacement(
         bool isUsedForReplacement,
         ReplacementMatchMode replacementMatchMode,

@@ -98,6 +98,63 @@ public sealed class ProductType : AggregateRoot
         return UnitResult.Success<DomainError>();
     }
 
+    public UnitResult<DomainError> SetCharacteristicRequired(
+    Guid characteristicDefinitionId,
+    bool isRequired)
+    {
+        if (characteristicDefinitionId == Guid.Empty)
+        {
+            return UnitResult.Failure(
+                GeneralErrors.ValueIsInvalid(
+                    nameof(characteristicDefinitionId)));
+        }
+
+        var characteristic = _characteristics
+            .FirstOrDefault(item =>
+                item.CharacteristicDefinitionId
+                    == characteristicDefinitionId);
+
+        if (characteristic is null)
+        {
+            return UnitResult.Failure(
+                CatalogErrors.ProductTypeCharacteristicNotFound(
+                    Id,
+                    characteristicDefinitionId));
+        }
+
+        characteristic.SetRequired(isRequired);
+
+        return UnitResult.Success<DomainError>();
+    }
+
+    public UnitResult<DomainError> RemoveCharacteristic(
+    Guid characteristicDefinitionId)
+    {
+        if (characteristicDefinitionId == Guid.Empty)
+        {
+            return UnitResult.Failure(
+                GeneralErrors.ValueIsInvalid(
+                    nameof(characteristicDefinitionId)));
+        }
+
+        var characteristic = _characteristics
+            .FirstOrDefault(item =>
+                item.CharacteristicDefinitionId
+                    == characteristicDefinitionId);
+
+        if (characteristic is null)
+        {
+            return UnitResult.Failure(
+                CatalogErrors.ProductTypeCharacteristicNotFound(
+                    Id,
+                    characteristicDefinitionId));
+        }
+
+        _characteristics.Remove(characteristic);
+
+        return UnitResult.Success<DomainError>();
+    }
+
     // Метод для проверки, разрешена ли характеристика для типа товара
     public bool AllowsCharacteristic(Guid characteristicDefinitionId)
     {

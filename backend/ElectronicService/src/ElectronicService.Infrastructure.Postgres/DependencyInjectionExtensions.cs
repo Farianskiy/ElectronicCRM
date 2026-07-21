@@ -18,6 +18,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using ElectronicService.Core.Catalog.ProductTypes.Abstractions;
+using ElectronicService.Core.Catalog.CharacteristicDefinitions.Abstractions;
 
 namespace ElectronicService.Infrastructure.Postgres;
 
@@ -59,9 +61,13 @@ public static class DependencyInjectionExtensions
         services.AddScoped<ICatalogDictionaryReader, CatalogDictionaryReader>();
         services.AddScoped<ICatalogDictionaryRepository, CatalogDictionaryRepository>();
         services.AddScoped<ICatalogAssistantUnknownTermResolver, CatalogAssistantUnknownTermResolver>();
-        services.AddScoped<ICatalogAssistantDictionarySuggestionRepository,CatalogAssistantDictionarySuggestionRepository>();
+        services.AddScoped<ICatalogAssistantDictionarySuggestionRepository, CatalogAssistantDictionarySuggestionRepository>();
         services.AddScoped<ICatalogAssistantDictionarySuggestionReader, CatalogAssistantDictionarySuggestionReader>();
         services.AddScoped<IPasswordHasher, PasswordHasher>();
+        services.AddScoped<ICatalogProductTypeSchemaReader, CatalogProductTypeSchemaReader>();
+        services.AddScoped<IProductTypeSchemaRepository, ProductTypeSchemaRepository>();
+        services.AddScoped<ICatalogCharacteristicDefinitionsReader, CatalogCharacteristicDefinitionsReader>();
+        services.AddScoped<ICharacteristicDefinitionRepository, CharacteristicDefinitionRepository>();
 
         return services;
     }
