@@ -52,6 +52,8 @@ public sealed class Product : AggregateRoot
 
     public DateTime? UpdatedAtUtc { get; private set; }
 
+    public uint Version { get; private set; }
+
     public IReadOnlyCollection<ProductCharacteristic> Characteristics => _characteristics;
 
     public IReadOnlyCollection<ProductAlias> Aliases => _aliases;
@@ -287,6 +289,176 @@ public sealed class Product : AggregateRoot
         }
 
         _characteristics.Remove(characteristic);
+        UpdatedAtUtc = DateTime.UtcNow;
+
+        return UnitResult.Success<DomainError>();
+    }
+
+    public UnitResult<DomainError> MigrateToProductType(
+    ProductType targetProductType,
+    IReadOnlyDictionary<
+        Guid,
+        CharacteristicDefinition> definitionsById,
+    IReadOnlyDictionary<
+        Guid,
+        CharacteristicValue> requiredValues)
+    {
+        ArgumentNullException.ThrowIfNull(
+            targetProductType);
+
+        ArgumentNullException.ThrowIfNull(
+            definitionsById);
+
+        ArgumentNullException.ThrowIfNull(
+            requiredValues);
+
+        if (targetProductType.Id == ProductTypeId)
+        {
+            return UnitResult.Failure(
+                CatalogErrors
+                    .ProductTypeMigrationTargetMustBeDifferent(
+                        targetProductType.Id));
+        }
+
+        var preparedNewCharacteristics =
+            new List<ProductCharacteristic>();
+
+        var preparedValueUpdates =
+            new List<(
+                ProductCharacteristic Characteristic,
+                CharacteristicValue Value)>();
+
+        /*
+         * Сначала проверяем и подготавливаем все
+         * переданные значения.
+         *
+         * Состояние Product пока не меняется.
+         */
+        foreach (var requiredValue in requiredValues)
+        {
+            var definitionId = requiredValue.Key;
+            var value = requiredValue.Value;
+
+            if (!targetProductType
+                .IsCharacteristicRequired(
+                    definitionId))
+            {
+                return UnitResult.Failure(
+                    CatalogErrors
+                        .ProductTypeMigrationUnexpectedValue(
+                            definitionId));
+            }
+
+            if (!definitionsById.TryGetValue(
+                    definitionId,
+                    out var definition))
+            {
+                return UnitResult.Failure(
+                    CatalogErrors
+                        .CharacteristicDefinitionNotFound(
+                            definitionId));
+            }
+
+            var valueValidationResult =
+                definition.ValidateValue(value);
+
+            if (valueValidationResult.IsFailure)
+            {
+                return UnitResult.Failure(
+                    valueValidationResult.Error);
+            }
+
+            var existingCharacteristic =
+                _characteristics.FirstOrDefault(
+                    characteristic =>
+                        characteristic
+                            .CharacteristicDefinitionId
+                        == definitionId);
+
+            if (existingCharacteristic is not null)
+            {
+                preparedValueUpdates.Add(
+                    (
+                        existingCharacteristic,
+                        value
+                    ));
+
+                continue;
+            }
+
+            var createResult =
+                ProductCharacteristic.Create(
+                    Id,
+                    definitionId,
+                    value);
+
+            if (createResult.IsFailure)
+            {
+                return UnitResult.Failure(
+                    createResult.Error);
+            }
+
+            preparedNewCharacteristics.Add(
+                createResult.Value);
+        }
+
+        /*
+         * Рассчитываем итоговый набор definition ID:
+         *
+         * разрешённые существующие
+         * +
+         * переданные новые значения.
+         */
+        var resultingDefinitionIds =
+            _characteristics
+                .Where(characteristic =>
+                    targetProductType
+                        .AllowsCharacteristic(
+                            characteristic
+                                .CharacteristicDefinitionId))
+                .Select(characteristic =>
+                    characteristic
+                        .CharacteristicDefinitionId)
+                .Concat(requiredValues.Keys)
+                .ToHashSet();
+
+        var missingRequiredDefinitionId =
+            targetProductType
+                .FindMissingRequiredCharacteristicId(
+                    resultingDefinitionIds);
+
+        if (missingRequiredDefinitionId.HasValue)
+        {
+            return UnitResult.Failure(
+                CatalogErrors
+                    .ProductTypeMigrationRequiredValueMissing(
+                        missingRequiredDefinitionId.Value));
+        }
+
+        /*
+         * Все проверки завершены.
+         * Теперь состояние агрегата можно менять.
+         */
+        _characteristics.RemoveAll(
+            characteristic =>
+                !targetProductType
+                    .AllowsCharacteristic(
+                        characteristic
+                            .CharacteristicDefinitionId));
+
+        foreach (var preparedValueUpdate
+                 in preparedValueUpdates)
+        {
+            preparedValueUpdate
+                .Characteristic
+                .ChangeValue(
+                    preparedValueUpdate.Value);
+        }
+
+        _characteristics.AddRange(
+            preparedNewCharacteristics);
+
+        ProductTypeId = targetProductType.Id;
         UpdatedAtUtc = DateTime.UtcNow;
 
         return UnitResult.Success<DomainError>();

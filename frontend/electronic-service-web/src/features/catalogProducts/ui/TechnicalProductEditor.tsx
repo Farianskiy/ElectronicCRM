@@ -10,6 +10,7 @@ import type { CatalogProductDetails } from "../model/types";
 import { TechnicalProductAliasesEditor } from "./TechnicalProductAliasesEditor";
 import { TechnicalProductCharacteristicsEditor } from "./TechnicalProductCharacteristicsEditor";
 import { TechnicalProductGeneralInformationEditor } from "./TechnicalProductGeneralInformationEditor";
+import { TechnicalProductTypeMigrationPreview } from "@/features/catalogProductTypeMigration/ui/TechnicalProductTypeMigrationPreview";
 
 interface TechnicalProductEditorProps {
   product: CatalogProductDetails;
@@ -190,6 +191,13 @@ export function TechnicalProductEditor({
 
       <div className="mt-6">
         <TechnicalProductGeneralInformationEditor product={product} />
+      </div>
+
+      <div className="mt-6">
+        <TechnicalProductTypeMigrationPreview
+          key={`${product.id}:${product.productTypeId}`}
+          product={product}
+        />
       </div>
 
       <div className="mt-6 grid gap-5 lg:grid-cols-2">

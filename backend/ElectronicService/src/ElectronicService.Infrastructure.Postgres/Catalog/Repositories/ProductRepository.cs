@@ -36,6 +36,23 @@ public sealed class ProductRepository : IProductRepository
                 cancellationToken);
     }
 
+    public async Task<bool> TrySaveChangesAsync(
+    CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await _dbContext
+                .SaveChangesAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            return true;
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return false;
+        }
+    }
+
     public Task SaveChangesAsync(
         CancellationToken cancellationToken = default)
     {

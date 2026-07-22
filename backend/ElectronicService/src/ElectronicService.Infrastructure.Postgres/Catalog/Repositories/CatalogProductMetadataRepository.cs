@@ -52,6 +52,35 @@ public sealed class CatalogProductMetadataRepository : ICatalogProductMetadataRe
                 cancellationToken);
     }
 
+    public async Task<
+        IReadOnlyCollection<CharacteristicDefinition>>
+    GetCharacteristicDefinitionsByIdsAsync(
+        IReadOnlyCollection<Guid>
+            characteristicDefinitionIds,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(
+            characteristicDefinitionIds);
+
+        var definitionIds = characteristicDefinitionIds
+            .Where(definitionId =>
+                definitionId != Guid.Empty)
+            .Distinct()
+            .ToArray();
+
+        if (definitionIds.Length == 0)
+        {
+            return [];
+        }
+
+        return await _dbContext.CharacteristicDefinitions
+            .AsNoTracking()
+            .Where(definition =>
+                definitionIds.Contains(definition.Id))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     private static string NormalizeCode(string code)
     {
         return code

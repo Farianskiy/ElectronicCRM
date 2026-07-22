@@ -14,4 +14,7 @@ public interface IProductRepository
 
     Task SaveChangesAsync(
         CancellationToken cancellationToken = default);
+
+    Task<bool> TrySaveChangesAsync(
+        CancellationToken cancellationToken = default);
 }

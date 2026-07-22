@@ -39,6 +39,8 @@ using ElectronicService.Core.Catalog.ProductTypes.RemoveCharacteristic;
 using ElectronicService.Core.Catalog.CharacteristicDefinitions.CreateDefinition;
 using ElectronicService.Core.Catalog.CharacteristicDefinitions.GetDefinitions;
 using ElectronicService.Core.Catalog.CharacteristicDefinitions.UpdateDefinition;
+using ElectronicService.Core.Catalog.Products.PreviewProductTypeMigration;
+using ElectronicService.Core.Catalog.Products.ApplyProductTypeMigration;
 
 namespace ElectronicService.Core;
 
@@ -85,6 +87,9 @@ public static class DependencyInjectionExtensions
         services.AddScoped<GetCatalogCharacteristicDefinitionsQueryHandler>();
         services.AddScoped<CreateCharacteristicDefinitionCommandHandler>();
         services.AddScoped<UpdateCharacteristicDefinitionCommandHandler>();
+        services.AddScoped<PreviewProductTypeMigrationQueryHandler>();
+        services.AddScoped<ProductTypeMigrationPlanner>();
+        services.AddScoped<ApplyProductTypeMigrationCommandHandler>();
 
 
         return services;

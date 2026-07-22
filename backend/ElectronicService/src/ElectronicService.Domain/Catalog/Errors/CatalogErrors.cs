@@ -216,4 +216,79 @@ public static class CatalogErrors
             $"Обязательную характеристику " +
             $"'{characteristicDefinitionId}' удалить нельзя.");
     }
+
+    public static DomainError
+    ProductTypeMigrationTargetMustBeDifferent(
+        Guid productTypeId)
+    {
+        return new DomainError(
+            "catalog.product_type_migration.target_must_be_different",
+            $"Товар уже относится к типу " +
+            $"'{productTypeId}'. Выберите другой тип.");
+    }
+
+    public static DomainError
+    ProductTypeMigrationPreviewIsStale()
+    {
+        return new DomainError(
+            "catalog.product_type_migration.preview_is_stale",
+            "Состояние товара или схема типа изменились " +
+            "после предварительного просмотра. " +
+            "Постройте preview заново.");
+    }
+
+    public static DomainError
+        ProductTypeMigrationDuplicateValue(
+            Guid characteristicDefinitionId)
+    {
+        return new DomainError(
+            "catalog.product_type_migration.duplicate_value",
+            $"Значение характеристики " +
+            $"'{characteristicDefinitionId}' " +
+            $"передано несколько раз.");
+    }
+
+    public static DomainError
+        ProductTypeMigrationRequiredValueMissing(
+            Guid characteristicDefinitionId)
+    {
+        return new DomainError(
+            "catalog.product_type_migration.required_value_missing",
+            $"Не передано обязательное значение " +
+            $"характеристики " +
+            $"'{characteristicDefinitionId}'.");
+    }
+
+    public static DomainError
+        ProductTypeMigrationUnexpectedValue(
+            Guid characteristicDefinitionId)
+    {
+        return new DomainError(
+            "catalog.product_type_migration.unexpected_value",
+            $"Характеристика " +
+            $"'{characteristicDefinitionId}' " +
+            $"не ожидается в этой миграции.");
+    }
+
+    public static DomainError
+        ProductTypeMigrationValueIsInvalid(
+            string characteristicCode,
+            string expectedDataType)
+    {
+        return new DomainError(
+            "catalog.product_type_migration.value_is_invalid",
+            $"Значение характеристики " +
+            $"'{characteristicCode}' некорректно. " +
+            $"Ожидаемый тип: {expectedDataType}.");
+    }
+
+    public static DomainError ProductConcurrencyConflict(
+    Guid productId)
+    {
+        return new DomainError(
+            "catalog.product.concurrency_conflict",
+            $"Товар '{productId}' был изменён другим " +
+            "пользователем или процессом. " +
+            "Обновите данные и повторите операцию.");
+    }
 }

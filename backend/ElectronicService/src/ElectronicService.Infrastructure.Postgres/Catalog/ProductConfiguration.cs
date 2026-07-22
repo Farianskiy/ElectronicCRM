@@ -125,5 +125,8 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.HasIndex(product => product.ProductTypeId);
 
         builder.HasIndex(product => product.ManufacturerId);
+
+        builder.Property(product => product.Version)
+            .IsRowVersion();
     }
 }
