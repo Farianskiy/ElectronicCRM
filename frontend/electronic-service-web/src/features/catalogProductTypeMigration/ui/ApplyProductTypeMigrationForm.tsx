@@ -10,6 +10,7 @@ import type {
   ProductTypeMigrationMissingRequiredCharacteristic,
   ProductTypeMigrationPreview,
 } from "../model/types";
+import { catalogProductAuditHistoryQueryKey } from "@/features/catalogProductAuditHistory/model/queryKeys";
 
 interface ApplyProductTypeMigrationFormProps {
   product: CatalogProductDetails;
@@ -93,6 +94,10 @@ export function ApplyProductTypeMigrationForm({
 
         queryClient.invalidateQueries({
           queryKey: ["catalog-product-type-characteristics"],
+        }),
+
+        queryClient.invalidateQueries({
+          queryKey: catalogProductAuditHistoryQueryKey(product.id),
         }),
       ]);
     },

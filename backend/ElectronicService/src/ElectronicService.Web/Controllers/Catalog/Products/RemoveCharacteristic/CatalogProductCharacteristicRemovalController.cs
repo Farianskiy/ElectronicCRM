@@ -1,5 +1,6 @@
 using ElectronicService.Core.Catalog.Products.RemoveCharacteristic;
 using Microsoft.AspNetCore.Authorization;
+using ElectronicService.Web.Auth;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ElectronicService.Web.Controllers.Catalog.Products
@@ -26,6 +27,9 @@ public sealed class CatalogProductCharacteristicRemovalController
     private const string RequiredCharacteristicCode =
         "catalog.required_characteristic.cannot_be_removed";
 
+    private const string ProductConcurrencyConflictCode =
+    "catalog.product.concurrency_conflict";
+
     private readonly
         RemoveProductCharacteristicCommandHandler _handler;
 
@@ -42,13 +46,21 @@ public sealed class CatalogProductCharacteristicRemovalController
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> RemoveCharacteristic(
         Guid id,
         string code,
         CancellationToken cancellationToken = default)
     {
+        if (!User.TryGetUserId(
+        out var changedByUserId))
+        {
+            return Unauthorized();
+        }
+
         var command = new RemoveProductCharacteristicCommand(
             id,
+            changedByUserId,
             code);
 
         var result = await _handler
@@ -83,6 +95,15 @@ public sealed class CatalogProductCharacteristicRemovalController
                     StringComparison.Ordinal))
             {
                 return NotFound(result.Error.Message);
+            }
+
+            if (string.Equals(
+                result.Error.Code,
+                ProductConcurrencyConflictCode,
+                StringComparison.Ordinal))
+            {
+                return Conflict(
+                    result.Error.Message);
             }
 
             return BadRequest(result.Error.Message);

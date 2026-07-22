@@ -5,6 +5,7 @@ using ElectronicService.Domain.Catalog.Manufacturers;
 using ElectronicService.Domain.Catalog.Products;
 using ElectronicService.Domain.Catalog.ProductTypes;
 using ElectronicService.Domain.Catalog.Dictionaries;
+using ElectronicService.Domain.Catalog.Audit;
 
 namespace ElectronicService.Infrastructure.Postgres.Data;
 
@@ -34,6 +35,8 @@ public sealed class ElectronicDbContext : DbContext
     public DbSet<CatalogDictionaryTerm> CatalogDictionaryTerms => Set<CatalogDictionaryTerm>();
 
     public DbSet<CatalogAssistantDictionarySuggestion> CatalogAssistantDictionarySuggestions => Set<CatalogAssistantDictionarySuggestion>();
+
+    public DbSet<ProductAuditEntry> ProductAuditEntries => Set<ProductAuditEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

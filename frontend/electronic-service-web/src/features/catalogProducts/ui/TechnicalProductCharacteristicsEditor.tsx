@@ -12,6 +12,7 @@ import { AppSelect } from "@/shared/ui/AppSelect";
 import { setCatalogProductCharacteristic } from "../api/setCatalogProductCharacteristic";
 import { removeCatalogProductCharacteristic } from "../api/removeCatalogProductCharacteristic";
 import type { CatalogProductDetails } from "../model/types";
+import { catalogProductAuditHistoryQueryKey } from "@/features/catalogProductAuditHistory/model/queryKeys";
 
 interface TechnicalProductCharacteristicsEditorProps {
   product: CatalogProductDetails;
@@ -156,6 +157,9 @@ export function TechnicalProductCharacteristicsEditor({
         queryClient.invalidateQueries({
           queryKey: ["catalog-products"],
         }),
+        queryClient.invalidateQueries({
+          queryKey: catalogProductAuditHistoryQueryKey(product.id),
+        }),
       ]);
 
       setDraftValues((currentValues) => {
@@ -186,6 +190,10 @@ export function TechnicalProductCharacteristicsEditor({
 
         queryClient.invalidateQueries({
           queryKey: ["catalog-products"],
+        }),
+
+        queryClient.invalidateQueries({
+          queryKey: catalogProductAuditHistoryQueryKey(product.id),
         }),
       ]);
 

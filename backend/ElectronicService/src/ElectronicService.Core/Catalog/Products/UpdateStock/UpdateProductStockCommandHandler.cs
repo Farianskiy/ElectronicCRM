@@ -1,5 +1,7 @@
 using CSharpFunctionalExtensions;
 using ElectronicService.Core.Catalog.Products.Abstractions;
+using ElectronicService.Core.Catalog.Products.Audit;
+using ElectronicService.Domain.Catalog.Audit;
 using ElectronicService.Domain.Catalog.Errors;
 using ElectronicService.Domain.Catalog.ValueObjects;
 using ElectronicService.Domain.Common;
@@ -8,11 +10,18 @@ namespace ElectronicService.Core.Catalog.Products.UpdateStock;
 
 public sealed class UpdateProductStockCommandHandler
 {
-    private readonly IProductRepository _productRepository;
+    private readonly IProductRepository
+        _productRepository;
 
-    public UpdateProductStockCommandHandler(IProductRepository productRepository)
+    private readonly ProductAuditRecorder
+        _auditRecorder;
+
+    public UpdateProductStockCommandHandler(
+        IProductRepository productRepository,
+        ProductAuditRecorder auditRecorder)
     {
         _productRepository = productRepository;
+        _auditRecorder = auditRecorder;
     }
 
     public async Task<UnitResult<DomainError>> Handle(
@@ -24,37 +33,76 @@ public sealed class UpdateProductStockCommandHandler
         if (command.ProductId == Guid.Empty)
         {
             return UnitResult.Failure(
-                GeneralErrors.ValueIsInvalid(nameof(command.ProductId)));
+                GeneralErrors.ValueIsInvalid(
+                    nameof(command.ProductId)));
+        }
+
+        if (command.ChangedByUserId == Guid.Empty)
+        {
+            return UnitResult.Failure(
+                CatalogErrors.CurrentUserIsRequired());
+        }
+
+        var stockQuantityResult =
+            StockQuantity.Create(
+                command.Quantity);
+
+        if (stockQuantityResult.IsFailure)
+        {
+            return UnitResult.Failure(
+                stockQuantityResult.Error);
         }
 
         var product = await _productRepository
-            .GetByIdAsync(command.ProductId, cancellationToken)
+            .GetByIdWithDetailsAsync(
+                command.ProductId,
+                cancellationToken)
             .ConfigureAwait(false);
 
         if (product is null)
         {
             return UnitResult.Failure(
-                CatalogErrors.ProductNotFound(command.ProductId.ToString()));
+                CatalogErrors.ProductNotFound(
+                    command.ProductId.ToString()));
         }
 
-        var stockQuantityResult = StockQuantity.Create(command.Quantity);
+        var beforeJson =
+            ProductAuditSnapshotSerializer.Serialize(
+                product);
 
-        if (stockQuantityResult.IsFailure)
-        {
-            return UnitResult.Failure(stockQuantityResult.Error);
-        }
-
-        var changeStockQuantityResult = product.ChangeStockQuantity(
-            stockQuantityResult.Value);
+        var changeStockQuantityResult =
+            product.ChangeStockQuantity(
+                stockQuantityResult.Value);
 
         if (changeStockQuantityResult.IsFailure)
         {
-            return UnitResult.Failure(changeStockQuantityResult.Error);
+            return UnitResult.Failure(
+                changeStockQuantityResult.Error);
         }
 
-        await _productRepository
-            .SaveChangesAsync(cancellationToken)
+        var auditResult =
+            _auditRecorder.RecordManualChange(
+                product,
+                command.ChangedByUserId,
+                ProductAuditOperation.StockUpdated,
+                beforeJson);
+
+        if (auditResult.IsFailure)
+        {
+            return UnitResult.Failure(
+                auditResult.Error);
+        }
+
+        var saved = await _productRepository
+            .TrySaveChangesAsync(cancellationToken)
             .ConfigureAwait(false);
+
+        if (!saved)
+        {
+            return UnitResult.Failure(
+                CatalogErrors.ProductConcurrencyConflict(
+                    command.ProductId));
+        }
 
         return UnitResult.Success<DomainError>();
     }

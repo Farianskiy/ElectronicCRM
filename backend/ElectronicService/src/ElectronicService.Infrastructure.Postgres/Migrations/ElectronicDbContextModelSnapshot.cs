@@ -22,6 +22,66 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Audit.ProductAuditEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AfterJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("after_json");
+
+                    b.Property<string>("BeforeJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("before_json");
+
+                    b.Property<DateTime>("ChangedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("changed_at_utc");
+
+                    b.Property<Guid?>("ChangedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("changed_by_user_id");
+
+                    b.Property<string>("Operation")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("operation");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("source");
+
+                    b.Property<Guid?>("SourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChangedByUserId")
+                        .HasDatabaseName("ix_product_audit_entries_changed_by");
+
+                    b.HasIndex("ProductId")
+                        .HasDatabaseName("ix_product_audit_entries_product_id");
+
+                    b.HasIndex("SourceId")
+                        .HasDatabaseName("ix_product_audit_entries_source_id");
+
+                    b.HasIndex("ProductId", "ChangedAtUtc")
+                        .HasDatabaseName("ix_product_audit_entries_product_date");
+
+                    b.ToTable("product_audit_entries", (string)null);
+                });
+
             modelBuilder.Entity("ElectronicService.Domain.Catalog.Characteristics.CharacteristicDefinition", b =>
                 {
                     b.Property<Guid>("Id")
@@ -358,6 +418,12 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                     b.Property<DateTime?>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at_utc");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
 
                     b.HasKey("Id");
 

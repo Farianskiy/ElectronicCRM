@@ -1,7 +1,6 @@
-using ElectronicService.Contracts.Catalog.Products
-    .ProductTypeMigration;
-using ElectronicService.Core.Catalog.Products
-    .ApplyProductTypeMigration;
+using ElectronicService.Contracts.Catalog.Products.ProductTypeMigration;
+using ElectronicService.Core.Catalog.Products.ApplyProductTypeMigration;
+using ElectronicService.Web.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -57,6 +56,12 @@ public sealed class
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        if (!User.TryGetUserId(
+        out var changedByUserId))
+        {
+            return Unauthorized();
+        }
+
         var requiredValues =
             request.RequiredValues?
                 .Select(value =>
@@ -69,6 +74,8 @@ public sealed class
         var command =
             new ApplyProductTypeMigrationCommand(
                 productId,
+                changedByUserId,
+
                 request.TargetProductTypeId,
                 request.ExpectedProductVersion,
                 request.ExpectedCurrentProductTypeId,

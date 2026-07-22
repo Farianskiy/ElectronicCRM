@@ -11,6 +11,8 @@ import { TechnicalProductAliasesEditor } from "./TechnicalProductAliasesEditor";
 import { TechnicalProductCharacteristicsEditor } from "./TechnicalProductCharacteristicsEditor";
 import { TechnicalProductGeneralInformationEditor } from "./TechnicalProductGeneralInformationEditor";
 import { TechnicalProductTypeMigrationPreview } from "@/features/catalogProductTypeMigration/ui/TechnicalProductTypeMigrationPreview";
+import { TechnicalProductAuditHistory } from "@/features/catalogProductAuditHistory/ui/TechnicalProductAuditHistory";
+import { catalogProductAuditHistoryQueryKey } from "@/features/catalogProductAuditHistory/model/queryKeys";
 
 interface TechnicalProductEditorProps {
   product: CatalogProductDetails;
@@ -73,6 +75,10 @@ export function TechnicalProductEditor({
 
       queryClient.invalidateQueries({
         queryKey: ["catalog-products"],
+      }),
+
+      queryClient.invalidateQueries({
+        queryKey: catalogProductAuditHistoryQueryKey(product.id),
       }),
     ]);
   }
@@ -277,6 +283,13 @@ export function TechnicalProductEditor({
         <TechnicalProductCharacteristicsEditor product={product} />
 
         <TechnicalProductAliasesEditor product={product} />
+
+        <div className="mt-6">
+          <TechnicalProductAuditHistory
+            key={product.id}
+            productId={product.id}
+          />
+        </div>
       </div>
     </section>
   );

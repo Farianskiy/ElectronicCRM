@@ -1,5 +1,7 @@
 using CSharpFunctionalExtensions;
 using ElectronicService.Core.Catalog.Products.Abstractions;
+using ElectronicService.Core.Catalog.Products.Audit;
+using ElectronicService.Domain.Catalog.Audit;
 using ElectronicService.Domain.Catalog.Errors;
 using ElectronicService.Domain.Common;
 
@@ -7,12 +9,18 @@ namespace ElectronicService.Core.Catalog.Products.RemoveAlias;
 
 public sealed class RemoveProductAliasCommandHandler
 {
-    private readonly IProductRepository _productRepository;
+    private readonly IProductRepository
+        _productRepository;
+
+    private readonly ProductAuditRecorder
+        _auditRecorder;
 
     public RemoveProductAliasCommandHandler(
-        IProductRepository productRepository)
+        IProductRepository productRepository,
+        ProductAuditRecorder auditRecorder)
     {
         _productRepository = productRepository;
+        _auditRecorder = auditRecorder;
     }
 
     public async Task<UnitResult<DomainError>> Handle(
@@ -26,6 +34,12 @@ public sealed class RemoveProductAliasCommandHandler
             return UnitResult.Failure(
                 GeneralErrors.ValueIsInvalid(
                     nameof(command.ProductId)));
+        }
+
+        if (command.ChangedByUserId == Guid.Empty)
+        {
+            return UnitResult.Failure(
+                CatalogErrors.CurrentUserIsRequired());
         }
 
         if (command.AliasId == Guid.Empty)
@@ -48,17 +62,43 @@ public sealed class RemoveProductAliasCommandHandler
                     command.ProductId.ToString()));
         }
 
-        var removeResult = product.RemoveAlias(
-            command.AliasId);
+        var beforeJson =
+            ProductAuditSnapshotSerializer.Serialize(
+                product);
+
+        var removeResult =
+            product.RemoveAlias(
+                command.AliasId);
 
         if (removeResult.IsFailure)
         {
-            return UnitResult.Failure(removeResult.Error);
+            return UnitResult.Failure(
+                removeResult.Error);
         }
 
-        await _productRepository
-            .SaveChangesAsync(cancellationToken)
+        var auditResult =
+            _auditRecorder.RecordManualChange(
+                product,
+                command.ChangedByUserId,
+                ProductAuditOperation.AliasRemoved,
+                beforeJson);
+
+        if (auditResult.IsFailure)
+        {
+            return UnitResult.Failure(
+                auditResult.Error);
+        }
+
+        var saved = await _productRepository
+            .TrySaveChangesAsync(cancellationToken)
             .ConfigureAwait(false);
+
+        if (!saved)
+        {
+            return UnitResult.Failure(
+                CatalogErrors.ProductConcurrencyConflict(
+                    command.ProductId));
+        }
 
         return UnitResult.Success<DomainError>();
     }

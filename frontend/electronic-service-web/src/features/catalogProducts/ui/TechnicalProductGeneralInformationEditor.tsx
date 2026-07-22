@@ -8,6 +8,7 @@ import { getCatalogManufacturers } from "@/features/catalogMetadata/api/getCatal
 import { AppSelect } from "@/shared/ui/AppSelect";
 import { updateCatalogProductGeneralInformation } from "../api/updateCatalogProductGeneralInformation";
 import type { CatalogProductDetails } from "../model/types";
+import { catalogProductAuditHistoryQueryKey } from "@/features/catalogProductAuditHistory/model/queryKeys";
 
 interface TechnicalProductGeneralInformationEditorProps {
   product: CatalogProductDetails;
@@ -103,6 +104,10 @@ export function TechnicalProductGeneralInformationEditor({
 
         queryClient.invalidateQueries({
           queryKey: ["catalog-products"],
+        }),
+
+        queryClient.invalidateQueries({
+          queryKey: catalogProductAuditHistoryQueryKey(product.id),
         }),
       ]);
 

@@ -3,6 +3,7 @@ namespace ElectronicService.Core.Catalog.Products
 
 public sealed record UpdateProductGeneralInformationCommand(
     Guid ProductId,
+    Guid ChangedByUserId,
     string Name,
     string Article,
     Guid ManufacturerId);

@@ -1,10 +1,11 @@
 using CSharpFunctionalExtensions;
 using ElectronicService.Core.Catalog.Products.Abstractions;
-using ElectronicService.Core.Catalog.Products
-    .PreviewProductTypeMigration;
+using ElectronicService.Core.Catalog.Products.PreviewProductTypeMigration;
 using ElectronicService.Domain.Catalog.Errors;
 using ElectronicService.Domain.Catalog.ValueObjects;
 using ElectronicService.Domain.Common;
+using ElectronicService.Core.Catalog.Products.Audit;
+using ElectronicService.Domain.Catalog.Audit;
 
 namespace ElectronicService.Core.Catalog.Products
     .ApplyProductTypeMigration;
@@ -18,12 +19,17 @@ public sealed class
     private readonly IProductRepository
         _productRepository;
 
+    private readonly ProductAuditRecorder
+        _auditRecorder;
+
     public ApplyProductTypeMigrationCommandHandler(
         ProductTypeMigrationPlanner planner,
-        IProductRepository productRepository)
+        IProductRepository productRepository,
+        ProductAuditRecorder auditRecorder)
     {
         _planner = planner;
         _productRepository = productRepository;
+        _auditRecorder = auditRecorder;
     }
 
     public async Task<UnitResult<DomainError>> Handle(
@@ -31,6 +37,12 @@ public sealed class
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command);
+
+        if (command.ChangedByUserId == Guid.Empty)
+        {
+            return UnitResult.Failure(
+                CatalogErrors.CurrentUserIsRequired());
+        }
 
         if (command.ExpectedProductVersion == 0)
         {
@@ -210,6 +222,10 @@ public sealed class
                     parseResult.Value;
         }
 
+        var beforeJson =
+            ProductAuditSnapshotSerializer.Serialize(
+                plan.Product);
+
         var migrationResult =
             plan.Product.MigrateToProductType(
                 plan.TargetProductType,
@@ -220,6 +236,19 @@ public sealed class
         {
             return UnitResult.Failure(
                 migrationResult.Error);
+        }
+
+        var auditResult =
+            _auditRecorder.RecordManualChange(
+                plan.Product,
+                command.ChangedByUserId,
+                ProductAuditOperation.ProductTypeMigrated,
+                beforeJson);
+
+        if (auditResult.IsFailure)
+        {
+            return UnitResult.Failure(
+                auditResult.Error);
         }
 
         /*

@@ -41,6 +41,8 @@ using ElectronicService.Core.Catalog.CharacteristicDefinitions.GetDefinitions;
 using ElectronicService.Core.Catalog.CharacteristicDefinitions.UpdateDefinition;
 using ElectronicService.Core.Catalog.Products.PreviewProductTypeMigration;
 using ElectronicService.Core.Catalog.Products.ApplyProductTypeMigration;
+using ElectronicService.Core.Catalog.Products.Audit;
+using ElectronicService.Core.Catalog.Products.GetAuditHistory;
 
 namespace ElectronicService.Core;
 
@@ -90,6 +92,8 @@ public static class DependencyInjectionExtensions
         services.AddScoped<PreviewProductTypeMigrationQueryHandler>();
         services.AddScoped<ProductTypeMigrationPlanner>();
         services.AddScoped<ApplyProductTypeMigrationCommandHandler>();
+        services.AddScoped<ProductAuditRecorder>();
+        services.AddScoped<GetProductAuditHistoryQueryHandler>();
 
 
         return services;

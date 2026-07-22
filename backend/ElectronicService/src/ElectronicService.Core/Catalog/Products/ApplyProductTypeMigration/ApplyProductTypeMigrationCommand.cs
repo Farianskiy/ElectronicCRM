@@ -3,10 +3,10 @@ namespace ElectronicService.Core.Catalog.Products
 
 public sealed record ApplyProductTypeMigrationCommand(
     Guid ProductId,
+    Guid ChangedByUserId,
+
     Guid TargetProductTypeId,
-
     uint ExpectedProductVersion,
-
     Guid ExpectedCurrentProductTypeId,
 
     IReadOnlyCollection<Guid>

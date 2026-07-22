@@ -3,4 +3,5 @@ namespace ElectronicService.Core.Catalog.Products
 
 public sealed record RemoveProductCharacteristicCommand(
     Guid ProductId,
+    Guid ChangedByUserId,
     string Code);

@@ -20,6 +20,8 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ElectronicService.Core.Catalog.ProductTypes.Abstractions;
 using ElectronicService.Core.Catalog.CharacteristicDefinitions.Abstractions;
+using ElectronicService.Core.Catalog.Products.Audit;
+using ElectronicService.Core.Catalog.Products.GetAuditHistory;
 
 namespace ElectronicService.Infrastructure.Postgres;
 
@@ -68,6 +70,8 @@ public static class DependencyInjectionExtensions
         services.AddScoped<IProductTypeSchemaRepository, ProductTypeSchemaRepository>();
         services.AddScoped<ICatalogCharacteristicDefinitionsReader, CatalogCharacteristicDefinitionsReader>();
         services.AddScoped<ICharacteristicDefinitionRepository, CharacteristicDefinitionRepository>();
+        services.AddScoped<IProductAuditRepository, ProductAuditRepository>();
+        services.AddScoped<IProductAuditHistoryReader, ProductAuditHistoryReader>();
 
         return services;
     }

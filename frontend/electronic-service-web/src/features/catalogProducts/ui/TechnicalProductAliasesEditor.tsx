@@ -7,6 +7,7 @@ import { useState } from "react";
 import { addCatalogProductAlias } from "../api/addCatalogProductAlias";
 import { removeCatalogProductAlias } from "../api/removeCatalogProductAlias";
 import type { CatalogProductDetails } from "../model/types";
+import { catalogProductAuditHistoryQueryKey } from "@/features/catalogProductAuditHistory/model/queryKeys";
 
 interface TechnicalProductAliasesEditorProps {
   product: CatalogProductDetails;
@@ -59,6 +60,10 @@ export function TechnicalProductAliasesEditor({
 
       queryClient.invalidateQueries({
         queryKey: ["catalog-products"],
+      }),
+
+      queryClient.invalidateQueries({
+        queryKey: catalogProductAuditHistoryQueryKey(product.id),
       }),
     ]);
   }
