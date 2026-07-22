@@ -2,8 +2,7 @@ using ElectronicService.Domain.Catalog.Audit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace ElectronicService.Infrastructure.Postgres
-    .Catalog.Configurations;
+namespace ElectronicService.Infrastructure.Postgres.Catalog.Configurations;
 
 public sealed class ProductAuditEntryConfiguration
     : IEntityTypeConfiguration<ProductAuditEntry>
@@ -64,18 +63,18 @@ public sealed class ProductAuditEntryConfiguration
             .HasColumnType("jsonb");
 
         builder.HasIndex(auditEntry =>
-                auditEntry.ProductId)
-            .HasDatabaseName(
-                "ix_product_audit_entries_product_id");
-
-        builder.HasIndex(auditEntry =>
                 new
                 {
                     auditEntry.ProductId,
-                    auditEntry.ChangedAtUtc
+                    auditEntry.ChangedAtUtc,
+                    auditEntry.Id
                 })
+            .IsDescending(
+                false,
+                true,
+                true)
             .HasDatabaseName(
-                "ix_product_audit_entries_product_date");
+                "ix_product_audit_entries_product_history");
 
         builder.HasIndex(auditEntry =>
                 auditEntry.ChangedByUserId)

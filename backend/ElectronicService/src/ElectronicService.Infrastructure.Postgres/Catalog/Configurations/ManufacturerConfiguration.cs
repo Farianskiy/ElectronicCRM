@@ -2,7 +2,7 @@ using ElectronicService.Domain.Catalog.Manufacturers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace ElectronicService.Infrastructure.Postgres.Catalog;
+namespace ElectronicService.Infrastructure.Postgres.Catalog.Configurations;
 
 public sealed class ManufacturerConfiguration : IEntityTypeConfiguration<Manufacturer>
 {

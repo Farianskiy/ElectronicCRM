@@ -1,30 +1,50 @@
+using ElectronicService.Domain.Catalog.Characteristics;
+using ElectronicService.Domain.Catalog.Manufacturers;
 using ElectronicService.Domain.Catalog.Products;
+using ElectronicService.Domain.Catalog.ProductTypes;
 
 namespace ElectronicService.Core.Catalog.Products.Audit;
 
 public static class ProductAuditSnapshotFactory
 {
     public static ProductAuditSnapshot Create(
-        Product product)
+        Product product,
+        ProductType productType,
+        Manufacturer manufacturer,
+        IReadOnlyDictionary<
+            Guid,
+            CharacteristicDefinition>
+            definitionsById)
     {
         ArgumentNullException.ThrowIfNull(product);
+        ArgumentNullException.ThrowIfNull(productType);
+        ArgumentNullException.ThrowIfNull(manufacturer);
+        ArgumentNullException.ThrowIfNull(definitionsById);
 
         var characteristics = product.Characteristics
             .OrderBy(characteristic =>
                 characteristic
                     .CharacteristicDefinitionId)
             .Select(characteristic =>
-                new ProductAuditCharacteristicSnapshot(
-                    characteristic
-                        .CharacteristicDefinitionId,
+            {
+                var definition =
+                    definitionsById[
+                        characteristic
+                            .CharacteristicDefinitionId];
 
-                    characteristic.Value
-                        .DataType
-                        .ToString(),
-
-                    characteristic.Value.TextValue,
-                    characteristic.Value.NumberValue,
-                    characteristic.Value.BooleanValue))
+                return new
+                    ProductAuditCharacteristicSnapshot(
+                        definition.Id,
+                        definition.Code,
+                        definition.Name,
+                        characteristic.Value
+                            .DataType
+                            .ToString(),
+                        definition.Unit,
+                        characteristic.Value.TextValue,
+                        characteristic.Value.NumberValue,
+                        characteristic.Value.BooleanValue);
+            })
             .ToList();
 
         var aliases = product.Aliases
@@ -36,16 +56,23 @@ public static class ProductAuditSnapshotFactory
             .ToList();
 
         return new ProductAuditSnapshot(
+            ProductAuditSnapshotVersions.Current,
+
             product.Id,
             product.Article.Value,
             product.Name.Value,
+
             product.ProductTypeId,
+            productType.Code,
+            productType.Name,
+
             product.ManufacturerId,
+            manufacturer.Name,
+
             product.Price.Amount,
             product.Price.Currency,
             product.StockQuantity.Value,
-            product.CreatedAtUtc,
-            product.UpdatedAtUtc,
+
             characteristics,
             aliases);
     }

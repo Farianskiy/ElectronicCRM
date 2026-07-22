@@ -80,9 +80,21 @@ public sealed class UpdateProductPriceCommandHandler
         /*
          * Состояние Product до изменения цены.
          */
-        var beforeJson =
-            ProductAuditSnapshotSerializer.Serialize(
-                product);
+        var beforeSnapshotResult =
+            await _auditRecorder
+                .CaptureAsync(
+                    product,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+        if (beforeSnapshotResult.IsFailure)
+        {
+            return UnitResult.Failure(
+                beforeSnapshotResult.Error);
+        }
+
+        var beforeSnapshot =
+            beforeSnapshotResult.Value;
 
         var changePriceResult =
             product.ChangePrice(
@@ -101,16 +113,30 @@ public sealed class UpdateProductPriceCommandHandler
          * ProductAuditEntry в тот же DbContext.
          */
         var auditResult =
-            _auditRecorder.RecordManualChange(
-                product,
-                command.ChangedByUserId,
-                ProductAuditOperation.PriceUpdated,
-                beforeJson);
+            await _auditRecorder
+                .RecordManualChangeAsync(
+                    product,
+                    command.ChangedByUserId,
+                    ProductAuditOperation.PriceUpdated,
+                    beforeSnapshot,
+                    cancellationToken)
+                .ConfigureAwait(false);
 
         if (auditResult.IsFailure)
         {
             return UnitResult.Failure(
                 auditResult.Error);
+        }
+
+        if (auditResult.Value
+            == ProductAuditRecordOutcome.NoChanges)
+        {
+            /*
+             * Доменный объект мог измениться в памяти,
+             * например UpdatedAtUtc, но SaveChanges
+             * не вызывается. База остаётся неизменной.
+             */
+            return UnitResult.Success<DomainError>();
         }
 
         /*

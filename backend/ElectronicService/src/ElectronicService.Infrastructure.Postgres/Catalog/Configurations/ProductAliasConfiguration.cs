@@ -2,7 +2,7 @@ using ElectronicService.Domain.Catalog.Products;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace ElectronicService.Infrastructure.Postgres.Catalog;
+namespace ElectronicService.Infrastructure.Postgres.Catalog.Configurations;
 
 public sealed class ProductAliasConfiguration : IEntityTypeConfiguration<ProductAlias>
 {
@@ -38,10 +38,10 @@ public sealed class ProductAliasConfiguration : IEntityTypeConfiguration<Product
         builder.HasIndex(alias => alias.ProductId);
 
         builder.HasIndex(alias => new
-            {
-                alias.ProductId,
-                alias.NormalizedValue
-            })
+        {
+            alias.ProductId,
+            alias.NormalizedValue
+        })
             .IsUnique();
 
         builder.HasIndex(alias => alias.NormalizedValue);

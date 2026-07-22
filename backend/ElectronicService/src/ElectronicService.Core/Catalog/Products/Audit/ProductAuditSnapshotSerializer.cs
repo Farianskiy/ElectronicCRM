@@ -1,5 +1,4 @@
 using System.Text.Json;
-using ElectronicService.Domain.Catalog.Products;
 
 namespace ElectronicService.Core.Catalog.Products.Audit;
 
@@ -10,29 +9,75 @@ public static class ProductAuditSnapshotSerializer
             new(JsonSerializerDefaults.Web);
 
     public static string Serialize(
-        Product product)
+        ProductAuditSnapshot snapshot)
     {
-        ArgumentNullException.ThrowIfNull(product);
-
-        var snapshot =
-            ProductAuditSnapshotFactory.Create(product);
+        ArgumentNullException.ThrowIfNull(snapshot);
 
         return JsonSerializer.Serialize(
             snapshot,
             SerializerOptions);
     }
 
-    public static ProductAuditSnapshot? Deserialize(
-        string? json)
+    public static bool TryDeserialize(
+        string? json,
+        out ProductAuditSnapshot? snapshot)
     {
+        snapshot = null;
+
+        /*
+         * null допустим для будущих операций
+         * создания или удаления товара.
+         */
         if (string.IsNullOrWhiteSpace(json))
         {
-            return null;
+            return true;
         }
 
-        return JsonSerializer.Deserialize<
-            ProductAuditSnapshot>(
-                json,
-                SerializerOptions);
+        try
+        {
+            var deserialized =
+                JsonSerializer.Deserialize<
+                    ProductAuditSnapshot>(
+                        json,
+                        SerializerOptions);
+
+            if (deserialized is null)
+            {
+                return false;
+            }
+
+            /*
+             * Не пытаемся интерпретировать
+             * неизвестную будущую версию.
+             */
+            if (deserialized.SnapshotVersion
+                is not ProductAuditSnapshotVersions.Legacy
+                and not ProductAuditSnapshotVersions.Current)
+            {
+                return false;
+            }
+
+            /*
+             * JSON может быть синтаксически корректным,
+             * но структурно неполным.
+             */
+            if (deserialized.Characteristics is null
+                || deserialized.Aliases is null)
+            {
+                return false;
+            }
+
+            snapshot = deserialized;
+
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+        catch (NotSupportedException)
+        {
+            return false;
+        }
     }
 }

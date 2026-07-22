@@ -11,36 +11,103 @@ public sealed class ProductAuditRecorder
     private readonly IProductAuditRepository
         _auditRepository;
 
+    private readonly ProductAuditSnapshotBuilder
+        _snapshotBuilder;
+
     public ProductAuditRecorder(
-        IProductAuditRepository auditRepository)
+        IProductAuditRepository auditRepository,
+        ProductAuditSnapshotBuilder snapshotBuilder)
     {
         _auditRepository = auditRepository;
+        _snapshotBuilder = snapshotBuilder;
     }
 
-    public UnitResult<DomainError> RecordManualChange(
-        Product product,
-        Guid changedByUserId,
-        ProductAuditOperation operation,
-        string beforeJson)
+    public Task<Result<
+        ProductAuditSnapshot,
+        DomainError>> CaptureAsync(
+            Product product,
+            CancellationToken cancellationToken =
+                default)
+    {
+        return _snapshotBuilder.BuildAsync(
+            product,
+            cancellationToken);
+    }
+
+    public async Task<Result<
+        ProductAuditRecordOutcome,
+        DomainError>> RecordManualChangeAsync(
+            Product product,
+            Guid changedByUserId,
+            ProductAuditOperation operation,
+            ProductAuditSnapshot beforeSnapshot,
+            CancellationToken cancellationToken =
+                default)
     {
         ArgumentNullException.ThrowIfNull(product);
+        ArgumentNullException.ThrowIfNull(
+            beforeSnapshot);
 
         if (changedByUserId == Guid.Empty)
         {
-            return UnitResult.Failure(
-                CatalogErrors.CurrentUserIsRequired());
+            return Result.Failure<
+                ProductAuditRecordOutcome,
+                DomainError>(
+                    CatalogErrors
+                        .CurrentUserIsRequired());
         }
 
-        if (string.IsNullOrWhiteSpace(beforeJson))
+        if (beforeSnapshot.ProductId != product.Id)
         {
-            return UnitResult.Failure(
-                GeneralErrors.ValueIsInvalid(
-                    nameof(beforeJson)));
+            return Result.Failure<
+                ProductAuditRecordOutcome,
+                DomainError>(
+                    GeneralErrors.ValueIsInvalid(
+                        nameof(beforeSnapshot)));
         }
+
+        var afterSnapshotResult =
+            await _snapshotBuilder
+                .BuildAsync(
+                    product,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+        if (afterSnapshotResult.IsFailure)
+        {
+            return Result.Failure<
+                ProductAuditRecordOutcome,
+                DomainError>(
+                    afterSnapshotResult.Error);
+        }
+
+        var afterSnapshot =
+            afterSnapshotResult.Value;
+
+        /*
+         * Не создаём audit entry и не вызываем
+         * SaveChanges для операции, которая
+         * ничего не изменила.
+         */
+        if (!ProductAuditSnapshotComparer
+                .HasMeaningfulChanges(
+                    beforeSnapshot,
+                    afterSnapshot))
+        {
+            return Result.Success<
+                ProductAuditRecordOutcome,
+                DomainError>(
+                    ProductAuditRecordOutcome
+                        .NoChanges);
+        }
+
+        var beforeJson =
+            ProductAuditSnapshotSerializer
+                .Serialize(beforeSnapshot);
 
         var afterJson =
-            ProductAuditSnapshotSerializer.Serialize(
-                product);
+            ProductAuditSnapshotSerializer
+                .Serialize(afterSnapshot);
 
         var auditEntryResult =
             ProductAuditEntry.Create(
@@ -54,13 +121,18 @@ public sealed class ProductAuditRecorder
 
         if (auditEntryResult.IsFailure)
         {
-            return UnitResult.Failure(
-                auditEntryResult.Error);
+            return Result.Failure<
+                ProductAuditRecordOutcome,
+                DomainError>(
+                    auditEntryResult.Error);
         }
 
         _auditRepository.Add(
             auditEntryResult.Value);
 
-        return UnitResult.Success<DomainError>();
+        return Result.Success<
+            ProductAuditRecordOutcome,
+            DomainError>(
+                ProductAuditRecordOutcome.Recorded);
     }
 }

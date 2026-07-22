@@ -66,9 +66,21 @@ public sealed class UpdateProductStockCommandHandler
                     command.ProductId.ToString()));
         }
 
-        var beforeJson =
-            ProductAuditSnapshotSerializer.Serialize(
-                product);
+        var beforeSnapshotResult =
+            await _auditRecorder
+                .CaptureAsync(
+                    product,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+        if (beforeSnapshotResult.IsFailure)
+        {
+            return UnitResult.Failure(
+                beforeSnapshotResult.Error);
+        }
+
+        var beforeSnapshot =
+            beforeSnapshotResult.Value;
 
         var changeStockQuantityResult =
             product.ChangeStockQuantity(
@@ -81,16 +93,30 @@ public sealed class UpdateProductStockCommandHandler
         }
 
         var auditResult =
-            _auditRecorder.RecordManualChange(
-                product,
-                command.ChangedByUserId,
-                ProductAuditOperation.StockUpdated,
-                beforeJson);
+            await _auditRecorder
+                .RecordManualChangeAsync(
+                    product,
+                    command.ChangedByUserId,
+                    ProductAuditOperation.StockUpdated,
+                    beforeSnapshot,
+                    cancellationToken)
+                .ConfigureAwait(false);
 
         if (auditResult.IsFailure)
         {
             return UnitResult.Failure(
                 auditResult.Error);
+        }
+
+        if (auditResult.Value
+            == ProductAuditRecordOutcome.NoChanges)
+        {
+            /*
+             * Доменный объект мог измениться в памяти,
+             * например UpdatedAtUtc, но SaveChanges
+             * не вызывается. База остаётся неизменной.
+             */
+            return UnitResult.Success<DomainError>();
         }
 
         var saved = await _productRepository

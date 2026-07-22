@@ -94,6 +94,7 @@ public static class DependencyInjectionExtensions
         services.AddScoped<ApplyProductTypeMigrationCommandHandler>();
         services.AddScoped<ProductAuditRecorder>();
         services.AddScoped<GetProductAuditHistoryQueryHandler>();
+        services.AddScoped<ProductAuditSnapshotBuilder>();
 
 
         return services;

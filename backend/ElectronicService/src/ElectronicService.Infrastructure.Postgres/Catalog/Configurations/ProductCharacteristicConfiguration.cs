@@ -3,7 +3,7 @@ using ElectronicService.Domain.Catalog.Products;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace ElectronicService.Infrastructure.Postgres.Catalog;
+namespace ElectronicService.Infrastructure.Postgres.Catalog.Configurations;
 
 public sealed class ProductCharacteristicConfiguration
     : IEntityTypeConfiguration<ProductCharacteristic>
@@ -90,10 +90,10 @@ public sealed class ProductCharacteristicConfiguration
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(characteristic => new
-            {
-                characteristic.ProductId,
-                characteristic.CharacteristicDefinitionId
-            })
+        {
+            characteristic.ProductId,
+            characteristic.CharacteristicDefinitionId
+        })
             .IsUnique();
 
         builder.HasIndex(characteristic => characteristic.CharacteristicDefinitionId);

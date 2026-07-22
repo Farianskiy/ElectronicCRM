@@ -1,12 +1,12 @@
 using ElectronicService.Core.Catalog.Products.Audit;
-using ElectronicService.Core.Catalog.Products
-    .GetAuditHistory;
+using ElectronicService.Core.Catalog.Products.GetAuditHistory;
 using ElectronicService.Domain.Catalog.Characteristics;
 using ElectronicService.Domain.Catalog.Manufacturers;
 using ElectronicService.Domain.Catalog.Products;
 using ElectronicService.Domain.Catalog.ProductTypes;
 using ElectronicService.Infrastructure.Postgres.Data;
 using Microsoft.EntityFrameworkCore;
+using ElectronicService.Domain.Catalog.Audit;
 
 namespace ElectronicService.Infrastructure.Postgres
     .Catalog.Queries;
@@ -66,17 +66,16 @@ public sealed class ProductAuditHistoryReader
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        var snapshots = entries
-            .SelectMany(entry =>
+        var parsedEntries = entries
+            .Select(ParseEntry)
+            .ToList();
+
+        var snapshots = parsedEntries
+            .SelectMany(parsedEntry =>
                 new[]
                 {
-                    ProductAuditSnapshotSerializer
-                        .Deserialize(
-                            entry.BeforeJson),
-
-                    ProductAuditSnapshotSerializer
-                        .Deserialize(
-                            entry.AfterJson)
+            parsedEntry.Before,
+            parsedEntry.After
                 })
             .Where(snapshot =>
                 snapshot is not null)
@@ -118,26 +117,43 @@ public sealed class ProductAuditHistoryReader
                 cancellationToken)
             .ConfigureAwait(false);
 
-        var items = entries
-            .Select(entry =>
+        var items = parsedEntries
+            .Select(parsedEntry =>
             {
-                var before =
-                    ProductAuditSnapshotSerializer
-                        .Deserialize(
-                            entry.BeforeJson);
+                IReadOnlyCollection<
+                    ProductAuditHistoryChangeResult>
+                    changes;
 
-                var after =
-                    ProductAuditSnapshotSerializer
-                        .Deserialize(
-                            entry.AfterJson);
+                if (!parsedEntry.BeforeIsValid
+                    || !parsedEntry.AfterIsValid)
+                {
+                    changes =
+                    [
+                        new ProductAuditHistoryChangeResult(
+                            "auditSnapshot",
+                            "Данные аудита",
 
-                var changes =
-                    ProductAuditDiffBuilder.Build(
-                        before,
-                        after,
-                        productTypeNames,
-                        manufacturerNames,
-                        definitions);
+                            parsedEntry.BeforeIsValid
+                                ? "Снимок прочитан"
+                                : "Снимок повреждён",
+
+                            parsedEntry.AfterIsValid
+                                ? "Снимок прочитан"
+                                : "Снимок повреждён")
+                    ];
+                }
+                else
+                {
+                    changes =
+                        ProductAuditDiffBuilder.Build(
+                            parsedEntry.Before,
+                            parsedEntry.After,
+                            productTypeNames,
+                            manufacturerNames,
+                            definitions);
+                }
+
+                var entry = parsedEntry.Entry;
 
                 return new
                     ProductAuditHistoryItemResult(
@@ -266,4 +282,34 @@ public sealed class ProductAuditHistoryReader
                     row.Name,
                     row.Unit));
     }
+
+    private static ParsedProductAuditEntry ParseEntry(
+    ProductAuditEntry entry)
+    {
+        var beforeIsValid =
+            ProductAuditSnapshotSerializer
+                .TryDeserialize(
+                    entry.BeforeJson,
+                    out var before);
+
+        var afterIsValid =
+            ProductAuditSnapshotSerializer
+                .TryDeserialize(
+                    entry.AfterJson,
+                    out var after);
+
+        return new ParsedProductAuditEntry(
+            entry,
+            beforeIsValid,
+            before,
+            afterIsValid,
+            after);
+    }
+
+    private sealed record ParsedProductAuditEntry(
+        ProductAuditEntry Entry,
+        bool BeforeIsValid,
+        ProductAuditSnapshot? Before,
+        bool AfterIsValid,
+        ProductAuditSnapshot? After);
 }

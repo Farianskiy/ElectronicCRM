@@ -2,7 +2,7 @@ using ElectronicService.Domain.Catalog.ProductTypes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace ElectronicService.Infrastructure.Postgres.Catalog;
+namespace ElectronicService.Infrastructure.Postgres.Catalog.Configurations;
 
 public sealed class ProductTypeConfiguration : IEntityTypeConfiguration<ProductType>
 {

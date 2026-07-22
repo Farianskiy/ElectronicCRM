@@ -43,22 +43,22 @@ internal static class ProductAuditDiffBuilder
             changes,
             "manufacturer",
             "Производитель",
-            FormatReference(
-                before?.ManufacturerId,
+            FormatManufacturer(
+                before,
                 manufacturerNames),
-            FormatReference(
-                after?.ManufacturerId,
+            FormatManufacturer(
+                after,
                 manufacturerNames));
 
         AddChange(
             changes,
             "productType",
             "Тип товара",
-            FormatReference(
-                before?.ProductTypeId,
+            FormatProductType(
+                before,
                 productTypeNames),
-            FormatReference(
-                after?.ProductTypeId,
+            FormatProductType(
+                after,
                 productTypeNames));
 
         AddChange(
@@ -123,9 +123,20 @@ internal static class ProductAuditDiffBuilder
             .Distinct()
             .OrderBy(
                 definitionId =>
-                    GetCharacteristicLabel(
+                {
+                    afterCharacteristics.TryGetValue(
                         definitionId,
-                        definitions),
+                        out var afterValue);
+
+                    beforeCharacteristics.TryGetValue(
+                        definitionId,
+                        out var beforeValue);
+
+                    return GetCharacteristicLabel(
+                        definitionId,
+                        afterValue ?? beforeValue,
+                        definitions);
+                },
                 StringComparer.Ordinal)
             .ToList();
 
@@ -149,6 +160,7 @@ internal static class ProductAuditDiffBuilder
                 $"characteristic:{definitionId}",
                 GetCharacteristicLabel(
                     definitionId,
+                    afterValue ?? beforeValue,
                     definitions),
                 FormatCharacteristicValue(
                     beforeValue,
@@ -206,22 +218,41 @@ internal static class ProductAuditDiffBuilder
     }
 
     private static string GetCharacteristicLabel(
-        Guid definitionId,
-        IReadOnlyDictionary<
-            Guid,
-            ProductAuditCharacteristicMetadata>
-            definitions)
+    Guid definitionId,
+    ProductAuditCharacteristicSnapshot?
+        characteristic,
+    IReadOnlyDictionary<
+        Guid,
+        ProductAuditCharacteristicMetadata>
+        definitions)
     {
-        if (!definitions.TryGetValue(
+        if (!string.IsNullOrWhiteSpace(
+                characteristic?.Name))
+        {
+            if (!string.IsNullOrWhiteSpace(
+                    characteristic.Code))
+            {
+                return string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"{characteristic.Name} " +
+                    $"({characteristic.Code})");
+            }
+
+            return characteristic.Name;
+        }
+
+        if (definitions.TryGetValue(
                 definitionId,
                 out var metadata))
         {
-            return $"Характеристика {definitionId}";
+            return string.Create(
+                CultureInfo.InvariantCulture,
+                $"{metadata.Name} ({metadata.Code})");
         }
 
         return string.Create(
             CultureInfo.InvariantCulture,
-            $"{metadata.Name} ({metadata.Code})");
+            $"Характеристика {definitionId}");
     }
 
     private static string?
@@ -264,31 +295,77 @@ internal static class ProductAuditDiffBuilder
             return value;
         }
 
-        if (string.IsNullOrWhiteSpace(
-                metadata?.Unit))
+        var unit =
+            !string.IsNullOrWhiteSpace(
+                characteristic.Unit)
+                    ? characteristic.Unit
+                    : metadata?.Unit;
+
+        if (string.IsNullOrWhiteSpace(unit))
         {
             return value;
         }
 
         return string.Create(
             CultureInfo.InvariantCulture,
-            $"{value} {metadata.Unit}");
+            $"{value} {unit}");
     }
 
-    private static string? FormatReference(
-        Guid? id,
-        IReadOnlyDictionary<Guid, string> names)
+    private static string? FormatManufacturer(
+    ProductAuditSnapshot? snapshot,
+    IReadOnlyDictionary<Guid, string> names)
     {
-        if (!id.HasValue)
+        if (snapshot is null)
         {
             return null;
         }
 
+        if (!string.IsNullOrWhiteSpace(
+                snapshot.ManufacturerName))
+        {
+            return snapshot.ManufacturerName;
+        }
+
         return names.TryGetValue(
-            id.Value,
+            snapshot.ManufacturerId,
             out var name)
                 ? name
-                : id.Value.ToString();
+                : snapshot
+                    .ManufacturerId
+                    .ToString();
+    }
+
+    private static string? FormatProductType(
+        ProductAuditSnapshot? snapshot,
+        IReadOnlyDictionary<Guid, string> names)
+    {
+        if (snapshot is null)
+        {
+            return null;
+        }
+
+        if (!string.IsNullOrWhiteSpace(
+                snapshot.ProductTypeName))
+        {
+            if (!string.IsNullOrWhiteSpace(
+                    snapshot.ProductTypeCode))
+            {
+                return string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"{snapshot.ProductTypeName} " +
+                    $"({snapshot.ProductTypeCode})");
+            }
+
+            return snapshot.ProductTypeName;
+        }
+
+        return names.TryGetValue(
+            snapshot.ProductTypeId,
+            out var name)
+                ? name
+                : snapshot
+                    .ProductTypeId
+                    .ToString();
     }
 
     private static string? FormatPrice(

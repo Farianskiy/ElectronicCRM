@@ -222,9 +222,21 @@ public sealed class
                     parseResult.Value;
         }
 
-        var beforeJson =
-            ProductAuditSnapshotSerializer.Serialize(
-                plan.Product);
+        var beforeSnapshotResult =
+            await _auditRecorder
+                .CaptureAsync(
+                    plan.Product,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+        if (beforeSnapshotResult.IsFailure)
+        {
+            return UnitResult.Failure(
+                beforeSnapshotResult.Error);
+        }
+
+        var beforeSnapshot =
+            beforeSnapshotResult.Value;
 
         var migrationResult =
             plan.Product.MigrateToProductType(
@@ -239,11 +251,14 @@ public sealed class
         }
 
         var auditResult =
-            _auditRecorder.RecordManualChange(
-                plan.Product,
-                command.ChangedByUserId,
-                ProductAuditOperation.ProductTypeMigrated,
-                beforeJson);
+            await _auditRecorder
+                .RecordManualChangeAsync(
+                    plan.Product,
+                    command.ChangedByUserId,
+                    ProductAuditOperation.ProductTypeMigrated,
+                    beforeSnapshot,
+                    cancellationToken)
+                .ConfigureAwait(false);
 
         if (auditResult.IsFailure)
         {
@@ -251,6 +266,16 @@ public sealed class
                 auditResult.Error);
         }
 
+        if (auditResult.Value
+            == ProductAuditRecordOutcome.NoChanges)
+        {
+            /*
+             * Доменный объект мог измениться в памяти,
+             * например UpdatedAtUtc, но SaveChanges
+             * не вызывается. База остаётся неизменной.
+             */
+            return UnitResult.Success<DomainError>();
+        }
         /*
         * Даже после проверки версии другой запрос
         * теоретически может изменить Product до момента

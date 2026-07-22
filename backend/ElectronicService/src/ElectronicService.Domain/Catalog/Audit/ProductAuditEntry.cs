@@ -124,6 +124,20 @@ public sealed class ProductAuditEntry : AggregateRoot
                 nameof(afterJson));
         }
 
+        /*
+        * Защита последнего уровня:
+        * одинаковые JSON не являются событием аудита.
+        */
+        if (!string.IsNullOrWhiteSpace(beforeJson)
+            && string.Equals(
+                beforeJson,
+                afterJson,
+                StringComparison.Ordinal))
+        {
+            return GeneralErrors.ValueIsInvalid(
+                nameof(afterJson));
+        }
+
         return new ProductAuditEntry(
             Guid.CreateVersion7(),
             productId,
