@@ -1,6 +1,7 @@
 using ElectronicService.Core.Catalog.ImportBatches.Abstractions;
 using ElectronicService.Domain.Catalog.ImportBatches;
 using ElectronicService.Infrastructure.Postgres.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace ElectronicService.Infrastructure.Postgres.Catalog.Repositories;
 
@@ -21,15 +22,88 @@ public sealed class CatalogImportBatchRepository
     {
         ArgumentNullException.ThrowIfNull(batch);
 
-        /*
-         * EF Core увидит обязательную навигацию
-         * batch.File и добавит обе сущности:
-         *
-         * INSERT catalog_import_batches
-         * INSERT catalog_import_files
-         */
         _dbContext.CatalogImportBatches.Add(
             batch);
+    }
+
+    public Task<CatalogImportBatch?>
+        GetByIdWithFileAsync(
+            Guid batchId,
+            CancellationToken cancellationToken =
+                default)
+    {
+        return _dbContext.CatalogImportBatches
+            .Include(batch => batch.File)
+            .FirstOrDefaultAsync(
+                batch => batch.Id == batchId,
+                cancellationToken);
+    }
+
+    public async Task ReplaceAnalysisAsync(
+        CatalogImportBatch batch,
+        IReadOnlyCollection<CatalogImportColumn>
+            columns,
+        IReadOnlyCollection<CatalogImportRow>
+            rows,
+        CancellationToken cancellationToken =
+            default)
+    {
+        ArgumentNullException.ThrowIfNull(batch);
+        ArgumentNullException.ThrowIfNull(columns);
+        ArgumentNullException.ThrowIfNull(rows);
+
+        /*
+         * ExecuteDeleteAsync выполняется сразу,
+         * а не при SaveChanges.
+         *
+         * Поэтому все действия обязательно
+         * объединяем одной транзакцией.
+         */
+        await using var transaction =
+            await _dbContext.Database
+                .BeginTransactionAsync(
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+        /*
+         * Сначала удаляем строки.
+         * Затем колонки.
+         *
+         * Старый анализ полностью заменяется
+         * новым результатом.
+         */
+        await _dbContext.CatalogImportRows
+            .Where(row =>
+                row.BatchId == batch.Id)
+            .ExecuteDeleteAsync(
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        await _dbContext.CatalogImportColumns
+            .Where(column =>
+                column.BatchId == batch.Id)
+            .ExecuteDeleteAsync(
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        _dbContext.CatalogImportColumns
+            .AddRange(columns);
+
+        _dbContext.CatalogImportRows
+            .AddRange(rows);
+
+        /*
+         * Здесь также сохраняется новый статус
+         * отслеживаемого CatalogImportBatch.
+         */
+        await _dbContext
+            .SaveChangesAsync(
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        await transaction
+            .CommitAsync(cancellationToken)
+            .ConfigureAwait(false);
     }
 
     public Task SaveChangesAsync(

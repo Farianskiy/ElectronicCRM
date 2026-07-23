@@ -46,6 +46,7 @@ using ElectronicService.Core.Catalog.Products.GetAuditHistory;
 using ElectronicService.Core.Users.CreateManagerUser;
 using ElectronicService.Core.Users.MakeUserManager;
 using ElectronicService.Core.Catalog.ImportBatches.CreateCatalogImportBatch;
+using ElectronicService.Core.Catalog.ImportBatches.AnalyzeCatalogImportBatch;
 
 namespace ElectronicService.Core;
 
@@ -101,6 +102,7 @@ public static class DependencyInjectionExtensions
         services.AddScoped<CreateManagerUserCommandHandler>();
         services.AddScoped<MakeUserManagerCommandHandler>();
         services.AddScoped<CreateCatalogImportBatchCommandHandler>();
+        services.AddScoped<AnalyzeCatalogImportBatchCommandHandler>();
 
 
         return services;

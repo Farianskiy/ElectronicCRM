@@ -43,6 +43,10 @@ public sealed class ElectronicDbContext : DbContext
 
     public DbSet<CatalogImportFile> CatalogImportFiles => Set<CatalogImportFile>();
 
+    public DbSet<CatalogImportColumn> CatalogImportColumns => Set<CatalogImportColumn>();
+
+    public DbSet<CatalogImportRow> CatalogImportRows => Set<CatalogImportRow>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(

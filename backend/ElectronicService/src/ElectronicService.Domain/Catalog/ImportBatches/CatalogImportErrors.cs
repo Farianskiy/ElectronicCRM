@@ -90,4 +90,103 @@ public static class CatalogImportErrors
             "catalog.import.file.cannot_be_read",
             "Не удалось прочитать загруженный Excel-файл.");
     }
+
+    public static DomainError InvalidColumnMapping()
+    {
+        return new DomainError(
+            "catalog.import.column.invalid_mapping",
+            "Сопоставление колонки импорта содержит " +
+            "некорректные данные.");
+    }
+
+    public static DomainError InvalidImportJson(
+        string propertyName)
+    {
+        return new DomainError(
+            "catalog.import.row.invalid_json",
+            $"Поле '{propertyName}' должно содержать " +
+            "корректный JSON.");
+    }
+
+    public static DomainError ImportJsonIsTooLong(
+        string propertyName,
+        int maximumLength)
+    {
+        return new DomainError(
+            "catalog.import.row.json_too_long",
+            $"Размер поля '{propertyName}' превышает " +
+            $"допустимый предел '{maximumLength}' символов.");
+    }
+
+    public static DomainError BatchNotFound(
+    Guid batchId)
+    {
+        return new DomainError(
+            "catalog.import.batch.not_found",
+            $"Пакет импорта '{batchId}' не найден.");
+    }
+
+    public static DomainError UserCannotAccessBatch()
+    {
+        return new DomainError(
+            "catalog.import.batch.access_denied",
+            "Пользователь не может изменять этот пакет импорта.");
+    }
+
+    public static DomainError BatchCannotBeAnalyzed(
+        CatalogImportBatchStatus status)
+    {
+        return new DomainError(
+            "catalog.import.batch.cannot_be_analyzed",
+            $"Пакет импорта в статусе '{status}' " +
+            "нельзя анализировать.");
+    }
+
+    public static DomainError ProductTypeNotFound(
+        Guid productTypeId)
+    {
+        return new DomainError(
+            "catalog.import.product_type.not_found",
+            $"Тип товара '{productTypeId}' не найден.");
+    }
+
+    public static DomainError InvalidWorkbook()
+    {
+        return new DomainError(
+            "catalog.import.workbook.invalid",
+            "Не удалось прочитать Excel-файл. " +
+            "Файл повреждён или не является корректным .xlsx.");
+    }
+
+    public static DomainError WorkbookHasNoData()
+    {
+        return new DomainError(
+            "catalog.import.workbook.no_data",
+            "Excel-файл не содержит таблицу с данными.");
+    }
+
+    public static DomainError WorkbookHasNoHeader()
+    {
+        return new DomainError(
+            "catalog.import.workbook.no_header",
+            "Не удалось определить строку заголовков Excel.");
+    }
+
+    public static DomainError WorkbookHasTooManyColumns(
+        int maximumColumns)
+    {
+        return new DomainError(
+            "catalog.import.workbook.too_many_columns",
+            $"Excel-файл содержит больше " +
+            $"'{maximumColumns}' используемых колонок.");
+    }
+
+    public static DomainError WorkbookHasTooManyRows(
+        int maximumRows)
+    {
+        return new DomainError(
+            "catalog.import.workbook.too_many_rows",
+            $"Excel-файл содержит больше " +
+            $"'{maximumRows}' строк с данными.");
+    }
 }
