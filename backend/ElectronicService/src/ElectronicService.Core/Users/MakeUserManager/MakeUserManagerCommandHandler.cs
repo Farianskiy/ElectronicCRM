@@ -1,0 +1,82 @@
+using CSharpFunctionalExtensions;
+using ElectronicService.Core.Abstractions.Data;
+using ElectronicService.Domain.Common;
+using ElectronicService.Domain.Users.Errors;
+using ElectronicService.Domain.Users.ValueObjects;
+
+namespace ElectronicService.Core.Users.MakeUserManager;
+
+public sealed class MakeUserManagerCommandHandler
+{
+    private readonly IUserRepository
+        _userRepository;
+
+    private readonly IUnitOfWork
+        _unitOfWork;
+
+    public MakeUserManagerCommandHandler(
+        IUserRepository userRepository,
+        IUnitOfWork unitOfWork)
+    {
+        _userRepository = userRepository;
+        _unitOfWork = unitOfWork;
+    }
+
+    public async Task<UnitResult<DomainError>> Handle(
+        MakeUserManagerCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+
+        var user = await _userRepository
+            .GetByIdAsync(
+                command.UserId,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        if (user is null)
+        {
+            return UnitResult.Failure(
+                UserErrors.NotFound(
+                    command.UserId));
+        }
+
+        var emailResult =
+            Email.Create(command.Email);
+
+        if (emailResult.IsFailure)
+        {
+            return UnitResult.Failure(
+                emailResult.Error);
+        }
+
+        var emailAlreadyExists =
+            await _userRepository
+                .ExistsByEmailAsync(
+                    emailResult.Value,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+        if (emailAlreadyExists
+            && !emailResult.Value.Equals(
+                user.Email))
+        {
+            return UnitResult.Failure(
+                UserErrors.EmailAlreadyTaken());
+        }
+
+        var makeManagerResult =
+            user.MakeManager(command.Email);
+
+        if (makeManagerResult.IsFailure)
+        {
+            return makeManagerResult;
+        }
+
+        await _unitOfWork
+            .SaveChangesAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return UnitResult.Success<DomainError>();
+    }
+}

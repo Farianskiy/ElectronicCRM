@@ -1,5 +1,4 @@
 using ElectronicService.Domain.Common;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace ElectronicService.Domain.Users.Errors;
 
@@ -59,5 +58,12 @@ public static class UserErrors
         return new DomainError(
             "user.email_already_taken",
             "Пользователь с таким email уже существует.");
+    }
+
+    public static DomainError AlreadyManager()
+    {
+        return new DomainError(
+            "user.already_manager",
+            "Пользователь уже является менеджером.");
     }
 }

@@ -45,6 +45,8 @@ public sealed class User : AggregateRoot
 
     public bool IsTechnical => Type == UserType.Technical;
 
+    public bool IsManager => Type == UserType.Manager;
+
     public bool IsActive => Status == UserStatus.Active;
 
     public bool IsBlocked => Status == UserStatus.Blocked;
@@ -84,6 +86,33 @@ public sealed class User : AggregateRoot
     }
 
     public bool CanManageProductSynonyms()
+    {
+        return IsActive && IsTechnical;
+    }
+
+    public bool CanCreateCatalogImport()
+    {
+        return IsActive
+            && (IsManager || IsTechnical);
+    }
+
+    public bool CanEditCatalogImport()
+    {
+        return IsActive
+            && (IsManager || IsTechnical);
+    }
+
+    public bool CanSubmitCatalogImportForReview()
+    {
+        return IsActive && IsManager;
+    }
+
+    public bool CanReviewCatalogImports()
+    {
+        return IsActive && IsTechnical;
+    }
+
+    public bool CanApplyCatalogImport()
     {
         return IsActive && IsTechnical;
     }
@@ -149,6 +178,34 @@ public sealed class User : AggregateRoot
             NormalizePasswordHash(passwordHash));
     }
 
+    public static Result<User, DomainError> CreateManager(
+        string displayName,
+        string email,
+        string? passwordHash = null)
+    {
+        var displayNameResult =
+            UserDisplayName.Create(displayName);
+
+        if (displayNameResult.IsFailure)
+        {
+            return displayNameResult.Error;
+        }
+
+        var emailResult = Email.Create(email);
+
+        if (emailResult.IsFailure)
+        {
+            return emailResult.Error;
+        }
+
+        return new User(
+            Guid.CreateVersion7(),
+            displayNameResult.Value,
+            emailResult.Value,
+            UserType.Manager,
+            NormalizePasswordHash(passwordHash));
+    }
+
     public UnitResult<DomainError> ChangeDisplayName(string displayName)
     {
         if (IsBlocked)
@@ -210,6 +267,36 @@ public sealed class User : AggregateRoot
 
         Email = emailResult.Value;
         Type = UserType.Technical;
+        UpdatedAtUtc = DateTime.UtcNow;
+
+        return UnitResult.Success<DomainError>();
+    }
+
+    public UnitResult<DomainError> MakeManager(
+    string email)
+    {
+        if (IsBlocked)
+        {
+            return UnitResult.Failure(
+                UserErrors.BlockedUserCannotBeChanged());
+        }
+
+        if (IsManager)
+        {
+            return UnitResult.Failure(
+                UserErrors.AlreadyManager());
+        }
+
+        var emailResult = Email.Create(email);
+
+        if (emailResult.IsFailure)
+        {
+            return UnitResult.Failure(
+                emailResult.Error);
+        }
+
+        Email = emailResult.Value;
+        Type = UserType.Manager;
         UpdatedAtUtc = DateTime.UtcNow;
 
         return UnitResult.Success<DomainError>();

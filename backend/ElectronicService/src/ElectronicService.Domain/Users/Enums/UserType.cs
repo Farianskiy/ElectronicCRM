@@ -4,5 +4,6 @@ public enum UserType
 {
     None = 0,
     Regular = 1,
-    Technical = 2
+    Technical = 2,
+    Manager = 3
 }

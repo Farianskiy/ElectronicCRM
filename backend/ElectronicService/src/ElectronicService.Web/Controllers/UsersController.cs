@@ -5,6 +5,9 @@ using ElectronicService.Core.Users.CreateRegularUser;
 using ElectronicService.Core.Users.CreateTechnicalUser;
 using ElectronicService.Core.Users.MakeUserRegular;
 using ElectronicService.Core.Users.MakeUserTechnical;
+using ElectronicService.Core.Users.CreateManagerUser;
+using ElectronicService.Core.Users.MakeUserManager;
+using Microsoft.AspNetCore.Authorization;
 using ElectronicService.Domain.Common;
 using Microsoft.AspNetCore.Mvc;
 
@@ -62,6 +65,40 @@ public sealed class UsersController : ControllerBase
             new UserResponse(result.Value));
     }
 
+    [Authorize(Roles = "Technical")]
+    [HttpPost("manager")]
+    public async Task<IActionResult> CreateManagerUser(
+        [FromBody] CreateManagerUserRequest request,
+        [FromServices]
+        CreateManagerUserCommandHandler handler,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var command =
+            new CreateManagerUserCommand(
+                request.DisplayName,
+                request.Email,
+                request.Password);
+
+        var result = await handler
+            .Handle(
+                command,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        if (result.IsFailure)
+        {
+            return ToProblem(result.Error);
+        }
+
+        return Created(
+            new Uri(
+                $"/api/users/{result.Value}",
+                UriKind.Relative),
+            new UserResponse(result.Value));
+    }
+
     // Делает существующего пользователя техническим
     [HttpPost("{id:guid}/make-technical")]
     public async Task<IActionResult> MakeUserTechnical(
@@ -94,6 +131,37 @@ public sealed class UsersController : ControllerBase
         var command = new MakeUserRegularCommand(id);
 
         var result = await handler.Handle(command, cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return ToProblem(result.Error);
+        }
+
+        return NoContent();
+    }
+
+    [Authorize(Roles = "Technical")]
+    [HttpPost("{id:guid}/make-manager")]
+    public async Task<IActionResult> MakeUserManager(
+        Guid id,
+        [FromBody]
+        MakeUserManagerRequest request,
+        [FromServices]
+        MakeUserManagerCommandHandler handler,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var command =
+            new MakeUserManagerCommand(
+                id,
+                request.Email);
+
+        var result = await handler
+            .Handle(
+                command,
+                cancellationToken)
+            .ConfigureAwait(false);
 
         if (result.IsFailure)
         {
@@ -142,6 +210,7 @@ public sealed class UsersController : ControllerBase
         return error.Code switch
         {
             "user.not_found" => StatusCodes.Status404NotFound,
+            "user.already_manager" => StatusCodes.Status409Conflict,
             "user.email_already_taken" => StatusCodes.Status409Conflict,
             "user.already_technical" => StatusCodes.Status409Conflict,
             "user.already_regular" => StatusCodes.Status409Conflict,
