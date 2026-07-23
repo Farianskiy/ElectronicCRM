@@ -22,6 +22,7 @@ using ElectronicService.Core.Catalog.ProductTypes.Abstractions;
 using ElectronicService.Core.Catalog.CharacteristicDefinitions.Abstractions;
 using ElectronicService.Core.Catalog.Products.Audit;
 using ElectronicService.Core.Catalog.Products.GetAuditHistory;
+using ElectronicService.Core.Catalog.ImportBatches.Abstractions;
 
 namespace ElectronicService.Infrastructure.Postgres;
 
@@ -72,6 +73,7 @@ public static class DependencyInjectionExtensions
         services.AddScoped<ICharacteristicDefinitionRepository, CharacteristicDefinitionRepository>();
         services.AddScoped<IProductAuditRepository, ProductAuditRepository>();
         services.AddScoped<IProductAuditHistoryReader, ProductAuditHistoryReader>();
+        services.AddScoped<ICatalogImportBatchRepository, CatalogImportBatchRepository>();
 
         return services;
     }

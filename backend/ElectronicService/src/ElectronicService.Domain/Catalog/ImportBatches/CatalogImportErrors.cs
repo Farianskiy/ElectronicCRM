@@ -68,4 +68,26 @@ public static class CatalogImportErrors
             "catalog.import.batch.failure_reason_required",
             "Необходимо указать причину ошибки импорта.");
     }
+
+    public static DomainError CurrentUserNotFound()
+    {
+        return new DomainError(
+            "catalog.import.current_user.not_found",
+            "Пользователь, создающий импорт, не найден.");
+    }
+
+    public static DomainError UserCannotCreateCatalogImport()
+    {
+        return new DomainError(
+            "catalog.import.user.cannot_create",
+            "Только активный менеджер или технический " +
+            "пользователь может загружать товары.");
+    }
+
+    public static DomainError FileCannotBeRead()
+    {
+        return new DomainError(
+            "catalog.import.file.cannot_be_read",
+            "Не удалось прочитать загруженный Excel-файл.");
+    }
 }
