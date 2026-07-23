@@ -6,6 +6,7 @@ using ElectronicService.Domain.Catalog.Products;
 using ElectronicService.Domain.Catalog.ProductTypes;
 using ElectronicService.Domain.Catalog.Dictionaries;
 using ElectronicService.Domain.Catalog.Audit;
+using ElectronicService.Domain.Catalog.ImportBatches;
 
 namespace ElectronicService.Infrastructure.Postgres.Data;
 
@@ -37,6 +38,10 @@ public sealed class ElectronicDbContext : DbContext
     public DbSet<CatalogAssistantDictionarySuggestion> CatalogAssistantDictionarySuggestions => Set<CatalogAssistantDictionarySuggestion>();
 
     public DbSet<ProductAuditEntry> ProductAuditEntries => Set<ProductAuditEntry>();
+
+    public DbSet<CatalogImportBatch> CatalogImportBatches => Set<CatalogImportBatch>();
+
+    public DbSet<CatalogImportFile> CatalogImportFiles => Set<CatalogImportFile>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
