@@ -103,6 +103,9 @@ public sealed class CatalogImportWorkbookAnalyzer
             IReadOnlyCollection<
                 CharacteristicDefinition>
                 characteristicDefinitions,
+            IReadOnlyCollection<
+                CatalogImportColumn>
+                existingColumns,
             CancellationToken cancellationToken =
                 default)
     {
@@ -126,6 +129,9 @@ public sealed class CatalogImportWorkbookAnalyzer
 
         ArgumentNullException.ThrowIfNull(
             characteristicDefinitions);
+
+        ArgumentNullException.ThrowIfNull(
+            existingColumns);
 
         try
         {
@@ -187,6 +193,14 @@ public sealed class CatalogImportWorkbookAnalyzer
                 BuildDefinitionLookups(
                     characteristicDefinitions);
 
+            var existingColumnsByNumber =
+                existingColumns
+                    .GroupBy(column =>
+                        column.SourceColumnNumber)
+                    .ToDictionary(
+                        group => group.Key,
+                        group => group.First());
+
             var headerRowNumber =
                 FindHeaderRowNumber(
                     worksheet,
@@ -211,6 +225,9 @@ public sealed class CatalogImportWorkbookAnalyzer
                     lastRowNumber,
                     lastColumnNumber,
                     definitionLookups,
+                    productType,
+                    characteristicDefinitions,
+                    existingColumnsByNumber,
                     cancellationToken);
 
             if (columnCandidates.Count == 0)
@@ -458,6 +475,14 @@ public sealed class CatalogImportWorkbookAnalyzer
             int lastRowNumber,
             int lastColumnNumber,
             DefinitionLookups definitionLookups,
+            ProductType? productType,
+            IReadOnlyCollection<
+                CharacteristicDefinition>
+                characteristicDefinitions,
+            Dictionary<
+                int,
+                CatalogImportColumn>
+                existingColumnsByNumber,
             CancellationToken cancellationToken)
     {
         var result =
@@ -506,6 +531,23 @@ public sealed class CatalogImportWorkbookAnalyzer
                     normalizedHeader,
                     definitionLookups);
 
+            if (existingColumnsByNumber.TryGetValue(
+                columnNumber,
+                out var existingColumn)
+            && CanPreserveMapping(
+                existingColumn,
+                productType,
+                characteristicDefinitions))
+            {
+                mapping =
+                    new ColumnMapping(
+                        existingColumn.TargetKind,
+                        existingColumn
+                            .CharacteristicDefinitionId,
+                        existingColumn.Confidence,
+                        existingColumn.IsConfirmed);
+            }
+
             result.Add(
                 new ColumnCandidate(
                     columnNumber,
@@ -544,6 +586,66 @@ public sealed class CatalogImportWorkbookAnalyzer
         }
 
         return false;
+    }
+
+    private static bool CanPreserveMapping(
+    CatalogImportColumn existingColumn,
+    ProductType? productType,
+    IReadOnlyCollection<
+        CharacteristicDefinition>
+        characteristicDefinitions)
+    {
+        /*
+         * Автоматическое неподтверждённое
+         * соответствие сохранять не требуется.
+         */
+        if (!existingColumn.IsConfirmed)
+        {
+            return false;
+        }
+
+        if (existingColumn.TargetKind
+            == CatalogImportColumnTargetKind
+                .Unmapped)
+        {
+            return false;
+        }
+
+        /*
+         * Ignore и стандартные поля:
+         *
+         * Name
+         * Article
+         * Manufacturer
+         * Price
+         * StockQuantity
+         *
+         * можно сохранить без ProductType.
+         */
+        if (existingColumn.TargetKind
+            != CatalogImportColumnTargetKind
+                .Characteristic)
+        {
+            return true;
+        }
+
+        if (productType is null
+            || existingColumn
+                .CharacteristicDefinitionId
+                is not Guid definitionId)
+        {
+            return false;
+        }
+
+        if (!productType.AllowsCharacteristic(
+                definitionId))
+        {
+            return false;
+        }
+
+        return characteristicDefinitions.Any(
+            definition =>
+                definition.Id == definitionId);
     }
 
     private static ColumnMapping

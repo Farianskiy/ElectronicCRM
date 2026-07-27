@@ -133,15 +133,12 @@ public sealed class
          * Technical может проверять batch
          * любого Manager.
          */
-        if (currentUser.IsManager
-            && batch.CreatedByUserId
-            != currentUser.Id)
+        if (batch.CreatedByUserId != currentUser.Id)
         {
             return Result.Failure<
                 AnalyzeCatalogImportBatchResult,
                 DomainError>(
-                    CatalogImportErrors
-                        .UserCannotAccessBatch());
+                    CatalogImportErrors.UserCannotAccessBatch());
         }
 
         if (!batch.IsEditable)
@@ -231,12 +228,20 @@ public sealed class
                     .ConfigureAwait(false);
         }
 
+        var existingColumns =
+            await _importBatchRepository
+                .GetColumnsForAnalysisAsync(
+                    batch.Id,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
         var analysisResult =
             _workbookAnalyzer.Analyze(
                 batch.Id,
                 batch.File.Content,
                 productType,
                 definitions,
+                existingColumns,
                 cancellationToken);
 
         if (analysisResult.IsFailure)

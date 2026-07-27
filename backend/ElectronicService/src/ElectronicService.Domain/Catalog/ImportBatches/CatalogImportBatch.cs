@@ -323,6 +323,52 @@ public sealed class CatalogImportBatch : AggregateRoot
             fileResult.Value);
     }
 
+    public bool CanEditRows =>
+    Status is
+        CatalogImportBatchStatus.NeedsCorrection
+        or CatalogImportBatchStatus.Ready;
+
+    public UnitResult<DomainError>
+    RefreshRowsValidationStatistics(
+        int rowsCount,
+        int validRowsCount,
+        int errorRowsCount)
+    {
+        if (!CanEditRows)
+        {
+            return UnitResult.Failure(
+                CatalogImportErrors.BatchRowsCannotBeEdited(
+                    Status));
+        }
+
+        /*
+         * После завершения mapping каждая строка
+         * должна быть либо Valid, либо Error.
+         */
+        if (rowsCount <= 0
+            || validRowsCount < 0
+            || errorRowsCount < 0
+            || validRowsCount + errorRowsCount
+                != rowsCount)
+        {
+            return UnitResult.Failure(
+                CatalogImportErrors
+                    .InvalidRowsStatistics());
+        }
+
+        RowsCount = rowsCount;
+        ValidRowsCount = validRowsCount;
+        ErrorRowsCount = errorRowsCount;
+
+        Status = errorRowsCount == 0
+            ? CatalogImportBatchStatus.Ready
+            : CatalogImportBatchStatus.NeedsCorrection;
+
+        Touch();
+
+        return UnitResult.Success<DomainError>();
+    }
+
     public UnitResult<DomainError>
         AssignProductType(
             Guid productTypeId)
@@ -419,6 +465,40 @@ public sealed class CatalogImportBatch : AggregateRoot
                 CatalogImportBatchStatus.Ready;
         }
 
+        Touch();
+
+        return UnitResult.Success<DomainError>();
+    }
+
+    public UnitResult<DomainError>
+        MarkMappingChanged()
+    {
+        if (!IsEditable)
+        {
+            return UnitResult.Failure(
+                CatalogImportErrors
+                    .BatchCannotBeAnalyzed(
+                        Status));
+        }
+
+        /*
+         * Существующие строки были проверены
+         * по предыдущей схеме колонок.
+         *
+         * До повторной валидации их результат
+         * считается устаревшим.
+         */
+        Status =
+            CatalogImportBatchStatus
+                .MappingRequired;
+
+        ValidRowsCount = 0;
+        ErrorRowsCount = 0;
+
+        /*
+         * RowsCount сохраняем:
+         * staging-строки физически не удаляются.
+         */
         Touch();
 
         return UnitResult.Success<DomainError>();

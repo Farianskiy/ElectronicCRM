@@ -55,5 +55,7 @@ public enum CatalogImportBatchStatus
     /*
      * Во время обработки произошла ошибка.
      */
-    Failed = 10
+    Failed = 10,
+
+    ChangesRequested = 11
 }

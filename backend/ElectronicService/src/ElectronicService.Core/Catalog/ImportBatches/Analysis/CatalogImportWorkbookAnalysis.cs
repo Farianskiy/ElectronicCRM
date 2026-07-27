@@ -1,4 +1,6 @@
 using ElectronicService.Domain.Catalog.ImportBatches;
+using ElectronicService.Domain.Catalog.ProductTypes;
+using ElectronicService.Domain.Catalog.Characteristics;
 
 namespace ElectronicService.Core.Catalog.ImportBatches.Analysis;
 

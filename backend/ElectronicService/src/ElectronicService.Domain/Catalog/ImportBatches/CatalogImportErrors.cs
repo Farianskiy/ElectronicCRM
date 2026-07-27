@@ -76,12 +76,19 @@ public static class CatalogImportErrors
             "Пользователь, создающий импорт, не найден.");
     }
 
-    public static DomainError UserCannotCreateCatalogImport()
+    public static DomainError BatchRowsCannotBeEdited(
+    CatalogImportBatchStatus status)
     {
         return new DomainError(
-            "catalog.import.user.cannot_create",
-            "Только активный менеджер или технический " +
-            "пользователь может загружать товары.");
+            "catalog.import.batch.rows_cannot_be_edited",
+            $"Строки пакета импорта в статусе '{status}' нельзя изменять.");
+    }
+
+    public static DomainError UserCannotSubmitCatalogImport()
+    {
+        return new DomainError(
+            "catalog.import.user.cannot_submit",
+            "Пользователь не может отправить этот пакет импорта на проверку.");
     }
 
     public static DomainError FileCannotBeRead()
@@ -188,5 +195,63 @@ public static class CatalogImportErrors
             "catalog.import.workbook.too_many_rows",
             $"Excel-файл содержит больше " +
             $"'{maximumRows}' строк с данными.");
+    }
+
+    public static DomainError ColumnNotFound(
+    Guid columnId)
+    {
+        return new DomainError(
+            "catalog.import.column.not_found",
+            $"Колонка импорта '{columnId}' не найдена.");
+    }
+
+    public static DomainError DuplicateColumnMapping()
+    {
+        return new DomainError(
+            "catalog.import.column.duplicate_mapping",
+            "Другая колонка уже сопоставлена " +
+            "с этим полем каталога.");
+    }
+
+    public static DomainError InvalidColumnTarget(
+        string targetKind)
+    {
+        return new DomainError(
+            "catalog.import.column.invalid_target",
+            $"Назначение колонки '{targetKind}' неизвестно.");
+    }
+
+    public static DomainError ProductTypeRequiredForCharacteristic()
+    {
+        return new DomainError(
+            "catalog.import.column.product_type_required",
+            "Перед сопоставлением характеристики " +
+            "необходимо выбрать тип товара.");
+    }
+
+    public static DomainError CharacteristicNotAllowed(
+        Guid characteristicDefinitionId,
+        Guid productTypeId)
+    {
+        return new DomainError(
+            "catalog.import.column.characteristic_not_allowed",
+            $"Характеристика '{characteristicDefinitionId}' " +
+            $"не разрешена для типа товара '{productTypeId}'.");
+    }
+
+    public static DomainError InvalidPagination()
+    {
+        return new DomainError(
+            "catalog.import.rows.invalid_pagination",
+            "Параметры пагинации содержат " +
+            "некорректные значения.");
+    }
+
+    public static DomainError InvalidRowStatus(
+        string status)
+    {
+        return new DomainError(
+            "catalog.import.rows.invalid_status",
+            $"Статус строки '{status}' неизвестен.");
     }
 }

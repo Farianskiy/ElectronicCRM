@@ -200,15 +200,26 @@ public sealed class CatalogImportColumn : Abstractions.Entity
      * редактором сопоставления на frontend.
      */
     public UnitResult<DomainError> ChangeMapping(
-        CatalogImportColumnTargetKind targetKind,
-        Guid? characteristicDefinitionId,
-        bool isConfirmed)
+    CatalogImportColumnTargetKind targetKind,
+    Guid? characteristicDefinitionId,
+    bool isConfirmed)
     {
+        /*
+         * Ручное подтверждение считается
+         * точным сопоставлением.
+         *
+         * Unmapped получает confidence = 0.
+         */
+        var confidence =
+            isConfirmed
+                ? 1.0000m
+                : 0.0000m;
+
         var validationResult =
             ValidateMapping(
                 targetKind,
                 characteristicDefinitionId,
-                Confidence,
+                confidence,
                 isConfirmed);
 
         if (validationResult.IsFailure)
@@ -217,8 +228,11 @@ public sealed class CatalogImportColumn : Abstractions.Entity
         }
 
         TargetKind = targetKind;
+
         CharacteristicDefinitionId =
             characteristicDefinitionId;
+
+        Confidence = confidence;
         IsConfirmed = isConfirmed;
 
         return UnitResult.Success<DomainError>();

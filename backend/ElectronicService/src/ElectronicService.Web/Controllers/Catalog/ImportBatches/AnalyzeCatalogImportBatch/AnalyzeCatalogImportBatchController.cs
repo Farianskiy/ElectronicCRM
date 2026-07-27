@@ -11,7 +11,7 @@ namespace ElectronicService.Web.Controllers.Catalog
     .ImportBatches.AnalyzeCatalogImportBatch;
 
 [ApiController]
-[Authorize(Roles = "Manager,Technical")]
+[Authorize(Roles = "Regular,Manager,Technical")]
 [Route("api/catalog/import-batches")]
 public sealed class
     AnalyzeCatalogImportBatchController

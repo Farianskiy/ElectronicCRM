@@ -92,19 +92,18 @@ public sealed class User : AggregateRoot
 
     public bool CanCreateCatalogImport()
     {
-        return IsActive
-            && (IsManager || IsTechnical);
+        return IsActive;
     }
 
     public bool CanEditCatalogImport()
     {
-        return IsActive
-            && (IsManager || IsTechnical);
+        return IsActive;
     }
 
     public bool CanSubmitCatalogImportForReview()
     {
-        return IsActive && IsManager;
+        return IsActive
+            && (IsRegular || IsManager);
     }
 
     public bool CanReviewCatalogImports()
