@@ -56,19 +56,21 @@ public sealed class CatalogImportBatchRepository
             .ConfigureAwait(false);
     }
 
-    public Task<List<CatalogImportColumn>>
-        GetColumnsForUpdateAsync(
-            Guid batchId,
-            CancellationToken cancellationToken =
-                default)
+    public async Task<IReadOnlyCollection<
+    CatalogImportColumn>>
+    GetColumnsForUpdateAsync(
+        Guid batchId,
+        CancellationToken cancellationToken =
+            default)
     {
-        return _dbContext
+        return await _dbContext
             .CatalogImportColumns
             .Where(column =>
                 column.BatchId == batchId)
             .OrderBy(column =>
                 column.SourceColumnNumber)
-            .ToListAsync(cancellationToken);
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
     }
 
     public Task<CatalogImportBatch?>
@@ -81,33 +83,6 @@ public sealed class CatalogImportBatchRepository
             .Include(batch => batch.File)
             .FirstOrDefaultAsync(
                 batch => batch.Id == batchId,
-                cancellationToken);
-    }
-
-    public Task<CatalogImportBatch?> GetByIdAsync(
-    Guid batchId,
-    CancellationToken cancellationToken = default)
-    {
-        return _dbContext.CatalogImportBatches
-            .FirstOrDefaultAsync(
-                batch => batch.Id == batchId,
-                cancellationToken);
-    }
-
-    public Task<CatalogImportRow?> GetRowByIdAsync(
-        Guid batchId,
-        Guid rowId,
-        CancellationToken cancellationToken = default)
-    {
-        /*
-         * AsNoTracking не используем:
-         * строка загружается для последующего изменения.
-         */
-        return _dbContext.CatalogImportRows
-            .FirstOrDefaultAsync(
-                row =>
-                    row.BatchId == batchId
-                    && row.Id == rowId,
                 cancellationToken);
     }
 
@@ -137,19 +112,36 @@ public sealed class CatalogImportBatchRepository
             .ConfigureAwait(false);
     }
 
+    public Task<CatalogImportRow?>
+        GetRowByIdAsync(
+            Guid batchId,
+            Guid rowId,
+            CancellationToken cancellationToken =
+                default)
+    {
+        return _dbContext.CatalogImportRows
+            .FirstOrDefaultAsync(
+                row =>
+                    row.BatchId == batchId
+                    && row.Id == rowId,
+                cancellationToken);
+    }
+
     public Task<int> CountRowsAsync(
         Guid batchId,
         CatalogImportRowStatus? status,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken =
+            default)
     {
         var query = _dbContext.CatalogImportRows
             .AsNoTracking()
-            .Where(row => row.BatchId == batchId);
+            .Where(row =>
+                row.BatchId == batchId);
 
         if (status.HasValue)
         {
-            query = query.Where(
-                row => row.Status == status.Value);
+            query = query.Where(row =>
+                row.Status == status.Value);
         }
 
         return query.CountAsync(cancellationToken);

@@ -1,9 +1,14 @@
 using CSharpFunctionalExtensions;
-using ElectronicService.Domain.Catalog.Characteristics;
-using ElectronicService.Domain.Catalog.ProductTypes;
+using ElectronicService.Domain.Catalog
+    .Characteristics;
+using ElectronicService.Domain.Catalog
+    .ImportBatches;
+using ElectronicService.Domain.Catalog
+    .ProductTypes;
 using ElectronicService.Domain.Common;
 
-namespace ElectronicService.Core.Catalog.ImportBatches.Analysis;
+namespace ElectronicService.Core.Catalog
+    .ImportBatches.Analysis;
 
 public interface ICatalogImportWorkbookAnalyzer
 {
@@ -11,11 +16,15 @@ public interface ICatalogImportWorkbookAnalyzer
         CatalogImportWorkbookAnalysis,
         DomainError> Analyze(
             Guid batchId,
-            ReadOnlyMemory<byte> workbookContent,
+            ReadOnlyMemory<byte>
+                workbookContent,
             ProductType? productType,
             IReadOnlyCollection<
                 CharacteristicDefinition>
                 characteristicDefinitions,
+            IReadOnlyCollection<
+                CatalogImportColumn>
+                existingColumns,
             CancellationToken cancellationToken =
                 default);
 }

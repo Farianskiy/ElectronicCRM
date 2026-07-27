@@ -92,28 +92,43 @@ public sealed class User : AggregateRoot
 
     public bool CanCreateCatalogImport()
     {
-        return IsActive;
+        return IsActive
+            && (
+                IsRegular
+                || IsManager
+                || IsTechnical
+            );
     }
 
     public bool CanEditCatalogImport()
     {
-        return IsActive;
+        return IsActive
+            && (
+                IsRegular
+                || IsManager
+                || IsTechnical
+            );
     }
 
     public bool CanSubmitCatalogImportForReview()
     {
         return IsActive
-            && (IsRegular || IsManager);
+            && (
+                IsRegular
+                || IsManager
+            );
     }
 
     public bool CanReviewCatalogImports()
     {
-        return IsActive && IsTechnical;
+        return IsActive
+            && IsTechnical;
     }
 
     public bool CanApplyCatalogImport()
     {
-        return IsActive && IsTechnical;
+        return IsActive
+            && IsTechnical;
     }
 
     public static Result<User, DomainError> CreateRegular(

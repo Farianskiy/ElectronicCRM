@@ -127,18 +127,23 @@ public sealed class
         }
 
         /*
-         * Manager может изменять только
-         * собственные batch.
-         *
-         * Technical может проверять batch
-         * любого Manager.
-         */
-        if (batch.CreatedByUserId != currentUser.Id)
+ * Анализ изменяет колонки, строки
+ * и статус пакета.
+ *
+ * Поэтому анализировать пакет может
+ * только пользователь, который его создал.
+ *
+ * Technical получает доступ к чужому
+ * пакету только после отправки на проверку.
+ */
+        if (batch.CreatedByUserId
+            != currentUser.Id)
         {
             return Result.Failure<
                 AnalyzeCatalogImportBatchResult,
                 DomainError>(
-                    CatalogImportErrors.UserCannotAccessBatch());
+                    CatalogImportErrors
+                        .UserCannotAccessBatch());
         }
 
         if (!batch.IsEditable)

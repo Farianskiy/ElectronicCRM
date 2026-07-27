@@ -73,7 +73,7 @@ public static class CatalogImportErrors
     {
         return new DomainError(
             "catalog.import.current_user.not_found",
-            "Пользователь, создающий импорт, не найден.");
+            "Текущий пользователь не найден.");
     }
 
     public static DomainError BatchRowsCannotBeEdited(
@@ -82,6 +82,15 @@ public static class CatalogImportErrors
         return new DomainError(
             "catalog.import.batch.rows_cannot_be_edited",
             $"Строки пакета импорта в статусе '{status}' нельзя изменять.");
+    }
+
+    public static DomainError UserCannotCreateCatalogImport()
+    {
+        return new DomainError(
+            "catalog.import.user.cannot_create",
+            "Пользователь не может создать " +
+            "пакет импорта. Проверьте его статус " +
+            "и права доступа.");
     }
 
     public static DomainError UserCannotSubmitCatalogImport()
