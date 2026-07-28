@@ -52,6 +52,16 @@ public sealed class CatalogProductMetadataRepository : ICatalogProductMetadataRe
                 cancellationToken);
     }
 
+    public async Task<IReadOnlyCollection<Manufacturer>> GetManufacturersAsync(
+    CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Manufacturers
+            .AsNoTracking()
+            .OrderBy(manufacturer => manufacturer.Name)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     public async Task<
         IReadOnlyCollection<CharacteristicDefinition>>
     GetCharacteristicDefinitionsByIdsAsync(

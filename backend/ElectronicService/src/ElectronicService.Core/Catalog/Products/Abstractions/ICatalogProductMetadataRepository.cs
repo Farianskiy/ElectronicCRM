@@ -10,18 +10,18 @@ public interface ICatalogProductMetadataRepository
         Guid productTypeId,
         CancellationToken cancellationToken = default);
 
-    Task<CharacteristicDefinition?>
-        GetCharacteristicDefinitionByCodeAsync(
-            string code,
-            CancellationToken cancellationToken = default);
+    Task<CharacteristicDefinition?> GetCharacteristicDefinitionByCodeAsync(
+        string code,
+        CancellationToken cancellationToken = default);
 
     Task<Manufacturer?> GetManufacturerByIdAsync(
         Guid manufacturerId,
         CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyCollection<CharacteristicDefinition>>
-        GetCharacteristicDefinitionsByIdsAsync(
-            IReadOnlyCollection<Guid>
-                characteristicDefinitionIds,
-            CancellationToken cancellationToken = default);
+    Task<IReadOnlyCollection<CharacteristicDefinition>> GetCharacteristicDefinitionsByIdsAsync(
+        IReadOnlyCollection<Guid> characteristicDefinitionIds,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyCollection<Manufacturer>> GetManufacturersAsync(
+        CancellationToken cancellationToken = default);
 }

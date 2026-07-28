@@ -263,4 +263,25 @@ public static class CatalogImportErrors
             "catalog.import.rows.invalid_status",
             $"Статус строки '{status}' неизвестен.");
     }
+
+    public static DomainError RowNotFound(Guid rowId)
+    {
+        return new DomainError(
+            "catalog.import.row.not_found",
+            $"Строка импорта '{rowId}' не найдена.");
+    }
+
+    public static DomainError UserCannotEditCatalogImport()
+    {
+        return new DomainError(
+            "catalog.import.user.cannot_edit",
+            "Пользователь не может редактировать этот пакет импорта.");
+    }
+
+    public static DomainError ManufacturerNotFound(Guid manufacturerId)
+    {
+        return new DomainError(
+            "catalog.import.manufacturer.not_found",
+            $"Производитель '{manufacturerId}' не найден.");
+    }
 }

@@ -6,5 +6,5 @@ public sealed record CatalogImportNormalizedRowData(
     string? Manufacturer,
     decimal? Price,
     int? StockQuantity,
-    IReadOnlyDictionary<string, string>
-        Characteristics);
+    IReadOnlyDictionary<string, string> Characteristics,
+    Guid? ManufacturerId = null);

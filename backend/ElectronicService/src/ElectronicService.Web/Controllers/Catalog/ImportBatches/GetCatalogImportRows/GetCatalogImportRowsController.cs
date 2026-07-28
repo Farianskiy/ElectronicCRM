@@ -71,6 +71,7 @@ public sealed class
                         item.Data.Name,
                         item.Data.Article,
                         item.Data.Manufacturer,
+                        item.Data.ManufacturerId,
                         item.Data.Price,
                         item.Data.StockQuantity,
                         item.Data.Characteristics),

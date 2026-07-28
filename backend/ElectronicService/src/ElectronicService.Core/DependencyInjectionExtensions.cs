@@ -48,8 +48,9 @@ using ElectronicService.Core.Users.MakeUserManager;
 using ElectronicService.Core.Catalog.ImportBatches.CreateCatalogImportBatch;
 using ElectronicService.Core.Catalog.ImportBatches.AnalyzeCatalogImportBatch;
 using ElectronicService.Core.Catalog.ImportBatches.GetCatalogImportBatch;
-using ElectronicService.Core.Catalog
-    .ImportBatches.GetCatalogImportRows;
+using ElectronicService.Core.Catalog.ImportBatches.GetCatalogImportRows;
+using ElectronicService.Core.Catalog.ImportBatches.Analysis;
+using ElectronicService.Core.Catalog.ImportBatches.UpdateCatalogImportRow;
 
 namespace ElectronicService.Core;
 
@@ -108,6 +109,8 @@ public static class DependencyInjectionExtensions
         services.AddScoped<AnalyzeCatalogImportBatchCommandHandler>();
         services.AddScoped<GetCatalogImportBatchQueryHandler>();
         services.AddScoped<GetCatalogImportRowsQueryHandler>();
+        services.AddScoped<ICatalogImportRowValidator, CatalogImportRowValidator>();
+        services.AddScoped<UpdateCatalogImportRowCommandHandler>();
 
 
         return services;

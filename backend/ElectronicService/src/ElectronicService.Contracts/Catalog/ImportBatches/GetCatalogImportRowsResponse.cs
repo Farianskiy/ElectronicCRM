@@ -20,15 +20,14 @@ public sealed record CatalogImportRowResponse(
     IReadOnlyCollection<
         CatalogImportRowIssueResponse> Warnings);
 
-public sealed record
-    CatalogImportNormalizedRowResponse(
-        string? Name,
-        string? Article,
-        string? Manufacturer,
-        decimal? Price,
-        int? StockQuantity,
-        IReadOnlyDictionary<string, string>
-            Characteristics);
+public sealed record CatalogImportNormalizedRowResponse(
+    string? Name,
+    string? Article,
+    string? Manufacturer,
+    Guid? ManufacturerId,
+    decimal? Price,
+    int? StockQuantity,
+    IReadOnlyDictionary<string, string> Characteristics);
 
 public sealed record CatalogImportRowIssueResponse(
     string Code,

@@ -240,14 +240,18 @@ public sealed class
                     cancellationToken)
                 .ConfigureAwait(false);
 
-        var analysisResult =
-            _workbookAnalyzer.Analyze(
-                batch.Id,
-                batch.File.Content,
-                productType,
-                definitions,
-                existingColumns,
-                cancellationToken);
+        var manufacturers = await _metadataRepository
+            .GetManufacturersAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var analysisResult = _workbookAnalyzer.Analyze(
+            batch.Id,
+            batch.File.Content,
+            productType,
+            definitions,
+            manufacturers,
+            existingColumns,
+            cancellationToken);
 
         if (analysisResult.IsFailure)
         {
