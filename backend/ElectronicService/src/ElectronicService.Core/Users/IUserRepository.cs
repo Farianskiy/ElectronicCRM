@@ -9,6 +9,10 @@ public interface IUserRepository
         Guid id,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyCollection<User>> GetByIdsAsync(
+        IReadOnlyCollection<Guid> ids,
+        CancellationToken cancellationToken = default);
+
     Task<User?> GetByEmailAsync(
         Email email,
         CancellationToken cancellationToken = default);

@@ -51,6 +51,11 @@ using ElectronicService.Core.Catalog.ImportBatches.GetCatalogImportBatch;
 using ElectronicService.Core.Catalog.ImportBatches.GetCatalogImportRows;
 using ElectronicService.Core.Catalog.ImportBatches.Analysis;
 using ElectronicService.Core.Catalog.ImportBatches.UpdateCatalogImportRow;
+using ElectronicService.Core.Catalog.ImportBatches.SubmitCatalogImportBatch;
+using ElectronicService.Core.Catalog.ImportBatches.GetCatalogImportReviewQueue;
+using ElectronicService.Core.Catalog.ImportBatches.StartCatalogImportReview;
+using ElectronicService.Core.Catalog.ImportBatches.RequestCatalogImportChanges;
+using ElectronicService.Core.Catalog.ImportBatches.RejectCatalogImportBatch;
 
 namespace ElectronicService.Core;
 
@@ -111,6 +116,11 @@ public static class DependencyInjectionExtensions
         services.AddScoped<GetCatalogImportRowsQueryHandler>();
         services.AddScoped<ICatalogImportRowValidator, CatalogImportRowValidator>();
         services.AddScoped<UpdateCatalogImportRowCommandHandler>();
+        services.AddScoped<SubmitCatalogImportBatchCommandHandler>();
+        services.AddScoped<GetCatalogImportReviewQueueQueryHandler>();
+        services.AddScoped<StartCatalogImportReviewCommandHandler>();
+        services.AddScoped<RequestCatalogImportChangesCommandHandler>();
+        services.AddScoped<RejectCatalogImportBatchCommandHandler>();
 
 
         return services;

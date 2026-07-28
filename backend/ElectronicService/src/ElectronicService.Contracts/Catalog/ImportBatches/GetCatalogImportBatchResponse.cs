@@ -13,7 +13,17 @@ public sealed record GetCatalogImportBatchResponse(
     DateTime CreatedAtUtc,
     DateTime? UpdatedAtUtc,
     DateTime? SubmittedAtUtc,
+    Guid? ReviewedByUserId,
+    DateTime? ReviewedAtUtc,
+    Guid? ChangesRequestedByUserId,
+    DateTime? ChangesRequestedAtUtc,
+    string? ChangesRequestComment,
+    Guid? RejectedByUserId,
+    DateTime? RejectedAtUtc,
+    string? RejectionReason,
     uint Version,
     bool CanEdit,
     bool CanSubmit,
-    bool CanApply);
+    bool CanApply,
+    bool CanRequestChanges,
+    bool CanReject);

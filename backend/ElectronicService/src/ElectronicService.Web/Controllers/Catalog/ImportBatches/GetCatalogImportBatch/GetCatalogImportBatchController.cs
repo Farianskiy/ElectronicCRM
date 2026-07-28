@@ -65,24 +65,33 @@ public sealed class
 
         var value = result.Value;
 
-        var response =
-            new GetCatalogImportBatchResponse(
-                value.BatchId,
-                value.CreatedByUserId,
-                value.ProductTypeId,
-                value.OriginalFileName,
-                value.FileSizeBytes,
-                value.Status.ToString(),
-                value.RowsCount,
-                value.ValidRowsCount,
-                value.ErrorRowsCount,
-                value.CreatedAtUtc,
-                value.UpdatedAtUtc,
-                value.SubmittedAtUtc,
-                value.Version,
-                value.CanEdit,
-                value.CanSubmit,
-                value.CanApply);
+        var response = new GetCatalogImportBatchResponse(
+            value.BatchId,
+            value.CreatedByUserId,
+            value.ProductTypeId,
+            value.OriginalFileName,
+            value.FileSizeBytes,
+            value.Status.ToString(),
+            value.RowsCount,
+            value.ValidRowsCount,
+            value.ErrorRowsCount,
+            value.CreatedAtUtc,
+            value.UpdatedAtUtc,
+            value.SubmittedAtUtc,
+            value.ReviewedByUserId,
+            value.ReviewedAtUtc,
+            value.ChangesRequestedByUserId,
+            value.ChangesRequestedAtUtc,
+            value.ChangesRequestComment,
+            value.RejectedByUserId,
+            value.RejectedAtUtc,
+            value.RejectionReason,
+            value.Version,
+            value.CanEdit,
+            value.CanSubmit,
+            value.CanApply,
+            value.CanRequestChanges,
+            value.CanReject);
 
         return Ok(response);
     }

@@ -148,6 +148,16 @@ public sealed class CatalogImportBatchConfiguration
             .HasColumnName(
                 "reviewed_at_utc");
 
+        builder.Property(batch => batch.ChangesRequestedByUserId)
+            .HasColumnName("changes_requested_by_user_id");
+
+        builder.Property(batch => batch.ChangesRequestedAtUtc)
+            .HasColumnName("changes_requested_at_utc");
+
+        builder.Property(batch => batch.ChangesRequestComment)
+            .HasColumnName("changes_request_comment")
+            .HasMaxLength(CatalogImportBatch.MaximumChangesRequestCommentLength);
+
         builder.Property(batch =>
                 batch.AppliedByUserId)
             .HasColumnName(
@@ -207,6 +217,11 @@ public sealed class CatalogImportBatchConfiguration
             .WithMany()
             .HasForeignKey(batch =>
                 batch.ReviewedByUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<User>()
+            .WithMany()
+            .HasForeignKey(batch => batch.ChangesRequestedByUserId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne<User>()

@@ -113,10 +113,7 @@ public sealed class User : AggregateRoot
     public bool CanSubmitCatalogImportForReview()
     {
         return IsActive
-            && (
-                IsRegular
-                || IsManager
-            );
+            && (IsRegular || IsManager);
     }
 
     public bool CanReviewCatalogImports()

@@ -1,7 +1,6 @@
 using ElectronicService.Domain.Catalog.ImportBatches;
 
-namespace ElectronicService.Core.Catalog
-    .ImportBatches.GetCatalogImportBatch;
+namespace ElectronicService.Core.Catalog.ImportBatches.GetCatalogImportBatch;
 
 public sealed record GetCatalogImportBatchResult(
     Guid BatchId,
@@ -16,7 +15,17 @@ public sealed record GetCatalogImportBatchResult(
     DateTime CreatedAtUtc,
     DateTime? UpdatedAtUtc,
     DateTime? SubmittedAtUtc,
+    Guid? ReviewedByUserId,
+    DateTime? ReviewedAtUtc,
+    Guid? ChangesRequestedByUserId,
+    DateTime? ChangesRequestedAtUtc,
+    string? ChangesRequestComment,
+    Guid? RejectedByUserId,
+    DateTime? RejectedAtUtc,
+    string? RejectionReason,
     uint Version,
     bool CanEdit,
     bool CanSubmit,
-    bool CanApply);
+    bool CanApply,
+    bool CanRequestChanges,
+    bool CanReject);

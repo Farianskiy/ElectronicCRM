@@ -284,4 +284,53 @@ public static class CatalogImportErrors
             "catalog.import.manufacturer.not_found",
             $"Производитель '{manufacturerId}' не найден.");
     }
+
+    public static DomainError UserCannotReviewCatalogImports()
+    {
+        return new DomainError(
+            "catalog.import.user.cannot_review",
+            "Пользователь не может проверять пакеты импорта.");
+    }
+
+    public static DomainError InvalidReviewQueueStatus(CatalogImportBatchStatus status)
+    {
+        return new DomainError(
+            "catalog.import.review_queue.invalid_status",
+            $"Статус '{status}' нельзя использовать для очереди проверки.");
+    }
+
+    public static DomainError BatchConcurrencyConflict()
+    {
+        return new DomainError(
+            "catalog.import.batch.concurrency_conflict",
+            "Пакет импорта уже был изменён другим пользователем. Обновите данные и повторите действие.");
+    }
+
+    public static DomainError ChangesRequestCommentIsRequired()
+    {
+        return new DomainError(
+            "catalog.import.batch.changes_request_comment_required",
+            "При возврате пакета на исправление необходимо указать комментарий.");
+    }
+
+    public static DomainError ChangesRequestCommentIsTooLong(int maximumLength)
+    {
+        return new DomainError(
+            "catalog.import.batch.changes_request_comment_too_long",
+            $"Комментарий к исправлениям не должен превышать {maximumLength} символов.");
+    }
+
+    public static DomainError ReviewIsAssignedToAnotherUser()
+    {
+        return new DomainError(
+            "catalog.import.batch.review_assigned_to_another_user",
+            "Проверка этого пакета назначена другому техническому пользователю.");
+    }
+
+    public static DomainError RejectionReasonIsTooLong(int maximumLength)
+    {
+        return new DomainError(
+            "catalog.import.batch.rejection_reason_too_long",
+            $"Причина отклонения не должна превышать {maximumLength} символов.");
+    }
 }

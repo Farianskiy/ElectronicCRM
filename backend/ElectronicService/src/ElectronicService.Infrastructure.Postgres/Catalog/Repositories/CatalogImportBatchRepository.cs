@@ -147,6 +147,68 @@ public sealed class CatalogImportBatchRepository
         return query.CountAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyCollection<CatalogImportBatch>> GetReviewQueueAsync(
+    CatalogImportBatchStatus? status,
+    int skip,
+    int take,
+    CancellationToken cancellationToken = default)
+    {
+        var query = _dbContext.CatalogImportBatches
+            .AsNoTracking()
+            .Where(batch =>
+                batch.Status == CatalogImportBatchStatus.Submitted
+                || batch.Status == CatalogImportBatchStatus.UnderReview);
+
+        if (status.HasValue)
+        {
+            query = query.Where(batch => batch.Status == status.Value);
+        }
+
+        return await query
+            .OrderBy(batch => batch.Status == CatalogImportBatchStatus.Submitted ? 0 : 1)
+            .ThenBy(batch => batch.SubmittedAtUtc)
+            .ThenBy(batch => batch.CreatedAtUtc)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public Task<int> CountReviewQueueAsync(
+    CatalogImportBatchStatus? status,
+    CancellationToken cancellationToken = default)
+    {
+        var query = _dbContext.CatalogImportBatches
+            .AsNoTracking()
+            .Where(batch =>
+                batch.Status == CatalogImportBatchStatus.Submitted
+                || batch.Status == CatalogImportBatchStatus.UnderReview);
+
+        if (status.HasValue)
+        {
+            query = query.Where(batch => batch.Status == status.Value);
+        }
+
+        return query.CountAsync(cancellationToken);
+    }
+
+    public async Task<bool> TrySaveChangesAsync(
+    CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await _dbContext
+                .SaveChangesAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            return true;
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return false;
+        }
+    }
+
     public async Task ReplaceAnalysisAsync(
         CatalogImportBatch batch,
         IReadOnlyCollection<CatalogImportColumn>

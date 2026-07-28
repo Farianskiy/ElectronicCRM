@@ -7,17 +7,15 @@ namespace ElectronicService.Domain.Catalog.ImportBatches;
 
 public sealed class CatalogImportBatch : AggregateRoot
 {
-    public const long MaximumFileSizeBytes =
-        10 * 1024 * 1024;
+    public const long MaximumFileSizeBytes = 10 * 1024 * 1024;
 
-    public const int MaximumFileNameLength =
-        255;
+    public const int MaximumFileNameLength = 255;
 
-    public const int MaximumContentTypeLength =
-        200;
+    public const int MaximumContentTypeLength = 200;
 
-    public const int MaximumReasonLength =
-        2_000;
+    public const int MaximumReasonLength = 2_000;
+
+    public const int MaximumChangesRequestCommentLength = 2_000;
 
     private CatalogImportBatch(
         Guid id,
@@ -150,6 +148,24 @@ public sealed class CatalogImportBatch : AggregateRoot
         private set;
     }
 
+    public Guid? ChangesRequestedByUserId
+    {
+        get;
+        private set;
+    }
+
+    public DateTime? ChangesRequestedAtUtc
+    {
+        get;
+        private set;
+    }
+
+    public string? ChangesRequestComment
+    {
+        get;
+        private set;
+    }
+
     public Guid? AppliedByUserId
     {
         get;
@@ -203,11 +219,12 @@ public sealed class CatalogImportBatch : AggregateRoot
     } = null!;
 
     public bool IsEditable =>
-        Status is
-            CatalogImportBatchStatus.Uploaded
-            or CatalogImportBatchStatus.MappingRequired
-            or CatalogImportBatchStatus.NeedsCorrection
-            or CatalogImportBatchStatus.Ready;
+    Status is
+        CatalogImportBatchStatus.Uploaded
+        or CatalogImportBatchStatus.MappingRequired
+        or CatalogImportBatchStatus.NeedsCorrection
+        or CatalogImportBatchStatus.Ready
+        or CatalogImportBatchStatus.ChangesRequested;
 
     public bool IsTerminal =>
         Status is
@@ -326,7 +343,8 @@ public sealed class CatalogImportBatch : AggregateRoot
     public bool CanEditRows =>
     Status is
         CatalogImportBatchStatus.NeedsCorrection
-        or CatalogImportBatchStatus.Ready;
+        or CatalogImportBatchStatus.Ready
+        or CatalogImportBatchStatus.ChangesRequested;
 
     public UnitResult<DomainError>
     RefreshRowsValidationStatistics(
@@ -525,10 +543,16 @@ public sealed class CatalogImportBatch : AggregateRoot
                     .ProductTypeIsRequired());
         }
 
-        Status =
-            CatalogImportBatchStatus.Submitted;
+        Status = CatalogImportBatchStatus.Submitted;
 
         SubmittedAtUtc = DateTime.UtcNow;
+
+        /*
+         * При повторной отправке пакет снова
+         * становится свободным в очереди.
+         */
+        ReviewedByUserId = null;
+        ReviewedAtUtc = null;
 
         Touch();
 
@@ -562,6 +586,56 @@ public sealed class CatalogImportBatch : AggregateRoot
 
         ReviewedByUserId = reviewedByUserId;
         ReviewedAtUtc = DateTime.UtcNow;
+
+        Touch();
+
+        return UnitResult.Success<DomainError>();
+    }
+
+    public UnitResult<DomainError> RequestChanges(
+    Guid requestedByUserId,
+    string comment)
+    {
+        if (requestedByUserId == Guid.Empty)
+        {
+            return UnitResult.Failure(
+                GeneralErrors.ValueIsInvalid(nameof(requestedByUserId)));
+        }
+
+        if (Status != CatalogImportBatchStatus.UnderReview)
+        {
+            return UnitResult.Failure(
+                CatalogImportErrors.InvalidStatusTransition(
+                    Status,
+                    CatalogImportBatchStatus.ChangesRequested));
+        }
+
+        if (ReviewedByUserId != requestedByUserId)
+        {
+            return UnitResult.Failure(
+                CatalogImportErrors.ReviewIsAssignedToAnotherUser());
+        }
+
+        if (string.IsNullOrWhiteSpace(comment))
+        {
+            return UnitResult.Failure(
+                CatalogImportErrors.ChangesRequestCommentIsRequired());
+        }
+
+        var normalizedComment = comment.Trim();
+
+        if (normalizedComment.Length > MaximumChangesRequestCommentLength)
+        {
+            return UnitResult.Failure(
+                CatalogImportErrors.ChangesRequestCommentIsTooLong(
+                    MaximumChangesRequestCommentLength));
+        }
+
+        Status = CatalogImportBatchStatus.ChangesRequested;
+
+        ChangesRequestedByUserId = requestedByUserId;
+        ChangesRequestedAtUtc = DateTime.UtcNow;
+        ChangesRequestComment = normalizedComment;
 
         Touch();
 
@@ -648,50 +722,45 @@ public sealed class CatalogImportBatch : AggregateRoot
     }
 
     public UnitResult<DomainError> Reject(
-        Guid rejectedByUserId,
-        string rejectionReason)
+    Guid rejectedByUserId,
+    string rejectionReason)
     {
         if (rejectedByUserId == Guid.Empty)
         {
             return UnitResult.Failure(
-                GeneralErrors.ValueIsInvalid(
-                    nameof(rejectedByUserId)));
+                GeneralErrors.ValueIsInvalid(nameof(rejectedByUserId)));
         }
 
-        if (string.IsNullOrWhiteSpace(
-                rejectionReason))
+        if (Status != CatalogImportBatchStatus.UnderReview)
         {
             return UnitResult.Failure(
-                CatalogImportErrors
-                    .RejectionReasonIsRequired());
+                CatalogImportErrors.InvalidStatusTransition(
+                    Status,
+                    CatalogImportBatchStatus.Rejected));
         }
 
-        if (Status is not
-            CatalogImportBatchStatus.Submitted
-            and not
-            CatalogImportBatchStatus.UnderReview)
+        if (ReviewedByUserId != rejectedByUserId)
         {
             return UnitResult.Failure(
-                CatalogImportErrors
-                    .InvalidStatusTransition(
-                        Status,
-                        CatalogImportBatchStatus
-                            .Rejected));
+                CatalogImportErrors.ReviewIsAssignedToAnotherUser());
         }
 
-        var normalizedReason =
-            rejectionReason.Trim();
-
-        if (normalizedReason.Length
-            > MaximumReasonLength)
+        if (string.IsNullOrWhiteSpace(rejectionReason))
         {
             return UnitResult.Failure(
-                GeneralErrors.ValueIsInvalid(
-                    nameof(rejectionReason)));
+                CatalogImportErrors.RejectionReasonIsRequired());
         }
 
-        Status =
-            CatalogImportBatchStatus.Rejected;
+        var normalizedReason = rejectionReason.Trim();
+
+        if (normalizedReason.Length > MaximumReasonLength)
+        {
+            return UnitResult.Failure(
+                CatalogImportErrors.RejectionReasonIsTooLong(
+                    MaximumReasonLength));
+        }
+
+        Status = CatalogImportBatchStatus.Rejected;
 
         RejectedByUserId = rejectedByUserId;
         RejectedAtUtc = DateTime.UtcNow;

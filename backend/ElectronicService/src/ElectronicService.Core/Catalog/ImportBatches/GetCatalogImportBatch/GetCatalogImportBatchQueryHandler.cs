@@ -121,8 +121,7 @@ public sealed class
          */
         var canEdit =
             isOwner
-            && currentUser
-                .CanEditCatalogImport()
+            && currentUser.CanEditCatalogImport()
             && batch.IsEditable;
 
         /*
@@ -145,39 +144,53 @@ public sealed class
          */
         var canApplyOwnBatch =
             isOwner
-            && batch.Status
-                == CatalogImportBatchStatus.Ready;
+            && batch.Status == CatalogImportBatchStatus.Ready;
 
         var canApplyReviewedBatch =
-            batch.Status
-                == CatalogImportBatchStatus.UnderReview;
+            batch.Status == CatalogImportBatchStatus.UnderReview
+            && batch.ReviewedByUserId == currentUser.Id;
 
         var canApply =
-            currentUser
-                .CanApplyCatalogImport()
-            && (
-                canApplyOwnBatch
-                || canApplyReviewedBatch
-            );
+            currentUser.CanApplyCatalogImport()
+            && (canApplyOwnBatch || canApplyReviewedBatch);
 
-        var result =
-            new GetCatalogImportBatchResult(
-                batch.Id,
-                batch.CreatedByUserId,
-                batch.ProductTypeId,
-                batch.OriginalFileName,
-                batch.FileSizeBytes,
-                batch.Status,
-                batch.RowsCount,
-                batch.ValidRowsCount,
-                batch.ErrorRowsCount,
-                batch.CreatedAtUtc,
-                batch.UpdatedAtUtc,
-                batch.SubmittedAtUtc,
-                batch.Version,
-                canEdit,
-                canSubmit,
-                canApply);
+        var canRequestChanges =
+            currentUser.CanReviewCatalogImports()
+            && batch.Status == CatalogImportBatchStatus.UnderReview
+            && batch.ReviewedByUserId == currentUser.Id;
+
+        var canReject =
+            currentUser.CanReviewCatalogImports()
+            && batch.Status == CatalogImportBatchStatus.UnderReview
+            && batch.ReviewedByUserId == currentUser.Id;
+
+        var result = new GetCatalogImportBatchResult(
+            batch.Id,
+            batch.CreatedByUserId,
+            batch.ProductTypeId,
+            batch.OriginalFileName,
+            batch.FileSizeBytes,
+            batch.Status,
+            batch.RowsCount,
+            batch.ValidRowsCount,
+            batch.ErrorRowsCount,
+            batch.CreatedAtUtc,
+            batch.UpdatedAtUtc,
+            batch.SubmittedAtUtc,
+            batch.ReviewedByUserId,
+            batch.ReviewedAtUtc,
+            batch.ChangesRequestedByUserId,
+            batch.ChangesRequestedAtUtc,
+            batch.ChangesRequestComment,
+            batch.RejectedByUserId,
+            batch.RejectedAtUtc,
+            batch.RejectionReason,
+            batch.Version,
+            canEdit,
+            canSubmit,
+            canApply,
+            canRequestChanges,
+            canReject);
 
         return Result.Success<
             GetCatalogImportBatchResult,
