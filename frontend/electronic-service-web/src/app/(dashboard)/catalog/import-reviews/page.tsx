@@ -18,6 +18,7 @@ import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
 import { formatDate } from "@/shared/lib/formatters";
 import { AppSelect } from "@/shared/ui/AppSelect";
 import { PageHeader } from "@/shared/ui/PageHeader";
+import { catalogImportQueryKeys } from "@/features/catalogImports/model/queryKeys";
 
 const pageSize = 25;
 
@@ -33,13 +34,7 @@ export default function CatalogImportReviewsPage() {
   const [page, setPage] = useState(1);
 
   const queueQuery = useQuery({
-    queryKey: [
-      "catalog-import-batches",
-      "review-queue",
-      status,
-      page,
-      pageSize,
-    ],
+    queryKey: catalogImportQueryKeys.reviewQueue(status, page, pageSize),
     queryFn: () =>
       getCatalogImportReviewQueue({
         status,
@@ -55,11 +50,11 @@ export default function CatalogImportReviewsPage() {
     onSuccess: async (result) => {
       await Promise.all([
         queryClient.invalidateQueries({
-          queryKey: ["catalog-import-batches", "review-queue"],
+          queryKey: catalogImportQueryKeys.reviewQueueRoot,
         }),
 
         queryClient.invalidateQueries({
-          queryKey: ["catalog-import-batches", "details", result.batchId],
+          queryKey: catalogImportQueryKeys.details(result.batchId),
         }),
       ]);
 
@@ -72,7 +67,7 @@ export default function CatalogImportReviewsPage() {
        * загрузкой страницы и нажатием кнопки.
        */
       await queryClient.invalidateQueries({
-        queryKey: ["catalog-import-batches", "review-queue"],
+        queryKey: catalogImportQueryKeys.reviewQueueRoot,
       });
     },
   });

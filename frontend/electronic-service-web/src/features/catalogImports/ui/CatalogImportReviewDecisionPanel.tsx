@@ -7,6 +7,7 @@ import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
 import { applyCatalogImportBatch } from "../api/applyCatalogImportBatch";
 import { rejectCatalogImportBatch } from "../api/rejectCatalogImportBatch";
 import { requestCatalogImportChanges } from "../api/requestCatalogImportChanges";
+import { catalogImportQueryKeys } from "../model/queryKeys";
 
 interface CatalogImportReviewDecisionPanelProps {
   batchId: string;
@@ -84,15 +85,15 @@ export function CatalogImportReviewDecisionPanel({
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({
-          queryKey: ["catalog-import-batches", "details", batchId],
+          queryKey: catalogImportQueryKeys.details(batchId),
         }),
 
         queryClient.invalidateQueries({
-          queryKey: ["catalog-import-batches", "review-queue"],
+          queryKey: catalogImportQueryKeys.reviewQueueRoot,
         }),
 
         queryClient.invalidateQueries({
-          queryKey: ["catalog-import-batches", "my"],
+          queryKey: catalogImportQueryKeys.myRoot,
         }),
 
         queryClient.invalidateQueries({
@@ -100,11 +101,11 @@ export function CatalogImportReviewDecisionPanel({
         }),
 
         queryClient.invalidateQueries({
-          queryKey: ["catalog-import-batches", "history", batchId],
+          queryKey: catalogImportQueryKeys.history(batchId),
         }),
 
         queryClient.invalidateQueries({
-          queryKey: ["catalog-import-batches", "applied-products", batchId],
+          queryKey: catalogImportQueryKeys.appliedProductsRoot(batchId),
         }),
       ]);
 
@@ -112,17 +113,13 @@ export function CatalogImportReviewDecisionPanel({
     },
 
     onError: async () => {
-      /*
-       * Пока Technical заполнял форму, состояние пакета
-       * мог изменить другой запрос или пользователь.
-       */
       await Promise.all([
         queryClient.invalidateQueries({
-          queryKey: ["catalog-import-batches", "details", batchId],
+          queryKey: catalogImportQueryKeys.details(batchId),
         }),
 
         queryClient.invalidateQueries({
-          queryKey: ["catalog-import-batches", "review-queue"],
+          queryKey: catalogImportQueryKeys.reviewQueueRoot,
         }),
       ]);
     },

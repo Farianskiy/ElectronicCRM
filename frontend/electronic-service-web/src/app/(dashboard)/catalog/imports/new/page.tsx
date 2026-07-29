@@ -16,6 +16,7 @@ import type { AnalyzeCatalogImportBatchResponse } from "@/features/catalogImport
 import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
 import { formatFileSize } from "@/shared/lib/formatters";
 import { PageHeader } from "@/shared/ui/PageHeader";
+import { catalogImportQueryKeys } from "@/features/catalogImports/model/queryKeys";
 
 const maximumFileSizeBytes = 10 * 1024 * 1024;
 
@@ -76,7 +77,7 @@ export default function NewCatalogImportPage() {
 
     onSuccess: async (analysisResult) => {
       await queryClient.invalidateQueries({
-        queryKey: ["catalog-import-batches", "my"],
+        queryKey: catalogImportQueryKeys.myRoot,
       });
 
       router.push(`/catalog/imports/${analysisResult.batchId}`);

@@ -6,6 +6,7 @@ import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
 import { formatDate } from "@/shared/lib/formatters";
 import { startCatalogImportReview } from "../api/startCatalogImportReview";
 import type { CatalogImportBatchStatus } from "../model/types";
+import { catalogImportQueryKeys } from "../model/queryKeys";
 
 interface CatalogImportReviewPanelProps {
   batchId: string;
@@ -31,22 +32,22 @@ export function CatalogImportReviewPanel({
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({
-          queryKey: ["catalog-import-batches", "details", batchId],
+          queryKey: catalogImportQueryKeys.details(batchId),
         }),
 
         queryClient.invalidateQueries({
-          queryKey: ["catalog-import-batches", "review-queue"],
+          queryKey: catalogImportQueryKeys.reviewQueueRoot,
         }),
 
         queryClient.invalidateQueries({
-          queryKey: ["catalog-import-batches", "history", batchId],
+          queryKey: catalogImportQueryKeys.history(batchId),
         }),
       ]);
     },
 
     onError: async () => {
       await queryClient.invalidateQueries({
-        queryKey: ["catalog-import-batches", "details", batchId],
+        queryKey: catalogImportQueryKeys.details(batchId),
       });
     },
   });

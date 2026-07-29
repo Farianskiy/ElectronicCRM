@@ -3,6 +3,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { submitCatalogImportBatch } from "../api/submitCatalogImportBatch";
 import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
+import { catalogImportQueryKeys } from "../model/queryKeys";
 
 interface CatalogImportSubmitPanelProps {
   batchId: string;
@@ -29,19 +30,19 @@ export function CatalogImportSubmitPanel({
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({
-          queryKey: ["catalog-import-batches", "details", batchId],
+          queryKey: catalogImportQueryKeys.details(batchId),
         }),
 
         queryClient.invalidateQueries({
-          queryKey: ["catalog-import-batches", "my"],
+          queryKey: catalogImportQueryKeys.myRoot,
         }),
 
         queryClient.invalidateQueries({
-          queryKey: ["catalog-import-batches", "mapping", batchId],
+          queryKey: catalogImportQueryKeys.mapping(batchId),
         }),
 
         queryClient.invalidateQueries({
-          queryKey: ["catalog-import-batches", "history", batchId],
+          queryKey: catalogImportQueryKeys.history(batchId),
         }),
       ]);
     },

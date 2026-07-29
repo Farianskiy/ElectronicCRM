@@ -16,6 +16,7 @@ import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
 import { formatDate, formatFileSize } from "@/shared/lib/formatters";
 import { AppSelect } from "@/shared/ui/AppSelect";
 import { PageHeader } from "@/shared/ui/PageHeader";
+import { catalogImportQueryKeys } from "@/features/catalogImports/model/queryKeys";
 
 const pageSize = 20;
 
@@ -101,7 +102,7 @@ export default function CatalogImportsPage() {
   const [page, setPage] = useState(1);
 
   const importsQuery = useQuery({
-    queryKey: ["catalog-import-batches", "my", status, page, pageSize],
+    queryKey: catalogImportQueryKeys.my(status, page, pageSize),
     queryFn: () =>
       getMyCatalogImportBatches({
         status,
@@ -121,7 +122,7 @@ export default function CatalogImportsPage() {
       }
 
       await queryClient.invalidateQueries({
-        queryKey: ["catalog-import-batches", "my"],
+        queryKey: catalogImportQueryKeys.myRoot,
       });
     },
   });
