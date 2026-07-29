@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { deleteCatalogImportBatch } from "@/features/catalogImports/api/deleteCatalogImportBatch";
 import { downloadCatalogImportFile } from "@/features/catalogImports/api/downloadCatalogImportFile";
 import { getCatalogImportBatch } from "@/features/catalogImports/api/getCatalogImportBatch";
@@ -12,6 +12,11 @@ import { formatDate, formatFileSize } from "@/shared/lib/formatters";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { CatalogImportRowsPreview } from "@/features/catalogImports/ui/CatalogImportRowsPreview";
 import { CatalogImportMappingEditor } from "@/features/catalogImports/ui/CatalogImportMappingEditor";
+import { CatalogImportSubmitPanel } from "@/features/catalogImports/ui/CatalogImportSubmitPanel";
+import { CatalogImportReviewPanel } from "@/features/catalogImports/ui/CatalogImportReviewPanel";
+import { CatalogImportReviewDecisionPanel } from "@/features/catalogImports/ui/CatalogImportReviewDecisionPanel";
+import { CatalogImportBatchHistory } from "@/features/catalogImports/ui/CatalogImportBatchHistory";
+import { CatalogImportAppliedProducts } from "@/features/catalogImports/ui/CatalogImportAppliedProducts";
 
 function getBatchIdFromParams(params: ReturnType<typeof useParams>): string {
   const batchId = params.batchId;
@@ -48,6 +53,18 @@ export default function CatalogImportDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const queryClient = useQueryClient();
+
+  const searchParams = useSearchParams();
+
+  const fromReviewQueue = searchParams.get("from") === "review-queue";
+
+  const backHref = fromReviewQueue
+    ? "/catalog/import-reviews"
+    : "/catalog/imports";
+
+  const backLabel = fromReviewQueue
+    ? "Назад к очереди проверки"
+    : "Назад к импортам";
 
   const batchId = getBatchIdFromParams(params);
 
@@ -100,6 +117,12 @@ export default function CatalogImportDetailsPage() {
     }
   }
 
+  const canEditRows =
+    Boolean(batch?.canEdit) &&
+    (batch?.status === "NeedsCorrection" ||
+      batch?.status === "Ready" ||
+      batch?.status === "ChangesRequested");
+
   return (
     <div className="grid gap-6">
       <PageHeader
@@ -109,10 +132,10 @@ export default function CatalogImportDetailsPage() {
 
       <div>
         <Link
-          href="/catalog/imports"
+          href={backHref}
           className="inline-flex rounded-xl bg-white/[0.06] px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/[0.1]"
         >
-          ← Назад к импортам
+          ← {backLabel}
         </Link>
       </div>
 
@@ -258,46 +281,67 @@ export default function CatalogImportDetailsPage() {
             </div>
           </section>
 
+          <CatalogImportSubmitPanel
+            batchId={batch.batchId}
+            originalFileName={batch.originalFileName}
+            rowsCount={batch.rowsCount}
+            validRowsCount={batch.validRowsCount}
+            errorRowsCount={batch.errorRowsCount}
+            canSubmit={batch.canSubmit}
+          />
+
           {batch.canEdit && (
             <CatalogImportMappingEditor batchId={batch.batchId} />
           )}
 
-          {batch.rowsCount > 0 && (
-            <CatalogImportRowsPreview batchId={batch.batchId} />
+          <CatalogImportBatchHistory batchId={batch.batchId} />
+
+          {batch.status === "Applied" && (
+            <CatalogImportAppliedProducts batchId={batch.batchId} />
           )}
 
-          <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
-            <h2 className="text-xl font-semibold text-white">Хронология</h2>
+          <CatalogImportRowsPreview
+            batchId={batch.batchId}
+            productTypeId={batch.productTypeId}
+            canEditRows={canEditRows}
+          />
 
-            <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <InfoCard label="Создан" value={formatDate(batch.createdAtUtc)} />
+          <CatalogImportReviewPanel
+            batchId={batch.batchId}
+            originalFileName={batch.originalFileName}
+            status={batch.status}
+            reviewedByUserId={batch.reviewedByUserId}
+            reviewedAtUtc={batch.reviewedAtUtc}
+          />
 
-              <InfoCard
-                label="Последнее изменение"
-                value={formatDate(batch.updatedAtUtc)}
-              />
+          <CatalogImportReviewDecisionPanel
+            batchId={batch.batchId}
+            originalFileName={batch.originalFileName}
+            rowsCount={batch.rowsCount}
+            validRowsCount={batch.validRowsCount}
+            errorRowsCount={batch.errorRowsCount}
+            canRequestChanges={batch.canRequestChanges}
+            canReject={batch.canReject}
+            canApply={batch.canApply}
+          />
 
-              <InfoCard
-                label="Отправлен на проверку"
-                value={formatDate(batch.submittedAtUtc)}
-              />
+          {batch.status === "Submitted" && (
+            <section className="rounded-3xl border border-blue-500/30 bg-blue-500/[0.07] p-6">
+              <h2 className="text-lg font-semibold text-blue-100">
+                Пакет отправлен на проверку
+              </h2>
 
-              <InfoCard
-                label="Проверка начата"
-                value={formatDate(batch.reviewedAtUtc)}
-              />
+              <p className="mt-2 text-sm leading-6 text-slate-300">
+                Пакет находится в общей очереди технических специалистов.
+                Редактирование возобновится только в том случае, если Technical
+                вернёт его на исправление.
+              </p>
 
-              <InfoCard
-                label="Возвращён на исправление"
-                value={formatDate(batch.changesRequestedAtUtc)}
-              />
-
-              <InfoCard
-                label="Применён"
-                value={formatDate(batch.appliedAtUtc)}
-              />
-            </div>
-          </section>
+              <p className="mt-3 text-sm text-blue-200">
+                Дата отправки: {formatDate(batch.submittedAtUtc)}
+              </p>
+            </section>
+          )}
 
           <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
             <h2 className="text-xl font-semibold text-white">

@@ -20,18 +20,20 @@ public sealed class UserRepository : IUserRepository
         CancellationToken cancellationToken = default)
     {
         return _dbContext.Users
-            .FirstOrDefaultAsync(user => user.Id == id, cancellationToken);
+            .FirstOrDefaultAsync(
+                user => user.Id == id,
+                cancellationToken);
     }
 
     public async Task<IReadOnlyCollection<User>> GetByIdsAsync(
-    IReadOnlyCollection<Guid> ids,
-    CancellationToken cancellationToken = default)
+        IReadOnlyCollection<Guid> ids,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(ids);
 
         if (ids.Count == 0)
         {
-            return Array.Empty<User>();
+            return [];
         }
 
         return await _dbContext.Users
@@ -46,7 +48,9 @@ public sealed class UserRepository : IUserRepository
         CancellationToken cancellationToken = default)
     {
         return _dbContext.Users
-            .FirstOrDefaultAsync(user => user.Email == email, cancellationToken);
+            .FirstOrDefaultAsync(
+                user => user.Email == email,
+                cancellationToken);
     }
 
     public Task<bool> ExistsByEmailAsync(
@@ -54,7 +58,9 @@ public sealed class UserRepository : IUserRepository
         CancellationToken cancellationToken = default)
     {
         return _dbContext.Users
-            .AnyAsync(user => user.Email == email, cancellationToken);
+            .AnyAsync(
+                user => user.Email == email,
+                cancellationToken);
     }
 
     public void Add(User user)

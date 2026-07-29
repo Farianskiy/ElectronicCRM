@@ -27,6 +27,7 @@ using ElectronicService.Core.Catalog.ImportBatches.Analysis;
 using ElectronicService.Infrastructure.Postgres.Catalog.ImportBatches;
 using ElectronicService.Core.Catalog.ImportBatches.ApplyCatalogImportBatch;
 using ElectronicService.Infrastructure.Postgres.Catalog.ImportBatches.Cleanup;
+using ElectronicService.Core.Catalog.ImportBatches.GetCatalogImportAppliedProducts;
 
 namespace ElectronicService.Infrastructure.Postgres;
 
@@ -104,6 +105,7 @@ public static class DependencyInjectionExtensions
         services.AddScoped<ICatalogImportBatchRepository, CatalogImportBatchRepository>();
         services.AddScoped<ICatalogImportWorkbookAnalyzer, CatalogImportWorkbookAnalyzer>();
         services.AddScoped<ICatalogImportBatchApplier, CatalogImportBatchApplier>();
+        services.AddScoped<ICatalogImportAppliedProductsReader, CatalogImportAppliedProductsReader>();
 
         return services;
     }

@@ -472,4 +472,11 @@ public static class CatalogImportErrors
             $"Сопоставление колонок пакета в статусе '{status}' нельзя изменять.");
     }
 
+    public static DomainError AppliedProductsUnavailable(CatalogImportBatchStatus status)
+    {
+        return new DomainError(
+            "catalog.import.applied_products.unavailable",
+            $"Товары импорта недоступны для пакета в статусе '{status}'.");
+    }
+
 }

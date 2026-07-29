@@ -13,9 +13,12 @@ import { getCatalogImportRowFilterStatusLabel } from "../model/catalogImportRowS
 import { CatalogImportRowStatusBadge } from "./CatalogImportRowStatusBadge";
 import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
 import { AppSelect } from "@/shared/ui/AppSelect";
+import { CatalogImportRowEditor } from "./CatalogImportRowEditor";
 
 interface CatalogImportRowsPreviewProps {
   batchId: string;
+  productTypeId?: string | null;
+  canEditRows: boolean;
 }
 
 const pageSize = 25;
@@ -57,6 +60,8 @@ function getRawDataEntries(row: CatalogImportRow): Array<[string, string]> {
 
 export function CatalogImportRowsPreview({
   batchId,
+  productTypeId,
+  canEditRows,
 }: CatalogImportRowsPreviewProps) {
   const [status, setStatus] = useState<CatalogImportRowFilterStatus | null>(
     null,
@@ -65,6 +70,8 @@ export function CatalogImportRowsPreview({
   const [page, setPage] = useState(1);
 
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
+
+  const [editingRowId, setEditingRowId] = useState<string | null>(null);
 
   const rowsQuery = useQuery({
     queryKey: [
@@ -97,11 +104,20 @@ export function CatalogImportRowsPreview({
     );
 
     setExpandedRowId(null);
+    setEditingRowId(null);
     setPage(1);
   }
 
   function toggleRow(rowId: string): void {
+    setEditingRowId(null);
+
     setExpandedRowId((currentRowId) => (currentRowId === rowId ? null : rowId));
+  }
+
+  function editRow(rowId: string): void {
+    setExpandedRowId(null);
+
+    setEditingRowId((currentRowId) => (currentRowId === rowId ? null : rowId));
   }
 
   return (
@@ -207,6 +223,10 @@ export function CatalogImportRowsPreview({
               {items.map((row) => {
                 const isExpanded = expandedRowId === row.rowId;
 
+                const isEditing = editingRowId === row.rowId;
+
+                const rowCanBeEdited = canEditRows && Boolean(productTypeId);
+
                 return (
                   <Fragment key={row.rowId}>
                     <tr className="bg-white/[0.01] align-top transition hover:bg-white/[0.04]">
@@ -264,20 +284,53 @@ export function CatalogImportRowsPreview({
                       </td>
 
                       <td className="px-4 py-4">
-                        <button
-                          type="button"
-                          onClick={() => toggleRow(row.rowId)}
-                          className="rounded-xl bg-white/[0.06] px-3 py-2 text-xs font-medium text-slate-200 transition hover:bg-teal-500 hover:text-white"
-                        >
-                          {isExpanded ? "Скрыть" : "Подробнее"}
-                        </button>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => toggleRow(row.rowId)}
+                            className="rounded-xl bg-white/[0.06] px-3 py-2 text-xs font-medium text-slate-200 transition hover:bg-teal-500 hover:text-white"
+                          >
+                            {isExpanded ? "Скрыть" : "Подробнее"}
+                          </button>
+
+                          {rowCanBeEdited && (
+                            <button
+                              type="button"
+                              onClick={() => editRow(row.rowId)}
+                              className={[
+                                "rounded-xl border px-3 py-2",
+                                "text-xs font-medium transition",
+                                isEditing
+                                  ? "border-teal-400/40 bg-teal-500/20 text-teal-100"
+                                  : "border-teal-500/30 bg-teal-500/10 text-teal-200 hover:bg-teal-500/20",
+                              ].join(" ")}
+                            >
+                              {isEditing ? "Закрыть редактор" : "Редактировать"}
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
 
-                    {isExpanded && (
+                    {(isExpanded || isEditing) && (
                       <tr className="bg-black/20">
                         <td colSpan={9} className="px-5 py-5">
-                          <CatalogImportRowDetails row={row} />
+                          {isEditing && productTypeId ? (
+                            <CatalogImportRowEditor
+                              key={`${row.rowId}-${row.status}`}
+                              batchId={batchId}
+                              productTypeId={productTypeId}
+                              row={row}
+                              onCancel={() => {
+                                setEditingRowId(null);
+                              }}
+                              onSaved={() => {
+                                setEditingRowId(null);
+                              }}
+                            />
+                          ) : (
+                            <CatalogImportRowDetails row={row} />
+                          )}
                         </td>
                       </tr>
                     )}
@@ -295,6 +348,7 @@ export function CatalogImportRowsPreview({
           disabled={page <= 1 || rowsQuery.isFetching}
           onClick={() => {
             setExpandedRowId(null);
+            setEditingRowId(null);
 
             setPage((currentPage) => Math.max(1, currentPage - 1));
           }}
@@ -312,6 +366,7 @@ export function CatalogImportRowsPreview({
           }
           onClick={() => {
             setExpandedRowId(null);
+            setEditingRowId(null);
 
             setPage((currentPage) => Math.min(totalPages, currentPage + 1));
           }}

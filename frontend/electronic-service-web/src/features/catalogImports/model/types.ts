@@ -224,3 +224,172 @@ export interface UpdateCatalogImportMappingResponse {
   unconfirmedColumnsCount: number;
   version: number;
 }
+
+export interface UpdateCatalogImportRowRequest {
+  name?: string | null;
+  article?: string | null;
+  manufacturerId?: string | null;
+  price?: number | null;
+  stockQuantity?: number | null;
+  characteristics: Record<string, string>;
+}
+
+export interface UpdateCatalogImportRowResponse {
+  rowId: string;
+  rowNumber: number;
+  rowStatus: CatalogImportRowStatus;
+  data: CatalogImportNormalizedRow;
+  issues: CatalogImportRowIssue[];
+  warnings: CatalogImportRowIssue[];
+  batchStatus: CatalogImportBatchStatus;
+  rowsCount: number;
+  validRowsCount: number;
+  errorRowsCount: number;
+  version: number;
+}
+
+export interface SubmitCatalogImportBatchResponse {
+  batchId: string;
+  status: CatalogImportBatchStatus;
+  submittedAtUtc?: string | null;
+  version: number;
+}
+
+export const catalogImportReviewQueueStatuses = [
+  "Submitted",
+  "UnderReview",
+] as const;
+
+export type CatalogImportReviewQueueStatus =
+  (typeof catalogImportReviewQueueStatuses)[number];
+
+export interface CatalogImportReviewQueueItem {
+  batchId: string;
+  createdByUserId: string;
+  createdByDisplayName: string;
+  createdByEmail?: string | null;
+  createdByUserType: string;
+  productTypeId?: string | null;
+  originalFileName: string;
+  status: CatalogImportReviewQueueStatus;
+  rowsCount: number;
+  validRowsCount: number;
+  errorRowsCount: number;
+  createdAtUtc: string;
+  submittedAtUtc?: string | null;
+  reviewedByUserId?: string | null;
+  reviewedAtUtc?: string | null;
+  version: number;
+}
+
+export interface GetCatalogImportReviewQueueResponse {
+  items: CatalogImportReviewQueueItem[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+export interface GetCatalogImportReviewQueueParams {
+  status?: CatalogImportReviewQueueStatus | null;
+  page: number;
+  pageSize: number;
+}
+
+export interface StartCatalogImportReviewResponse {
+  batchId: string;
+  status: CatalogImportBatchStatus;
+  reviewedByUserId?: string | null;
+  reviewedAtUtc?: string | null;
+  version: number;
+}
+
+export interface RequestCatalogImportChangesRequest {
+  comment: string;
+}
+
+export interface RequestCatalogImportChangesResponse {
+  batchId: string;
+  status: CatalogImportBatchStatus;
+  changesRequestedByUserId?: string | null;
+  changesRequestedAtUtc?: string | null;
+  comment?: string | null;
+  version: number;
+}
+
+export interface RejectCatalogImportBatchRequest {
+  reason: string;
+}
+
+export interface RejectCatalogImportBatchResponse {
+  batchId: string;
+  status: CatalogImportBatchStatus;
+  rejectedByUserId?: string | null;
+  rejectedAtUtc?: string | null;
+  rejectionReason?: string | null;
+  version: number;
+}
+
+export interface ApplyCatalogImportBatchResponse {
+  batchId: string;
+  status: CatalogImportBatchStatus;
+  appliedByUserId?: string | null;
+  appliedAtUtc?: string | null;
+  createdProductsCount: number;
+  version: number;
+}
+
+export const catalogImportHistoryEventTypes = [
+  "Uploaded",
+  "Submitted",
+  "ReviewStarted",
+  "ChangesRequested",
+  "Rejected",
+  "Applied",
+] as const;
+
+export type CatalogImportHistoryEventType =
+  (typeof catalogImportHistoryEventTypes)[number];
+
+export interface CatalogImportBatchHistoryItem {
+  eventType: CatalogImportHistoryEventType;
+  occurredAtUtc: string;
+  actorUserId?: string | null;
+  actorDisplayName?: string | null;
+  actorEmail?: string | null;
+  actorUserType?: string | null;
+  comment?: string | null;
+}
+
+export interface GetCatalogImportBatchHistoryResponse {
+  batchId: string;
+  items: CatalogImportBatchHistoryItem[];
+}
+
+export interface CatalogImportAppliedProduct {
+  productId: string;
+  article: string;
+  name: string;
+  productTypeCode: string;
+  productTypeName: string;
+  manufacturerName: string;
+  priceAmount: number;
+  priceCurrency: string;
+  stockQuantity: number;
+  appliedAtUtc: string;
+}
+
+export interface GetCatalogImportAppliedProductsResponse {
+  batchId: string;
+  items: CatalogImportAppliedProduct[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+export interface GetCatalogImportAppliedProductsParams {
+  batchId: string;
+  page: number;
+  pageSize: number;
+}

@@ -20,6 +20,10 @@ const regularNavigation = [
 
 const technicalNavigation = [
   {
+    href: "/catalog/import-reviews",
+    label: "Проверка импортов",
+  },
+  {
     href: "/catalog/characteristics",
     label: "Характеристики каталога",
   },
