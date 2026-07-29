@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { getCatalogProductTypeCharacteristics } from "@/features/catalogMetadata/api/getCatalogProductTypeCharacteristics";
 import { getCatalogProductTypes } from "@/features/catalogMetadata/api/getCatalogProductTypes";
 import type {
@@ -23,6 +23,7 @@ import {
   type GetCatalogImportMappingResponse,
   type UpdateCatalogImportMappingResponse,
 } from "../model/types";
+import { validateCatalogImportMapping } from "../model/mappingValidation";
 
 interface CatalogImportMappingEditorProps {
   batchId: string;
@@ -81,127 +82,6 @@ function getCharacteristicLabel(
   return `${characteristic.name}${unit} · ${formatCharacteristicDataType(
     characteristic.dataType,
   )}${required}`;
-}
-
-function validateMapping(
-  productTypeId: string,
-  columns: CatalogImportMappingColumn[],
-  characteristics: CatalogProductTypeCharacteristicMetadata[],
-): string[] {
-  const errors: string[] = [];
-
-  if (!productTypeId) {
-    errors.push("Выберите тип товара.");
-  }
-
-  const unmappedColumns = columns.filter(
-    (column) => column.targetKind === "Unmapped",
-  );
-
-  if (unmappedColumns.length > 0) {
-    const headers = unmappedColumns
-      .slice(0, 5)
-      .map((column) => `«${column.sourceHeader}»`)
-      .join(", ");
-
-    const suffix =
-      unmappedColumns.length > 5 ? ` и ещё ${unmappedColumns.length - 5}` : "";
-
-    errors.push(
-      `Для всех колонок нужно выбрать назначение или Ignore. Не сопоставлены: ${headers}${suffix}.`,
-    );
-  }
-
-  for (const requiredTarget of requiredStandardTargetKinds) {
-    const mappedCount = columns.filter(
-      (column) => column.targetKind === requiredTarget,
-    ).length;
-
-    if (mappedCount === 0) {
-      errors.push(
-        `Не назначена колонка «${getCatalogImportColumnTargetLabel(
-          requiredTarget,
-        )}».`,
-      );
-    }
-  }
-
-  for (const standardTarget of standardTargetKinds) {
-    const mappedCount = columns.filter(
-      (column) => column.targetKind === standardTarget,
-    ).length;
-
-    if (mappedCount > 1) {
-      errors.push(
-        `Назначение «${getCatalogImportColumnTargetLabel(
-          standardTarget,
-        )}» выбрано более одного раза.`,
-      );
-    }
-  }
-
-  const characteristicColumns = columns.filter(
-    (column) => column.targetKind === "Characteristic",
-  );
-
-  const incompleteCharacteristicColumns = characteristicColumns.filter(
-    (column) => !column.characteristicDefinitionId,
-  );
-
-  if (incompleteCharacteristicColumns.length > 0) {
-    errors.push(
-      "Для каждой колонки с назначением «Характеристика» нужно выбрать конкретную характеристику.",
-    );
-  }
-
-  const characteristicCounts = new Map<string, number>();
-
-  for (const column of characteristicColumns) {
-    const definitionId = column.characteristicDefinitionId;
-
-    if (!definitionId) {
-      continue;
-    }
-
-    characteristicCounts.set(
-      definitionId,
-      (characteristicCounts.get(definitionId) ?? 0) + 1,
-    );
-  }
-
-  for (const [definitionId, count] of characteristicCounts) {
-    if (count <= 1) {
-      continue;
-    }
-
-    const characteristic = characteristics.find(
-      (item) => item.id === definitionId,
-    );
-
-    errors.push(
-      `Характеристика «${
-        characteristic?.name ?? definitionId
-      }» назначена более чем одной Excel-колонке.`,
-    );
-  }
-
-  const requiredCharacteristics = characteristics.filter(
-    (characteristic) => characteristic.isRequired,
-  );
-
-  for (const characteristic of requiredCharacteristics) {
-    const isMapped = characteristicColumns.some(
-      (column) => column.characteristicDefinitionId === characteristic.id,
-    );
-
-    if (!isMapped) {
-      errors.push(
-        `Не сопоставлена обязательная характеристика «${characteristic.name}».`,
-      );
-    }
-  }
-
-  return errors;
 }
 
 export function CatalogImportMappingEditor({
@@ -298,6 +178,18 @@ function CatalogImportMappingForm({
 
   const characteristics = characteristicsQuery.data ?? [];
 
+  const mappingValidation = useMemo(
+    () =>
+      validateCatalogImportMapping(
+        selectedProductTypeId,
+        columns,
+        characteristics,
+      ),
+    [selectedProductTypeId, columns, characteristics],
+  );
+
+  const mappingMetrics = mappingValidation.metrics;
+
   const saveMutation = useMutation({
     mutationFn: async (): Promise<SaveMappingResult> => {
       const mapping = await updateCatalogImportMapping(batchId, {
@@ -324,11 +216,18 @@ function CatalogImportMappingForm({
       setFormErrors([]);
 
       setColumns((currentColumns) =>
-        currentColumns.map((column) => ({
-          ...column,
-          confidence: column.targetKind === "Unmapped" ? 0 : 1,
-          isConfirmed: column.targetKind !== "Unmapped",
-        })),
+        currentColumns.map((column) => {
+          const hasCompleteAssignment =
+            column.targetKind !== "Unmapped" &&
+            (column.targetKind !== "Characteristic" ||
+              Boolean(column.characteristicDefinitionId));
+
+          return {
+            ...column,
+            confidence: hasCompleteAssignment ? 1 : column.confidence,
+            isConfirmed: hasCompleteAssignment,
+          };
+        }),
       );
 
       setSuccessMessage(
@@ -407,17 +306,24 @@ function CatalogImportMappingForm({
     saveMutation.reset();
 
     setColumns((currentColumns) =>
-      currentColumns.map((column) =>
-        column.columnId === columnId
-          ? {
-              ...column,
-              targetKind,
-              characteristicDefinitionId: null,
-              confidence: targetKind === "Unmapped" ? 0 : 1,
-              isConfirmed: targetKind !== "Unmapped",
-            }
-          : column,
-      ),
+      currentColumns.map((column) => {
+        if (column.columnId !== columnId) {
+          return column;
+        }
+
+        const requiresCharacteristic = targetKind === "Characteristic";
+
+        const isConfirmed =
+          targetKind !== "Unmapped" && !requiresCharacteristic;
+
+        return {
+          ...column,
+          targetKind,
+          characteristicDefinitionId: null,
+          confidence: targetKind === "Unmapped" ? 0 : column.confidence,
+          isConfirmed,
+        };
+      }),
     );
   }
 
@@ -454,14 +360,8 @@ function CatalogImportMappingForm({
       return;
     }
 
-    const validationErrors = validateMapping(
-      selectedProductTypeId,
-      columns,
-      characteristics,
-    );
-
-    if (validationErrors.length > 0) {
-      setFormErrors(validationErrors);
+    if (!mappingValidation.metrics.isComplete) {
+      setFormErrors(mappingValidation.errors);
       setSuccessMessage(null);
 
       return;
@@ -544,27 +444,74 @@ function CatalogImportMappingForm({
           </div>
         )}
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <MappingSummaryCard
-            label="Колонок Excel"
-            value={columns.length.toString()}
+            label="Системные поля"
+            value={[
+              mappingMetrics.requiredSystemFieldsMapped,
+              mappingMetrics.requiredSystemFieldsTotal,
+            ].join(" из ")}
+            warning={
+              mappingMetrics.requiredSystemFieldsMapped !==
+              mappingMetrics.requiredSystemFieldsTotal
+            }
+          />
+
+          <MappingSummaryCard
+            label="Обязательные характеристики"
+            value={[
+              mappingMetrics.requiredCharacteristicsMapped,
+              mappingMetrics.requiredCharacteristicsTotal,
+            ].join(" из ")}
+            warning={
+              mappingMetrics.requiredCharacteristicsMapped !==
+              mappingMetrics.requiredCharacteristicsTotal
+            }
           />
 
           <MappingSummaryCard
             label="Не сопоставлено"
-            value={unmappedCount.toString()}
-            warning={unmappedCount > 0}
+            value={mappingMetrics.unmappedColumnsCount.toString()}
+            warning={mappingMetrics.unmappedColumnsCount > 0}
           />
 
           <MappingSummaryCard
-            label="Игнорируется"
-            value={ignoredCount.toString()}
+            label="Характеристика не выбрана"
+            value={mappingMetrics.incompleteCharacteristicColumnsCount.toString()}
+            warning={mappingMetrics.incompleteCharacteristicColumnsCount > 0}
           />
 
           <MappingSummaryCard
-            label="Характеристик"
-            value={characteristicCount.toString()}
+            label="Дубли назначений"
+            value={mappingMetrics.duplicateAssignmentsCount.toString()}
+            warning={mappingMetrics.duplicateAssignmentsCount > 0}
           />
+        </div>
+
+        <div
+          className={[
+            "rounded-2xl border p-5",
+            mappingMetrics.isComplete
+              ? "border-green-500/30 bg-green-500/10"
+              : "border-amber-500/30 bg-amber-500/10",
+          ].join(" ")}
+        >
+          <h3
+            className={[
+              "font-semibold",
+              mappingMetrics.isComplete ? "text-green-100" : "text-amber-100",
+            ].join(" ")}
+          >
+            {mappingMetrics.isComplete
+              ? "Сопоставление готово"
+              : "Сопоставление не завершено"}
+          </h3>
+
+          <p className="mt-2 text-sm leading-6 text-slate-300">
+            {mappingMetrics.isComplete
+              ? "Все обязательные поля и характеристики назначены. Можно сохранить mapping и повторно запустить анализ."
+              : "Заполните обязательные системные поля, выберите характеристики и устраните дублирующиеся назначения."}
+          </p>
         </div>
 
         <div className="rounded-2xl border border-teal-500/20 bg-teal-500/[0.06] p-4">
@@ -617,10 +564,35 @@ function CatalogImportMappingForm({
                     ),
                 );
 
+                const currentColumnErrors =
+                  mappingValidation.columnErrors[column.columnId] ?? [];
+
+                const hasCompleteAssignment =
+                  column.targetKind !== "Unmapped" &&
+                  (column.targetKind !== "Characteristic" ||
+                    Boolean(column.characteristicDefinitionId));
+
+                const recognitionLabel =
+                  column.confidence > 0
+                    ? "Распознано автоматически"
+                    : "Автораспознавание отсутствует";
+
+                const readinessLabel =
+                  currentColumnErrors.length > 0
+                    ? currentColumnErrors[0]
+                    : hasCompleteAssignment
+                      ? "Сопоставление готово"
+                      : "Требуется завершить сопоставление";
+
                 return (
                   <tr
                     key={column.columnId}
-                    className="bg-white/[0.01] align-top"
+                    className={[
+                      "align-top transition",
+                      currentColumnErrors.length > 0
+                        ? "bg-red-500/[0.04]"
+                        : "bg-white/[0.01]",
+                    ].join(" ")}
                   >
                     <td className="px-4 py-4 font-medium text-white">
                       {column.sourceColumnNumber}
@@ -636,22 +608,26 @@ function CatalogImportMappingForm({
                       </p>
                     </td>
 
-                    <td className="px-4 py-4">
-                      <p className="text-slate-300">
+                    <td className="w-64 px-4 py-4">
+                      <p className="text-slate-200">
                         {formatConfidence(column.confidence)}
+                      </p>
+
+                      <p className="mt-1 text-xs text-slate-500">
+                        {recognitionLabel}
                       </p>
 
                       <p
                         className={[
-                          "mt-1 text-xs",
-                          column.isConfirmed
-                            ? "text-green-300"
-                            : "text-amber-300",
+                          "mt-2 text-xs leading-5",
+                          currentColumnErrors.length > 0
+                            ? "text-red-300"
+                            : hasCompleteAssignment
+                              ? "text-green-300"
+                              : "text-amber-300",
                         ].join(" ")}
                       >
-                        {column.isConfirmed
-                          ? "Подтверждено"
-                          : "Требует проверки"}
+                        {readinessLabel}
                       </p>
                     </td>
 
@@ -680,36 +656,63 @@ function CatalogImportMappingForm({
                           }),
                         )}
                       />
+                      {currentColumnErrors.length > 0 && (
+                        <div className="mt-2 grid gap-1">
+                          {currentColumnErrors.map((error) => (
+                            <p
+                              key={error}
+                              className="text-xs leading-5 text-red-300"
+                            >
+                              {error}
+                            </p>
+                          ))}
+                        </div>
+                      )}
                     </td>
 
                     <td className="w-[420px] px-4 py-4">
                       {column.targetKind === "Characteristic" ? (
-                        <AppSelect
-                          ariaLabel={`Характеристика колонки ${column.sourceHeader}`}
-                          value={column.characteristicDefinitionId ?? ""}
-                          disabled={
-                            !initialMapping.canEdit ||
-                            saveMutation.isPending ||
-                            characteristicsQuery.isFetching ||
-                            !selectedProductTypeId
-                          }
-                          onChange={(value) =>
-                            handleCharacteristicChange(column.columnId, value)
-                          }
-                          options={[
-                            {
-                              value: "",
-                              label: "Выберите характеристику",
-                            },
-                            ...characteristics.map((characteristic) => ({
-                              value: characteristic.id,
-                              label: getCharacteristicLabel(characteristic),
-                              disabled: usedCharacteristicIds.has(
-                                characteristic.id,
-                              ),
-                            })),
-                          ]}
-                        />
+                        <div>
+                          <AppSelect
+                            ariaLabel={`Характеристика колонки ${column.sourceHeader}`}
+                            value={column.characteristicDefinitionId ?? ""}
+                            disabled={
+                              !initialMapping.canEdit ||
+                              saveMutation.isPending ||
+                              characteristicsQuery.isFetching ||
+                              !selectedProductTypeId
+                            }
+                            onChange={(value) =>
+                              handleCharacteristicChange(column.columnId, value)
+                            }
+                            options={[
+                              {
+                                value: "",
+                                label: "Выберите характеристику",
+                              },
+                              ...characteristics.map((characteristic) => ({
+                                value: characteristic.id,
+                                label: getCharacteristicLabel(characteristic),
+                                disabled: usedCharacteristicIds.has(
+                                  characteristic.id,
+                                ),
+                              })),
+                            ]}
+                          />
+
+                          {currentColumnErrors.length > 0 && (
+                            <div className="mt-2 grid gap-1">
+                              {currentColumnErrors.map((error) => (
+                                <p
+                                  key={error}
+                                  className="text-xs leading-5 text-red-300"
+                                >
+                                  {error}
+                                </p>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       ) : (
                         <span className="text-slate-600">Не требуется</span>
                       )}
@@ -720,6 +723,20 @@ function CatalogImportMappingForm({
             </tbody>
           </table>
         </div>
+
+        {!mappingMetrics.isComplete && mappingValidation.errors.length > 0 && (
+          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5">
+            <h3 className="font-semibold text-amber-100">
+              Чтобы продолжить, исправьте:
+            </h3>
+
+            <ul className="mt-3 grid gap-2 text-sm leading-6 text-amber-100">
+              {mappingValidation.errors.map((error) => (
+                <li key={error}>• {error}</li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {formErrors.length > 0 && (
           <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-5">
@@ -750,11 +767,21 @@ function CatalogImportMappingForm({
           </div>
         )}
 
-        <div className="flex justify-end">
+        <div className="flex flex-col items-end gap-2">
+          {!mappingMetrics.isComplete && (
+            <p className="max-w-xl text-right text-xs leading-5 text-amber-300">
+              Кнопка станет доступна после заполнения всех обязательных
+              назначений.
+            </p>
+          )}
+
           <button
             type="submit"
             disabled={
-              !initialMapping.canEdit || !selectedProductTypeId || isBusy
+              !initialMapping.canEdit ||
+              !mappingMetrics.isComplete ||
+              characteristicsQuery.isError ||
+              isBusy
             }
             className="rounded-2xl bg-teal-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-teal-400 disabled:cursor-not-allowed disabled:opacity-50"
           >

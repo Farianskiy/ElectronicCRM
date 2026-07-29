@@ -479,4 +479,11 @@ public static class CatalogImportErrors
             $"Товары импорта недоступны для пакета в статусе '{status}'.");
     }
 
+    public static DomainError ErrorReportUnavailable()
+    {
+        return new DomainError(
+            "catalog.import.error_report.unavailable",
+            "В пакете отсутствуют строки с ошибками.");
+    }
+
 }
