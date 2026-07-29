@@ -26,6 +26,13 @@ public sealed class CatalogImportBatchRepository
             batch);
     }
 
+    public void Remove(CatalogImportBatch batch)
+    {
+        ArgumentNullException.ThrowIfNull(batch);
+
+        _dbContext.CatalogImportBatches.Remove(batch);
+    }
+
     public Task<CatalogImportBatch?>
     GetByIdAsync(
         Guid batchId,
@@ -274,6 +281,48 @@ public sealed class CatalogImportBatchRepository
         await transaction
             .CommitAsync(cancellationToken)
             .ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyCollection<CatalogImportBatch>> GetByCreatorAsync(
+        Guid createdByUserId,
+        CatalogImportBatchStatus? status,
+        int skip,
+        int take,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _dbContext.CatalogImportBatches
+            .AsNoTracking()
+            .Where(batch => batch.CreatedByUserId == createdByUserId);
+
+        if (status.HasValue)
+        {
+            query = query.Where(batch => batch.Status == status.Value);
+        }
+
+        return await query
+            .OrderByDescending(batch => batch.UpdatedAtUtc ?? batch.CreatedAtUtc)
+            .ThenByDescending(batch => batch.CreatedAtUtc)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public Task<int> CountByCreatorAsync(
+        Guid createdByUserId,
+        CatalogImportBatchStatus? status,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _dbContext.CatalogImportBatches
+            .AsNoTracking()
+            .Where(batch => batch.CreatedByUserId == createdByUserId);
+
+        if (status.HasValue)
+        {
+            query = query.Where(batch => batch.Status == status.Value);
+        }
+
+        return query.CountAsync(cancellationToken);
     }
 
     public Task SaveChangesAsync(

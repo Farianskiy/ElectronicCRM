@@ -56,6 +56,10 @@ using ElectronicService.Core.Catalog.ImportBatches.GetCatalogImportReviewQueue;
 using ElectronicService.Core.Catalog.ImportBatches.StartCatalogImportReview;
 using ElectronicService.Core.Catalog.ImportBatches.RequestCatalogImportChanges;
 using ElectronicService.Core.Catalog.ImportBatches.RejectCatalogImportBatch;
+using ElectronicService.Core.Catalog.ImportBatches.ApplyCatalogImportBatch;
+using ElectronicService.Core.Catalog.ImportBatches.GetMyCatalogImportBatches;
+using ElectronicService.Core.Catalog.ImportBatches.DownloadCatalogImportFile;
+using ElectronicService.Core.Catalog.ImportBatches.DeleteCatalogImportBatch;
 
 namespace ElectronicService.Core;
 
@@ -121,6 +125,10 @@ public static class DependencyInjectionExtensions
         services.AddScoped<StartCatalogImportReviewCommandHandler>();
         services.AddScoped<RequestCatalogImportChangesCommandHandler>();
         services.AddScoped<RejectCatalogImportBatchCommandHandler>();
+        services.AddScoped<ApplyCatalogImportBatchCommandHandler>();
+        services.AddScoped<GetMyCatalogImportBatchesQueryHandler>();
+        services.AddScoped<DownloadCatalogImportFileQueryHandler>();
+        services.AddScoped<DeleteCatalogImportBatchCommandHandler>();
 
 
         return services;

@@ -333,4 +333,122 @@ public static class CatalogImportErrors
             "catalog.import.batch.rejection_reason_too_long",
             $"Причина отклонения не должна превышать {maximumLength} символов.");
     }
+
+    public static DomainError UserCannotApplyCatalogImport()
+    {
+        return new DomainError(
+            "catalog.import.user.cannot_apply",
+            "Пользователь не может применять пакеты импорта.");
+    }
+
+    public static DomainError BatchCannotBeAppliedByCurrentUser()
+    {
+        return new DomainError(
+            "catalog.import.batch.cannot_be_applied_by_current_user",
+            "Текущий пользователь не может применить этот пакет импорта.");
+    }
+
+    public static DomainError InvalidNormalizedRow(int rowNumber)
+    {
+        return new DomainError(
+            "catalog.import.apply.invalid_normalized_row",
+            $"Нормализованные данные строки Excel '{rowNumber}' некорректны.");
+    }
+
+    public static DomainError DuplicateArticleInBatch(
+        string article,
+        int firstRowNumber,
+        int duplicateRowNumber)
+    {
+        return new DomainError(
+            "catalog.import.apply.duplicate_article",
+            $"Артикул '{article}' повторяется в строках Excel " +
+            $"'{firstRowNumber}' и '{duplicateRowNumber}'.");
+    }
+
+    public static DomainError ProductArticleAlreadyExists(
+        string article,
+        int rowNumber)
+    {
+        return new DomainError(
+            "catalog.import.apply.article_already_exists",
+            $"Товар с артикулом '{article}' уже существует. " +
+            $"Конфликт обнаружен в строке Excel '{rowNumber}'.");
+    }
+
+    public static DomainError CharacteristicDefinitionNotFound(
+        Guid characteristicDefinitionId)
+    {
+        return new DomainError(
+            "catalog.import.apply.characteristic_definition_not_found",
+            $"Определение характеристики '{characteristicDefinitionId}' не найдено.");
+    }
+
+    public static DomainError InvalidCharacteristicValue(
+        int rowNumber,
+        Guid characteristicDefinitionId)
+    {
+        return new DomainError(
+            "catalog.import.apply.invalid_characteristic_value",
+            $"Значение характеристики '{characteristicDefinitionId}' " +
+            $"в строке Excel '{rowNumber}' некорректно.");
+    }
+
+    public static DomainError ApplyConcurrencyConflict()
+    {
+        return new DomainError(
+            "catalog.import.apply.concurrency_conflict",
+            "Во время применения каталог был изменён другим процессом. " +
+            "Обновите данные и повторите операцию.");
+    }
+
+    public static DomainError ApplyDatabaseFailure()
+    {
+        return new DomainError(
+            "catalog.import.apply.database_failure",
+            "Не удалось сохранить результат применения пакета импорта.");
+    }
+
+    public static DomainError UserCannotViewOwnCatalogImports()
+    {
+        return new DomainError(
+            "catalog.import.user.cannot_view_own",
+            "Пользователь не может просматривать собственные пакеты импорта.");
+    }
+
+    public static DomainError InvalidBatchListPagination()
+    {
+        return new DomainError(
+            "catalog.import.batches.invalid_pagination",
+            "Параметры пагинации списка импортов содержат некорректные значения.");
+    }
+
+    public static DomainError InvalidBatchStatusFilter(CatalogImportBatchStatus status)
+    {
+        return new DomainError(
+            "catalog.import.batches.invalid_status",
+            $"Статус пакета импорта '{status}' нельзя использовать для фильтрации.");
+    }
+
+    public static DomainError FileIntegrityCheckFailed()
+    {
+        return new DomainError(
+            "catalog.import.file.integrity_check_failed",
+            "Проверка целостности исходного Excel-файла завершилась ошибкой.");
+    }
+
+    public static DomainError UserCannotDeleteCatalogImport()
+    {
+        return new DomainError(
+            "catalog.import.user.cannot_delete",
+            "Пользователь не может удалять пакеты импорта.");
+    }
+
+    public static DomainError BatchCannotBeDeleted(CatalogImportBatchStatus status)
+    {
+        return new DomainError(
+            "catalog.import.batch.cannot_be_deleted",
+            $"Пакет импорта в статусе '{status}' нельзя удалить.");
+    }
+
 }

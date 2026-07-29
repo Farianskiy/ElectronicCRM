@@ -86,12 +86,16 @@ public sealed class
             value.RejectedByUserId,
             value.RejectedAtUtc,
             value.RejectionReason,
+            value.AppliedByUserId,
+            value.AppliedAtUtc,
             value.Version,
             value.CanEdit,
             value.CanSubmit,
             value.CanApply,
             value.CanRequestChanges,
-            value.CanReject);
+            value.CanReject,
+            value.CanDownloadFile,
+            value.CanDelete);
 
         return Ok(response);
     }

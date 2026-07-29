@@ -164,6 +164,21 @@ public sealed class
             && batch.Status == CatalogImportBatchStatus.UnderReview
             && batch.ReviewedByUserId == currentUser.Id;
 
+        var canDownloadFile =
+        (
+            isOwner
+            && currentUser.CanViewOwnCatalogImports()
+        )
+        || (
+            currentUser.CanReviewCatalogImports()
+            && batch.ReviewedByUserId == currentUser.Id
+        );
+
+        var canDelete =
+            isOwner
+            && currentUser.CanDeleteOwnCatalogImport()
+            && batch.CanBeDeletedByOwner;
+
         var result = new GetCatalogImportBatchResult(
             batch.Id,
             batch.CreatedByUserId,
@@ -185,12 +200,16 @@ public sealed class
             batch.RejectedByUserId,
             batch.RejectedAtUtc,
             batch.RejectionReason,
+            batch.AppliedByUserId,
+            batch.AppliedAtUtc,
             batch.Version,
             canEdit,
             canSubmit,
             canApply,
             canRequestChanges,
-            canReject);
+            canReject,
+            canDownloadFile,
+            canDelete);
 
         return Result.Success<
             GetCatalogImportBatchResult,

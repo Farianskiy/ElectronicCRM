@@ -226,6 +226,14 @@ public sealed class CatalogImportBatch : AggregateRoot
         or CatalogImportBatchStatus.Ready
         or CatalogImportBatchStatus.ChangesRequested;
 
+    public bool CanBeDeletedByOwner =>
+    Status is
+        CatalogImportBatchStatus.Uploaded
+        or CatalogImportBatchStatus.MappingRequired
+        or CatalogImportBatchStatus.NeedsCorrection
+        or CatalogImportBatchStatus.Ready
+        or CatalogImportBatchStatus.ChangesRequested;
+
     public bool IsTerminal =>
         Status is
             CatalogImportBatchStatus.Applied

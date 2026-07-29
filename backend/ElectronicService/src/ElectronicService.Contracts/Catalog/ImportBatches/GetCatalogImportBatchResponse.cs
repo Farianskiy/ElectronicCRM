@@ -21,9 +21,13 @@ public sealed record GetCatalogImportBatchResponse(
     Guid? RejectedByUserId,
     DateTime? RejectedAtUtc,
     string? RejectionReason,
+    Guid? AppliedByUserId,
+    DateTime? AppliedAtUtc,
     uint Version,
     bool CanEdit,
     bool CanSubmit,
     bool CanApply,
     bool CanRequestChanges,
-    bool CanReject);
+    bool CanReject,
+    bool CanDownloadFile,
+    bool CanDelete);

@@ -25,6 +25,8 @@ using ElectronicService.Core.Catalog.Products.GetAuditHistory;
 using ElectronicService.Core.Catalog.ImportBatches.Abstractions;
 using ElectronicService.Core.Catalog.ImportBatches.Analysis;
 using ElectronicService.Infrastructure.Postgres.Catalog.ImportBatches;
+using ElectronicService.Core.Catalog.ImportBatches.ApplyCatalogImportBatch;
+using ElectronicService.Infrastructure.Postgres.Catalog.ImportBatches.Cleanup;
 
 namespace ElectronicService.Infrastructure.Postgres;
 
@@ -53,6 +55,30 @@ public static class DependencyInjectionExtensions
             options.UseLoggerFactory(loggerFactory);
         });
 
+        services.AddOptions<CatalogImportCleanupOptions>()
+            .Bind(configuration.GetSection(
+                CatalogImportCleanupOptions.SectionName))
+            .Validate(
+                options =>
+                    options.RetentionDays is >= 1 and <= 3650,
+                "CatalogImportCleanup:RetentionDays must be between 1 and 3650.")
+            .Validate(
+                options =>
+                    options.InitialDelayMinutes is >= 0 and <= 1440,
+                "CatalogImportCleanup:InitialDelayMinutes must be between 0 and 1440.")
+            .Validate(
+                options =>
+                    options.IntervalHours is >= 1 and <= 720,
+                "CatalogImportCleanup:IntervalHours must be between 1 and 720.")
+            .Validate(
+                options =>
+                    options.BatchSize is >= 1 and <= 5000,
+                "CatalogImportCleanup:BatchSize must be between 1 and 5000.")
+            .ValidateOnStart();
+
+        services.AddScoped<CatalogImportCleanupService>();
+        services.AddHostedService<CatalogImportCleanupHostedService>();
+
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<CatalogDataSeeder>();
@@ -77,6 +103,7 @@ public static class DependencyInjectionExtensions
         services.AddScoped<IProductAuditHistoryReader, ProductAuditHistoryReader>();
         services.AddScoped<ICatalogImportBatchRepository, CatalogImportBatchRepository>();
         services.AddScoped<ICatalogImportWorkbookAnalyzer, CatalogImportWorkbookAnalyzer>();
+        services.AddScoped<ICatalogImportBatchApplier, CatalogImportBatchApplier>();
 
         return services;
     }

@@ -14,6 +14,7 @@ const regularNavigation = [
   { href: "/", label: "Главная" },
   { href: "/catalog/assistant", label: "Assistant" },
   { href: "/catalog/products", label: "Каталог товаров" },
+  { href: "/catalog/imports", label: "Импорт каталога" },
   { href: "/profile", label: "Профиль" },
 ];
 
@@ -84,7 +85,7 @@ export function AppShell({ children }: AppShellProps) {
             {session?.displayName ?? "Пользователь"}
           </p>
           <p className="mt-1 text-xs text-slate-400">
-            {technical ? "Technical" : "Regular"}
+            {session?.userType ?? "Unknown"}
           </p>
         </div>
       </aside>

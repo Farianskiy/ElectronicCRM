@@ -24,3 +24,23 @@ export function formatDate(value?: string | null): string {
 export function formatPercent(value: number): string {
   return `${Math.round(value * 100)}%`;
 }
+
+export function formatFileSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) {
+    return "—";
+  }
+
+  if (bytes < 1024) {
+    return `${bytes} Б`;
+  }
+
+  const kilobytes = bytes / 1024;
+
+  if (kilobytes < 1024) {
+    return `${kilobytes.toFixed(1)} КБ`;
+  }
+
+  const megabytes = kilobytes / 1024;
+
+  return `${megabytes.toFixed(2)} МБ`;
+}

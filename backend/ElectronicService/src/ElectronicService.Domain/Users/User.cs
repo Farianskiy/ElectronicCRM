@@ -110,6 +110,17 @@ public sealed class User : AggregateRoot
             );
     }
 
+    public bool CanViewOwnCatalogImports()
+    {
+        return IsActive;
+    }
+
+    public bool CanDeleteOwnCatalogImport()
+    {
+        return IsActive
+            && (IsRegular || IsManager || IsTechnical);
+    }
+
     public bool CanSubmitCatalogImportForReview()
     {
         return IsActive

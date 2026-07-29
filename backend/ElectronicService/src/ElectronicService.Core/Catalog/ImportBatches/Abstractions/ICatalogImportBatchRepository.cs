@@ -6,6 +6,8 @@ public interface ICatalogImportBatchRepository
 {
     void Add(CatalogImportBatch batch);
 
+    void Remove(CatalogImportBatch batch);
+
     Task<CatalogImportBatch?> GetByIdWithFileAsync(
         Guid batchId,
         CancellationToken cancellationToken = default);
@@ -59,5 +61,17 @@ public interface ICatalogImportBatchRepository
         CancellationToken cancellationToken = default);
 
     Task<bool> TrySaveChangesAsync(
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyCollection<CatalogImportBatch>> GetByCreatorAsync(
+        Guid createdByUserId,
+        CatalogImportBatchStatus? status,
+        int skip,
+        int take,
+        CancellationToken cancellationToken = default);
+
+    Task<int> CountByCreatorAsync(
+        Guid createdByUserId,
+        CatalogImportBatchStatus? status,
         CancellationToken cancellationToken = default);
 }

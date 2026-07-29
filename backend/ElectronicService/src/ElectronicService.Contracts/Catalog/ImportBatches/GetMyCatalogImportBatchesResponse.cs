@@ -1,35 +1,32 @@
-using ElectronicService.Domain.Catalog.ImportBatches;
+namespace ElectronicService.Contracts.Catalog.ImportBatches;
 
-namespace ElectronicService.Core.Catalog.ImportBatches.GetCatalogImportBatch;
+public sealed record GetMyCatalogImportBatchesResponse(
+    IReadOnlyCollection<MyCatalogImportBatchItemResponse> Items,
+    int Page,
+    int PageSize,
+    int TotalCount,
+    int TotalPages);
 
-public sealed record GetCatalogImportBatchResult(
+public sealed record MyCatalogImportBatchItemResponse(
     Guid BatchId,
-    Guid CreatedByUserId,
     Guid? ProductTypeId,
     string OriginalFileName,
     long FileSizeBytes,
-    CatalogImportBatchStatus Status,
+    string Status,
     int RowsCount,
     int ValidRowsCount,
     int ErrorRowsCount,
     DateTime CreatedAtUtc,
     DateTime? UpdatedAtUtc,
+    DateTime LastActivityAtUtc,
     DateTime? SubmittedAtUtc,
-    Guid? ReviewedByUserId,
-    DateTime? ReviewedAtUtc,
-    Guid? ChangesRequestedByUserId,
     DateTime? ChangesRequestedAtUtc,
     string? ChangesRequestComment,
-    Guid? RejectedByUserId,
     DateTime? RejectedAtUtc,
     string? RejectionReason,
-    Guid? AppliedByUserId,
     DateTime? AppliedAtUtc,
     uint Version,
     bool CanEdit,
     bool CanSubmit,
     bool CanApply,
-    bool CanRequestChanges,
-    bool CanReject,
-    bool CanDownloadFile,
     bool CanDelete);
