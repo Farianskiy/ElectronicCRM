@@ -14,6 +14,7 @@ import { CatalogImportRowStatusBadge } from "./CatalogImportRowStatusBadge";
 import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
 import { AppSelect } from "@/shared/ui/AppSelect";
 import { CatalogImportRowEditor } from "./CatalogImportRowEditor";
+import { catalogImportQueryKeys } from "../model/queryKeys";
 
 interface CatalogImportRowsPreviewProps {
   batchId: string;
@@ -74,14 +75,7 @@ export function CatalogImportRowsPreview({
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
 
   const rowsQuery = useQuery({
-    queryKey: [
-      "catalog-import-batches",
-      "rows",
-      batchId,
-      status,
-      page,
-      pageSize,
-    ],
+    queryKey: catalogImportQueryKeys.rows(batchId, status, page, pageSize),
     queryFn: () =>
       getCatalogImportRows({
         batchId,

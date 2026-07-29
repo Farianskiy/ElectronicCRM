@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
 import { formatDate } from "@/shared/lib/formatters";
 import { getCatalogImportBatchHistory } from "../api/getCatalogImportBatchHistory";
+import { catalogImportQueryKeys } from "../model/queryKeys";
 import type {
   CatalogImportBatchHistoryItem,
   CatalogImportHistoryEventType,
@@ -72,7 +73,7 @@ export function CatalogImportBatchHistory({
   batchId,
 }: CatalogImportBatchHistoryProps) {
   const historyQuery = useQuery({
-    queryKey: ["catalog-import-batches", "history", batchId],
+    queryKey: catalogImportQueryKeys.history(batchId),
     queryFn: () => getCatalogImportBatchHistory(batchId),
     enabled: batchId.length > 0,
   });

@@ -12,6 +12,7 @@ import type {
 import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
 import { AppSelect } from "@/shared/ui/AppSelect";
 import { updateCatalogImportRow } from "../api/updateCatalogImportRow";
+import { catalogImportQueryKeys } from "../model/queryKeys";
 import type {
   CatalogImportRow,
   UpdateCatalogImportRowRequest,
@@ -190,15 +191,15 @@ export function CatalogImportRowEditor({
     onSuccess: async (result) => {
       await Promise.all([
         queryClient.invalidateQueries({
-          queryKey: ["catalog-import-batches", "details", batchId],
+          queryKey: catalogImportQueryKeys.details(batchId),
         }),
 
         queryClient.invalidateQueries({
-          queryKey: ["catalog-import-batches", "rows", batchId],
+          queryKey: catalogImportQueryKeys.rowsRoot(batchId),
         }),
 
         queryClient.invalidateQueries({
-          queryKey: ["catalog-import-batches", "my"],
+          queryKey: catalogImportQueryKeys.myRoot,
         }),
       ]);
 

@@ -24,6 +24,7 @@ import {
   type UpdateCatalogImportMappingResponse,
 } from "../model/types";
 import { validateCatalogImportMapping } from "../model/mappingValidation";
+import { catalogImportQueryKeys } from "../model/queryKeys";
 
 interface CatalogImportMappingEditorProps {
   batchId: string;
@@ -40,12 +41,6 @@ const standardTargetKinds: readonly CatalogImportColumnTargetKind[] = [
   "Manufacturer",
   "Price",
   "StockQuantity",
-];
-
-const requiredStandardTargetKinds: readonly CatalogImportColumnTargetKind[] = [
-  "Name",
-  "Article",
-  "Manufacturer",
 ];
 
 function formatConfidence(confidence: number): string {
@@ -88,7 +83,7 @@ export function CatalogImportMappingEditor({
   batchId,
 }: CatalogImportMappingEditorProps) {
   const mappingQuery = useQuery({
-    queryKey: ["catalog-import-batches", "mapping", batchId],
+    queryKey: catalogImportQueryKeys.mapping(batchId),
     queryFn: () => getCatalogImportMapping(batchId),
     enabled: batchId.length > 0,
   });
@@ -238,15 +233,15 @@ function CatalogImportMappingForm({
 
       await Promise.all([
         queryClient.invalidateQueries({
-          queryKey: ["catalog-import-batches", "details", batchId],
+          queryKey: catalogImportQueryKeys.details(batchId),
         }),
 
         queryClient.invalidateQueries({
-          queryKey: ["catalog-import-batches", "rows", batchId],
+          queryKey: catalogImportQueryKeys.rowsRoot(batchId),
         }),
 
         queryClient.invalidateQueries({
-          queryKey: ["catalog-import-batches", "my"],
+          queryKey: catalogImportQueryKeys.myRoot,
         }),
       ]);
     },
@@ -255,18 +250,6 @@ function CatalogImportMappingForm({
       setSuccessMessage(null);
     },
   });
-
-  const unmappedCount = columns.filter(
-    (column) => column.targetKind === "Unmapped",
-  ).length;
-
-  const ignoredCount = columns.filter(
-    (column) => column.targetKind === "Ignore",
-  ).length;
-
-  const characteristicCount = columns.filter(
-    (column) => column.targetKind === "Characteristic",
-  ).length;
 
   function handleProductTypeChange(productTypeId: string): void {
     if (productTypeId === selectedProductTypeId) {

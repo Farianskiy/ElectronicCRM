@@ -6,6 +6,7 @@ import { useState } from "react";
 import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
 import { formatDate, formatPrice } from "@/shared/lib/formatters";
 import { getCatalogImportAppliedProducts } from "../api/getCatalogImportAppliedProducts";
+import { catalogImportQueryKeys } from "../model/queryKeys";
 
 interface CatalogImportAppliedProductsProps {
   batchId: string;
@@ -19,13 +20,7 @@ export function CatalogImportAppliedProducts({
   const [page, setPage] = useState(1);
 
   const productsQuery = useQuery({
-    queryKey: [
-      "catalog-import-batches",
-      "applied-products",
-      batchId,
-      page,
-      pageSize,
-    ],
+    queryKey: catalogImportQueryKeys.appliedProducts(batchId, page, pageSize),
     queryFn: () =>
       getCatalogImportAppliedProducts({
         batchId,

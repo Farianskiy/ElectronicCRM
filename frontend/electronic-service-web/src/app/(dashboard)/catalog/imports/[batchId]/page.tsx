@@ -18,6 +18,7 @@ import { CatalogImportReviewDecisionPanel } from "@/features/catalogImports/ui/C
 import { CatalogImportBatchHistory } from "@/features/catalogImports/ui/CatalogImportBatchHistory";
 import { CatalogImportAppliedProducts } from "@/features/catalogImports/ui/CatalogImportAppliedProducts";
 import { CatalogImportErrorReportButton } from "@/features/catalogImports/ui/CatalogImportErrorReportButton";
+import { catalogImportQueryKeys } from "@/features/catalogImports/model/queryKeys";
 
 function getBatchIdFromParams(params: ReturnType<typeof useParams>): string {
   const batchId = params.batchId;
@@ -70,7 +71,7 @@ export default function CatalogImportDetailsPage() {
   const batchId = getBatchIdFromParams(params);
 
   const batchQuery = useQuery({
-    queryKey: ["catalog-import-batches", "details", batchId],
+    queryKey: catalogImportQueryKeys.details(batchId),
     queryFn: () => getCatalogImportBatch(batchId),
     enabled: batchId.length > 0,
   });
@@ -97,7 +98,7 @@ export default function CatalogImportDetailsPage() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: ["catalog-import-batches", "my"],
+        queryKey: catalogImportQueryKeys.myRoot,
       });
 
       router.replace("/catalog/imports");
