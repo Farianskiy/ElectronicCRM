@@ -10,6 +10,8 @@ import { CatalogImportStatusBadge } from "@/features/catalogImports/ui/CatalogIm
 import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
 import { formatDate, formatFileSize } from "@/shared/lib/formatters";
 import { PageHeader } from "@/shared/ui/PageHeader";
+import { CatalogImportRowsPreview } from "@/features/catalogImports/ui/CatalogImportRowsPreview";
+import { CatalogImportMappingEditor } from "@/features/catalogImports/ui/CatalogImportMappingEditor";
 
 function getBatchIdFromParams(params: ReturnType<typeof useParams>): string {
   const batchId = params.batchId;
@@ -255,6 +257,14 @@ export default function CatalogImportDetailsPage() {
               <InfoCard label="Версия" value={batch.version.toString()} />
             </div>
           </section>
+
+          {batch.canEdit && (
+            <CatalogImportMappingEditor batchId={batch.batchId} />
+          )}
+
+          {batch.rowsCount > 0 && (
+            <CatalogImportRowsPreview batchId={batch.batchId} />
+          )}
 
           <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
             <h2 className="text-xl font-semibold text-white">Хронология</h2>

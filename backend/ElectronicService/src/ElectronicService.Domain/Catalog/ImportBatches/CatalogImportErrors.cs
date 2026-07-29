@@ -451,4 +451,25 @@ public static class CatalogImportErrors
             $"Пакет импорта в статусе '{status}' нельзя удалить.");
     }
 
+    public static DomainError MappingColumnsAreRequired()
+    {
+        return new DomainError(
+            "catalog.import.mapping.columns_required",
+            "Для сохранения сопоставления необходимо передать все колонки Excel.");
+    }
+
+    public static DomainError MappingColumnSetMismatch()
+    {
+        return new DomainError(
+            "catalog.import.mapping.column_set_mismatch",
+            "Набор переданных колонок не соответствует колонкам текущего анализа.");
+    }
+
+    public static DomainError BatchMappingCannotBeEdited(CatalogImportBatchStatus status)
+    {
+        return new DomainError(
+            "catalog.import.mapping.cannot_be_edited",
+            $"Сопоставление колонок пакета в статусе '{status}' нельзя изменять.");
+    }
+
 }

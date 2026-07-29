@@ -151,10 +151,19 @@ export default function CatalogImportsPage() {
 
   return (
     <div className="grid gap-6">
-      <PageHeader
-        title="Импорт каталога"
-        description="История загруженных Excel-файлов и состояние обработки каждого пакета."
-      />
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+        <PageHeader
+          title="Импорт каталога"
+          description="История загруженных Excel-файлов и состояние обработки каждого пакета."
+        />
+
+        <Link
+          href="/catalog/imports/new"
+          className="inline-flex shrink-0 items-center justify-center rounded-2xl bg-teal-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-teal-400"
+        >
+          Загрузить Excel
+        </Link>
+      </div>
 
       <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
         <div className="grid gap-4 md:grid-cols-[minmax(0,320px)_1fr] md:items-end">
