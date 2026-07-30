@@ -2,7 +2,7 @@
 
 import { useMutation } from "@tanstack/react-query";
 import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
-import { downloadCatalogImportErrorReport } from "../api/downloadCatalogImportErrorReport";
+import { downloadCatalogImportErrorReport } from "../../api/downloadCatalogImportErrorReport";
 
 interface CatalogImportErrorReportButtonProps {
   batchId: string;

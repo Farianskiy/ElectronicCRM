@@ -12,13 +12,15 @@ import {
   type CatalogImportReviewQueueItem,
   type CatalogImportReviewQueueStatus,
 } from "@/features/catalogImports/model/types";
-import { CatalogImportStatusBadge } from "@/features/catalogImports/ui/CatalogImportStatusBadge";
+import {
+  catalogImportQueryKeys,
+  CatalogImportStatusBadge,
+} from "@/features/catalogImports";
 import { useAuthSession } from "@/features/auth/model/useAuthSession";
 import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
 import { formatDate } from "@/shared/lib/formatters";
 import { AppSelect } from "@/shared/ui/AppSelect";
 import { PageHeader } from "@/shared/ui/PageHeader";
-import { catalogImportQueryKeys } from "@/features/catalogImports/model/queryKeys";
 
 const pageSize = 25;
 

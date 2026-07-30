@@ -2,19 +2,19 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { Fragment, useState } from "react";
-import { getCatalogImportRows } from "../api/getCatalogImportRows";
+import { getCatalogImportRows } from "../../api/getCatalogImportRows";
 import {
   catalogImportRowFilterStatuses,
   type CatalogImportRow,
   type CatalogImportRowFilterStatus,
   type CatalogImportRowIssue,
-} from "../model/types";
-import { getCatalogImportRowFilterStatusLabel } from "../model/catalogImportRowStatus";
-import { CatalogImportRowStatusBadge } from "./CatalogImportRowStatusBadge";
+} from "../../model/types";
+import { getCatalogImportRowFilterStatusLabel } from "../../model/catalogImportRowStatus";
+import { CatalogImportRowStatusBadge } from ".././CatalogImportRowStatusBadge";
 import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
 import { AppSelect } from "@/shared/ui/AppSelect";
 import { CatalogImportRowEditor } from "./CatalogImportRowEditor";
-import { catalogImportQueryKeys } from "../model/queryKeys";
+import { catalogImportQueryKeys } from "../../model/queryKeys";
 
 interface CatalogImportRowsPreviewProps {
   batchId: string;

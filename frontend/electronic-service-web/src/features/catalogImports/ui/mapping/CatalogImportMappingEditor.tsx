@@ -10,11 +10,11 @@ import type {
 } from "@/features/catalogMetadata/model/types";
 import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
 import { AppSelect } from "@/shared/ui/AppSelect";
-import { analyzeCatalogImportBatch } from "../api/analyzeCatalogImportBatch";
-import { getCatalogImportMapping } from "../api/getCatalogImportMapping";
-import { updateCatalogImportMapping } from "../api/updateCatalogImportMapping";
-import { getCatalogImportColumnTargetLabel } from "../model/catalogImportColumnTarget";
-import { getCatalogImportStatusLabel } from "../model/catalogImportStatus";
+import { analyzeCatalogImportBatch } from "../../api/analyzeCatalogImportBatch";
+import { getCatalogImportMapping } from "../../api/getCatalogImportMapping";
+import { updateCatalogImportMapping } from "../../api/updateCatalogImportMapping";
+import { getCatalogImportColumnTargetLabel } from "../../model/catalogImportColumnTarget";
+import { getCatalogImportStatusLabel } from "../../model/catalogImportStatus";
 import {
   catalogImportColumnTargetKinds,
   type AnalyzeCatalogImportBatchResponse,
@@ -22,9 +22,9 @@ import {
   type CatalogImportMappingColumn,
   type GetCatalogImportMappingResponse,
   type UpdateCatalogImportMappingResponse,
-} from "../model/types";
-import { validateCatalogImportMapping } from "../model/mappingValidation";
-import { catalogImportQueryKeys } from "../model/queryKeys";
+} from "../../model/types";
+import { validateCatalogImportMapping } from "../../model/mappingValidation";
+import { catalogImportQueryKeys } from "../../model/queryKeys";
 
 interface CatalogImportMappingEditorProps {
   batchId: string;

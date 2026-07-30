@@ -3,12 +3,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
 import { formatDate } from "@/shared/lib/formatters";
-import { getCatalogImportBatchHistory } from "../api/getCatalogImportBatchHistory";
-import { catalogImportQueryKeys } from "../model/queryKeys";
+import { getCatalogImportBatchHistory } from "../../api/getCatalogImportBatchHistory";
+import { catalogImportQueryKeys } from "../../model/queryKeys";
 import type {
   CatalogImportBatchHistoryItem,
   CatalogImportHistoryEventType,
-} from "../model/types";
+} from "../../model/types";
 
 interface CatalogImportBatchHistoryProps {
   batchId: string;
