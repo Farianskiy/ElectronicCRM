@@ -1,10 +1,10 @@
 using ElectronicService.Contracts.Catalog.ImportBatches;
 using ElectronicService.Core.Catalog.ImportBatches.GetMyCatalogImportBatches;
 using ElectronicService.Domain.Catalog.ImportBatches;
-using ElectronicService.Domain.Common;
 using ElectronicService.Web.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ElectronicService.Web.Controllers.Catalog.ImportBatches.Common;
 
 namespace ElectronicService.Web.Controllers.Catalog.ImportBatches.GetMyCatalogImportBatches;
 
@@ -13,6 +13,7 @@ namespace ElectronicService.Web.Controllers.Catalog.ImportBatches.GetMyCatalogIm
 [Route("api/catalog/import-batches")]
 public sealed class GetMyCatalogImportBatchesController : ControllerBase
 {
+    private const string ProblemTitle = "Не удалось выполнить операцию.";
     [HttpGet("my")]
     [ProducesResponseType(typeof(GetMyCatalogImportBatchesResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -27,10 +28,7 @@ public sealed class GetMyCatalogImportBatchesController : ControllerBase
     {
         if (!User.TryGetUserId(out var currentUserId))
         {
-            return Problem(
-                statusCode: StatusCodes.Status401Unauthorized,
-                title: "Пользователь не определён.",
-                detail: "В JWT отсутствует корректный идентификатор пользователя.");
+            return this.ToCurrentUserProblem();
         }
 
         var query = new GetMyCatalogImportBatchesQuery(
@@ -45,7 +43,7 @@ public sealed class GetMyCatalogImportBatchesController : ControllerBase
 
         if (result.IsFailure)
         {
-            return ToProblem(result.Error);
+            return this.ToCatalogImportProblem(result.Error, ProblemTitle);
         }
 
         var items = result.Value.Items
@@ -82,35 +80,5 @@ public sealed class GetMyCatalogImportBatchesController : ControllerBase
             result.Value.TotalPages);
 
         return Ok(response);
-    }
-
-    private ObjectResult ToProblem(DomainError error)
-    {
-        var statusCode = error.Code switch
-        {
-            "catalog.import.current_user.not_found"
-                => StatusCodes.Status401Unauthorized,
-
-            "catalog.import.user.cannot_view_own"
-                => StatusCodes.Status403Forbidden,
-
-            "catalog.import.batches.invalid_pagination"
-                => StatusCodes.Status400BadRequest,
-
-            "catalog.import.batches.invalid_status"
-                => StatusCodes.Status400BadRequest,
-
-            _ => StatusCodes.Status400BadRequest
-        };
-
-        return StatusCode(
-            statusCode,
-            new ProblemDetails
-            {
-                Status = statusCode,
-                Title = "Не удалось получить список импортов.",
-                Detail = error.Message,
-                Type = error.Code
-            });
     }
 }

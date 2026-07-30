@@ -1,7 +1,7 @@
 using ElectronicService.Contracts.Catalog.ImportBatches;
 using ElectronicService.Core.Catalog.ImportBatches.RejectCatalogImportBatch;
-using ElectronicService.Domain.Common;
 using ElectronicService.Web.Auth;
+using ElectronicService.Web.Controllers.Catalog.ImportBatches.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,6 +12,7 @@ namespace ElectronicService.Web.Controllers.Catalog.ImportBatches.RejectCatalogI
 [Route("api/catalog/import-batches")]
 public sealed class RejectCatalogImportBatchController : ControllerBase
 {
+    private const string ProblemTitle = "Не удалось выполнить операцию.";
     [HttpPost("{batchId:guid}/review/reject")]
     [ProducesResponseType(typeof(RejectCatalogImportBatchResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -27,10 +28,7 @@ public sealed class RejectCatalogImportBatchController : ControllerBase
     {
         if (!User.TryGetUserId(out var currentUserId))
         {
-            return Problem(
-                statusCode: StatusCodes.Status401Unauthorized,
-                title: "Пользователь не определён.",
-                detail: "В JWT отсутствует корректный идентификатор пользователя.");
+            return this.ToCurrentUserProblem();
         }
 
         var command = new RejectCatalogImportBatchCommand(
@@ -44,7 +42,7 @@ public sealed class RejectCatalogImportBatchController : ControllerBase
 
         if (result.IsFailure)
         {
-            return ToProblem(result.Error);
+            return this.ToCatalogImportProblem(result.Error, ProblemTitle);
         }
 
         var response = new RejectCatalogImportBatchResponse(
@@ -56,47 +54,5 @@ public sealed class RejectCatalogImportBatchController : ControllerBase
             result.Value.Version);
 
         return Ok(response);
-    }
-
-    private ObjectResult ToProblem(DomainError error)
-    {
-        var statusCode = error.Code switch
-        {
-            "catalog.import.current_user.not_found"
-                => StatusCodes.Status401Unauthorized,
-
-            "catalog.import.user.cannot_review"
-                => StatusCodes.Status403Forbidden,
-
-            "catalog.import.batch.not_found"
-                => StatusCodes.Status404NotFound,
-
-            "catalog.import.batch.invalid_status_transition"
-                => StatusCodes.Status409Conflict,
-
-            "catalog.import.batch.review_assigned_to_another_user"
-                => StatusCodes.Status409Conflict,
-
-            "catalog.import.batch.concurrency_conflict"
-                => StatusCodes.Status409Conflict,
-
-            "catalog.import.batch.rejection_reason_required"
-                => StatusCodes.Status400BadRequest,
-
-            "catalog.import.batch.rejection_reason_too_long"
-                => StatusCodes.Status400BadRequest,
-
-            _ => StatusCodes.Status400BadRequest
-        };
-
-        return StatusCode(
-            statusCode,
-            new ProblemDetails
-            {
-                Status = statusCode,
-                Title = "Не удалось отклонить пакет импорта.",
-                Detail = error.Message,
-                Type = error.Code
-            });
     }
 }

@@ -1,7 +1,7 @@
 using ElectronicService.Contracts.Catalog.ImportBatches;
 using ElectronicService.Core.Catalog.ImportBatches.GetCatalogImportReviewQueue;
 using ElectronicService.Domain.Catalog.ImportBatches;
-using ElectronicService.Domain.Common;
+using ElectronicService.Web.Controllers.Catalog.ImportBatches.Common;
 using ElectronicService.Web.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -13,6 +13,7 @@ namespace ElectronicService.Web.Controllers.Catalog.ImportBatches.GetCatalogImpo
 [Route("api/catalog/import-batches")]
 public sealed class GetCatalogImportReviewQueueController : ControllerBase
 {
+    private const string ProblemTitle = "Не удалось выполнить операцию.";
     [HttpGet("review-queue")]
     [ProducesResponseType(typeof(GetCatalogImportReviewQueueResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -27,10 +28,7 @@ public sealed class GetCatalogImportReviewQueueController : ControllerBase
     {
         if (!User.TryGetUserId(out var currentUserId))
         {
-            return Problem(
-                statusCode: StatusCodes.Status401Unauthorized,
-                title: "Пользователь не определён.",
-                detail: "В JWT отсутствует корректный идентификатор пользователя.");
+            return this.ToCurrentUserProblem();
         }
 
         var query = new GetCatalogImportReviewQueueQuery(
@@ -45,7 +43,7 @@ public sealed class GetCatalogImportReviewQueueController : ControllerBase
 
         if (result.IsFailure)
         {
-            return ToProblem(result.Error);
+            return this.ToCatalogImportProblem(result.Error, ProblemTitle);
         }
 
         var items = result.Value.Items
@@ -77,35 +75,5 @@ public sealed class GetCatalogImportReviewQueueController : ControllerBase
             result.Value.TotalPages);
 
         return Ok(response);
-    }
-
-    private ObjectResult ToProblem(DomainError error)
-    {
-        var statusCode = error.Code switch
-        {
-            "catalog.import.current_user.not_found"
-                => StatusCodes.Status401Unauthorized,
-
-            "catalog.import.user.cannot_review"
-                => StatusCodes.Status403Forbidden,
-
-            "catalog.import.rows.invalid_pagination"
-                => StatusCodes.Status400BadRequest,
-
-            "catalog.import.review_queue.invalid_status"
-                => StatusCodes.Status400BadRequest,
-
-            _ => StatusCodes.Status400BadRequest
-        };
-
-        return StatusCode(
-            statusCode,
-            new ProblemDetails
-            {
-                Status = statusCode,
-                Title = "Не удалось получить очередь проверки импортов.",
-                Detail = error.Message,
-                Type = error.Code
-            });
     }
 }

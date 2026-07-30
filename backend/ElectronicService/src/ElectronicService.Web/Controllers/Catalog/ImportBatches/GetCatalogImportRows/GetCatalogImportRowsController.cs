@@ -1,16 +1,12 @@
-using ElectronicService.Contracts.Catalog
-    .ImportBatches;
-using ElectronicService.Core.Catalog
-    .ImportBatches.GetCatalogImportRows;
-using ElectronicService.Domain.Catalog
-    .ImportBatches;
-using ElectronicService.Domain.Common;
+using ElectronicService.Contracts.Catalog.ImportBatches;
+using ElectronicService.Core.Catalog.ImportBatches.GetCatalogImportRows;
+using ElectronicService.Domain.Catalog.ImportBatches;
 using ElectronicService.Web.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ElectronicService.Web.Controllers.Catalog.ImportBatches.Common;
 
-namespace ElectronicService.Web.Controllers.Catalog
-    .ImportBatches.GetCatalogImportRows;
+namespace ElectronicService.Web.Controllers.Catalog.ImportBatches.GetCatalogImportRows;
 
 [ApiController]
 [Authorize(Roles =
@@ -20,6 +16,7 @@ public sealed class
     GetCatalogImportRowsController
     : ControllerBase
 {
+    private const string ProblemTitle = "Не удалось выполнить операцию.";
     [HttpGet("{batchId:guid}/rows")]
     [ProducesResponseType(
     typeof(GetCatalogImportRowsResponse),
@@ -38,10 +35,7 @@ public sealed class
     {
         if (!User.TryGetUserId(out var currentUserId))
         {
-            return Problem(
-                statusCode: StatusCodes.Status401Unauthorized,
-                title: "Пользователь не определён.",
-                detail: "В JWT отсутствует корректный идентификатор пользователя.");
+            return this.ToCurrentUserProblem();
         }
 
         var query = new GetCatalogImportRowsQuery(
@@ -57,7 +51,7 @@ public sealed class
 
         if (result.IsFailure)
         {
-            return ToProblem(result.Error);
+            return this.ToCatalogImportProblem(result.Error, ProblemTitle);
         }
 
         var items = result.Value.Items
@@ -101,42 +95,5 @@ public sealed class
             result.Value.TotalPages);
 
         return Ok(response);
-    }
-
-    private ObjectResult ToProblem(
-        DomainError error)
-    {
-        var statusCode =
-            error.Code switch
-            {
-                "catalog.import.batch.not_found"
-                    => StatusCodes.Status404NotFound,
-
-                "catalog.import.batch.access_denied"
-                    => StatusCodes.Status403Forbidden,
-
-                "catalog.import.current_user.not_found"
-                    => StatusCodes.Status401Unauthorized,
-
-                "catalog.import.rows.invalid_pagination"
-                    => StatusCodes.Status400BadRequest,
-
-                "catalog.import.row.invalid_json"
-                    => StatusCodes.Status500InternalServerError,
-
-                _ => StatusCodes.Status400BadRequest
-            };
-
-        return StatusCode(
-            statusCode,
-            new ProblemDetails
-            {
-                Status = statusCode,
-                Title =
-                    "Не удалось получить строки " +
-                    "пакета импорта.",
-                Detail = error.Message,
-                Type = error.Code
-            });
     }
 }
