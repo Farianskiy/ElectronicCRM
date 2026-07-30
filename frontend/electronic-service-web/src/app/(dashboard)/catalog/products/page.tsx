@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import Link from "next/link";
-import type { FormEvent, ReactNode } from "react";
+import type { FormEvent } from "react";
 import { useState } from "react";
 import { searchCatalogProducts } from "@/features/catalogProducts/api/searchCatalogProducts";
 import { formatPrice } from "@/shared/lib/formatters";
@@ -109,33 +109,6 @@ const initialAppliedFilters: AppliedCatalogFilters = {
   characteristics: [],
   onlyInStock: null,
 };
-
-interface SelectContainerProps {
-  children: ReactNode;
-}
-
-function SelectContainer({ children }: SelectContainerProps) {
-  return (
-    <div className="relative">
-      {children}
-
-      <svg
-        aria-hidden="true"
-        viewBox="0 0 20 20"
-        fill="none"
-        className="pointer-events-none absolute right-4 top-1/2 size-4 -translate-y-1/2 text-slate-400"
-      >
-        <path
-          d="m6 8 4 4 4-4"
-          stroke="currentColor"
-          strokeWidth="1.75"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    </div>
-  );
-}
 
 interface CharacteristicFilterFieldProps {
   characteristic: CatalogProductTypeCharacteristicMetadata;
