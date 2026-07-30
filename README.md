@@ -274,7 +274,7 @@ docker compose down --volumes
 
 ```powershell
 cd backend
-docker compose up -d
+docker compose --env-file ..\.env up -d
 ```
 
 Этот Compose поднимает PostgreSQL на порту `5434`.

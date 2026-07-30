@@ -1,5 +1,10 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Web"><PropertyGroup>  <UserSecretsId>46aa58f3-0eb4-4249-a521-2048809d9630</UserSecretsId>
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <UserSecretsId>46aa58f3-0eb4-4249-a521-2048809d9630</UserSecretsId>
   </PropertyGroup>
+
+  <ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\ElectronicService.Contracts\ElectronicService.Contracts.csproj" />
