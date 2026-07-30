@@ -2,7 +2,7 @@ name: electroniccrm
 
 services:
   postgres:
-    image: ${POSTGRES_IMAGE:-postgres:18-alpine}
+    image: ${POSTGRES_IMAGE:-postgres:18}
     container_name: electroniccrm-postgres
     restart: unless-stopped
     shm_size: 128mb
