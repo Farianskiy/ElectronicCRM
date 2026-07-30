@@ -1,5 +1,5 @@
 import type { CatalogImportBatchDetails } from "../../model/types";
-import { CatalogImportErrorReportButton } from "../CatalogImportErrorReportButton";
+import { CatalogImportErrorReportButton } from "../results";
 
 interface CatalogImportProcessingSummaryProps {
   batch: CatalogImportBatchDetails;

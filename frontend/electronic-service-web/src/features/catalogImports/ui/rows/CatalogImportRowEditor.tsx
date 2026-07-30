@@ -11,13 +11,13 @@ import type {
 } from "@/features/catalogMetadata/model/types";
 import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
 import { AppSelect } from "@/shared/ui/AppSelect";
-import { updateCatalogImportRow } from "../api/updateCatalogImportRow";
-import { catalogImportQueryKeys } from "../model/queryKeys";
+import { updateCatalogImportRow } from "../../api/updateCatalogImportRow";
+import { catalogImportQueryKeys } from "../../model/queryKeys";
 import type {
   CatalogImportRow,
   UpdateCatalogImportRowRequest,
   UpdateCatalogImportRowResponse,
-} from "../model/types";
+} from "../../model/types";
 
 interface CatalogImportRowEditorProps {
   batchId: string;

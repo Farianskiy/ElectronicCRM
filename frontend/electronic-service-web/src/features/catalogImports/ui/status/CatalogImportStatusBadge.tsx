@@ -1,5 +1,5 @@
-import { getCatalogImportStatusLabel } from "../model/catalogImportStatus";
-import type { CatalogImportBatchStatus } from "../model/types";
+import { getCatalogImportStatusLabel } from "../../model/catalogImportStatus";
+import type { CatalogImportBatchStatus } from "../../model/types";
 
 interface CatalogImportStatusBadgeProps {
   status: CatalogImportBatchStatus;

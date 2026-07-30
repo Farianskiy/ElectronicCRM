@@ -1,9 +1,9 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { submitCatalogImportBatch } from "../api/submitCatalogImportBatch";
+import { submitCatalogImportBatch } from "../../api/submitCatalogImportBatch";
 import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
-import { catalogImportQueryKeys } from "../model/queryKeys";
+import { catalogImportQueryKeys } from "../../model/queryKeys";
 
 interface CatalogImportSubmitPanelProps {
   batchId: string;

@@ -6,7 +6,7 @@ import { deleteCatalogImportBatch } from "../../api/deleteCatalogImportBatch";
 import { downloadCatalogImportFile } from "../../api/downloadCatalogImportFile";
 import { catalogImportQueryKeys } from "../../model/queryKeys";
 import type { CatalogImportBatchDetails } from "../../model/types";
-import { CatalogImportStatusBadge } from "../CatalogImportStatusBadge";
+import { CatalogImportStatusBadge } from "../status";
 import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
 import { formatFileSize } from "@/shared/lib/formatters";
 

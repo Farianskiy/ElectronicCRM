@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useSearchParams } from "next/navigation";
-import { CatalogImportDetailsScreen } from "@/features/catalogImports/ui/details";
+import { CatalogImportDetailsScreen } from "@/features/catalogImports";
 
 export default function CatalogImportDetailsPage() {
   const params = useParams<{ batchId: string }>();

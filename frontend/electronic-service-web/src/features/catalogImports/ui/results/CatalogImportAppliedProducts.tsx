@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
 import { formatDate, formatPrice } from "@/shared/lib/formatters";
-import { getCatalogImportAppliedProducts } from "../api/getCatalogImportAppliedProducts";
-import { catalogImportQueryKeys } from "../model/queryKeys";
+import { getCatalogImportAppliedProducts } from "../../api/getCatalogImportAppliedProducts";
+import { catalogImportQueryKeys } from "../../model/queryKeys";
 
 interface CatalogImportAppliedProductsProps {
   batchId: string;

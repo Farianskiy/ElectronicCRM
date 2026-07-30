@@ -4,9 +4,9 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthSession } from "@/features/auth/model/useAuthSession";
 import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
 import { formatDate } from "@/shared/lib/formatters";
-import { startCatalogImportReview } from "../api/startCatalogImportReview";
-import type { CatalogImportBatchStatus } from "../model/types";
-import { catalogImportQueryKeys } from "../model/queryKeys";
+import { startCatalogImportReview } from "../../api/startCatalogImportReview";
+import type { CatalogImportBatchStatus } from "../../model/types";
+import { catalogImportQueryKeys } from "../../model/queryKeys";
 
 interface CatalogImportReviewPanelProps {
   batchId: string;

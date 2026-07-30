@@ -1,11 +1,13 @@
 import type { CatalogImportBatchDetails } from "../../model/types";
-import { CatalogImportAppliedProducts } from "../CatalogImportAppliedProducts";
-import { CatalogImportBatchHistory } from "../CatalogImportBatchHistory";
-import { CatalogImportMappingEditor } from "../CatalogImportMappingEditor";
-import { CatalogImportReviewDecisionPanel } from "../CatalogImportReviewDecisionPanel";
-import { CatalogImportReviewPanel } from "../CatalogImportReviewPanel";
-import { CatalogImportRowsPreview } from "../CatalogImportRowsPreview";
-import { CatalogImportSubmitPanel } from "../CatalogImportSubmitPanel";
+import { CatalogImportBatchHistory } from "../history";
+import { CatalogImportMappingEditor } from "../mapping";
+import { CatalogImportAppliedProducts } from "../results";
+import {
+  CatalogImportReviewDecisionPanel,
+  CatalogImportReviewPanel,
+  CatalogImportSubmitPanel,
+} from "../review";
+import { CatalogImportRowsPreview } from "../rows";
 import { CatalogImportBatchOverview } from "./CatalogImportBatchOverview";
 import { CatalogImportDecisionNotices } from "./CatalogImportDecisionNotices";
 import { CatalogImportProcessingSummary } from "./CatalogImportProcessingSummary";

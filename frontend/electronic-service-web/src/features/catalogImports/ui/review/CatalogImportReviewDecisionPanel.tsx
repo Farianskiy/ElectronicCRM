@@ -4,10 +4,10 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
-import { applyCatalogImportBatch } from "../api/applyCatalogImportBatch";
-import { rejectCatalogImportBatch } from "../api/rejectCatalogImportBatch";
-import { requestCatalogImportChanges } from "../api/requestCatalogImportChanges";
-import { catalogImportQueryKeys } from "../model/queryKeys";
+import { applyCatalogImportBatch } from "../../api/applyCatalogImportBatch";
+import { rejectCatalogImportBatch } from "../../api/rejectCatalogImportBatch";
+import { requestCatalogImportChanges } from "../../api/requestCatalogImportChanges";
+import { catalogImportQueryKeys } from "../../model/queryKeys";
 
 interface CatalogImportReviewDecisionPanelProps {
   batchId: string;

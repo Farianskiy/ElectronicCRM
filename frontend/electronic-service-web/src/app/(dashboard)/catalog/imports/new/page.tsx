@@ -16,7 +16,7 @@ import type { AnalyzeCatalogImportBatchResponse } from "@/features/catalogImport
 import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
 import { formatFileSize } from "@/shared/lib/formatters";
 import { PageHeader } from "@/shared/ui/PageHeader";
-import { catalogImportQueryKeys } from "@/features/catalogImports/model/queryKeys";
+import { catalogImportQueryKeys } from "@/features/catalogImports";
 
 const maximumFileSizeBytes = 10 * 1024 * 1024;
 
