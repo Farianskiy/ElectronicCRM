@@ -7,6 +7,8 @@ using ElectronicService.Infrastructure.Postgres.Data;
 using ElectronicService.Web.Auth;
 using ElectronicService.Web.Users;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 
@@ -30,6 +32,22 @@ var jwtOptions = builder.Configuration
     .GetSection("Jwt")
     .Get<JwtOptions>()
     ?? throw new InvalidOperationException("JWT options are not configured.");
+
+if (string.IsNullOrWhiteSpace(jwtOptions.Issuer))
+{
+    throw new InvalidOperationException("JWT issuer is not configured.");
+}
+
+if (string.IsNullOrWhiteSpace(jwtOptions.Audience))
+{
+    throw new InvalidOperationException("JWT audience is not configured.");
+}
+
+if (string.IsNullOrWhiteSpace(jwtOptions.SecretKey) || jwtOptions.SecretKey.Length < 32)
+{
+    throw new InvalidOperationException(
+        "JWT secret key must contain at least 32 characters.");
+}
 
 builder.Services.AddScoped<IJwtTokenProvider, JwtTokenProvider>();
 
@@ -58,34 +76,59 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
+var frontendOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>()
+    ?? [];
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("Frontend", policy =>
     {
+        if (frontendOrigins.Length == 0)
+        {
+            return;
+        }
+
         policy
-            .WithOrigins(
-                "http://localhost:3000",
-                "http://192.168.100.14:3000")
+            .WithOrigins(frontendOrigins)
             .AllowAnyHeader()
             .AllowAnyMethod();
     });
 });
 
-builder.Services.AddHealthChecks()
-    .AddDbContextCheck<ElectronicDbContext>();
+builder.Services
+    .AddHealthChecks()
+    .AddDbContextCheck<ElectronicDbContext>(
+        name: "postgres",
+        tags: ["ready"]);
 
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
 {
+    var dbContext = scope.ServiceProvider.GetRequiredService<ElectronicDbContext>();
     var seeder = scope.ServiceProvider.GetRequiredService<CatalogDataSeeder>();
 
+    await dbContext.Database.MigrateAsync();
     await seeder.SeedAsync();
 }
 
 app.MapGet("/", () => "ElectronicService is running!");
 
-app.MapHealthChecks("/health");
+app.MapHealthChecks(
+    "/health/live",
+    new HealthCheckOptions
+    {
+        Predicate = _ => false
+    });
+
+app.MapHealthChecks(
+    "/health/ready",
+    new HealthCheckOptions
+    {
+        Predicate = registration => registration.Tags.Contains("ready")
+    });
 
 app.UseCors("Frontend");
 

@@ -171,7 +171,10 @@ function CatalogImportMappingForm({
     staleTime: 5 * 60 * 1000,
   });
 
-  const characteristics = characteristicsQuery.data ?? [];
+  const characteristics = useMemo(
+    () => characteristicsQuery.data ?? [],
+    [characteristicsQuery.data],
+  );
 
   const mappingValidation = useMemo(
     () =>
