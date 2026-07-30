@@ -1,10 +1,10 @@
 using ElectronicService.Contracts.Catalog.ImportBatches;
 using ElectronicService.Core.Catalog.ImportBatches.UpdateCatalogImportMapping;
 using ElectronicService.Domain.Catalog.ImportBatches;
-using ElectronicService.Domain.Common;
 using ElectronicService.Web.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ElectronicService.Web.Controllers.Catalog.ImportBatches.Common;
 
 namespace ElectronicService.Web.Controllers.Catalog.ImportBatches.UpdateCatalogImportMapping;
 
@@ -13,6 +13,7 @@ namespace ElectronicService.Web.Controllers.Catalog.ImportBatches.UpdateCatalogI
 [Route("api/catalog/import-batches")]
 public sealed class UpdateCatalogImportMappingController : ControllerBase
 {
+    private const string ProblemTitle = "Не удалось сохранить сопоставление колонок.";
     [HttpPut("{batchId:guid}/mapping")]
     [ProducesResponseType(typeof(UpdateCatalogImportMappingResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -28,10 +29,7 @@ public sealed class UpdateCatalogImportMappingController : ControllerBase
     {
         if (!User.TryGetUserId(out var currentUserId))
         {
-            return Problem(
-                statusCode: StatusCodes.Status401Unauthorized,
-                title: "Пользователь не определён.",
-                detail: "В JWT отсутствует корректный идентификатор пользователя.");
+            return this.ToCurrentUserProblem();
         }
 
         var mappings = new List<UpdateCatalogImportColumnMapping>();
@@ -49,9 +47,9 @@ public sealed class UpdateCatalogImportMappingController : ControllerBase
                     || !Enum.IsDefined<CatalogImportColumnTargetKind>(targetKind)
                     || targetKind == CatalogImportColumnTargetKind.None)
                 {
-                    return ToProblem(
-                        CatalogImportErrors.InvalidColumnTarget(
-                            targetKindText));
+                    return this.ToCatalogImportProblem(
+                        CatalogImportErrors.InvalidColumnTarget(targetKindText),
+                        ProblemTitle);
                 }
 
                 mappings.Add(
@@ -74,7 +72,7 @@ public sealed class UpdateCatalogImportMappingController : ControllerBase
 
         if (result.IsFailure)
         {
-            return ToProblem(result.Error);
+            return this.ToCatalogImportProblem(result.Error, ProblemTitle);
         }
 
         var response = new UpdateCatalogImportMappingResponse(
@@ -87,47 +85,5 @@ public sealed class UpdateCatalogImportMappingController : ControllerBase
             result.Value.Version);
 
         return Ok(response);
-    }
-
-    private ObjectResult ToProblem(DomainError error)
-    {
-        var statusCode = error.Code switch
-        {
-            "catalog.import.current_user.not_found"
-                => StatusCodes.Status401Unauthorized,
-
-            "catalog.import.user.cannot_edit"
-                => StatusCodes.Status403Forbidden,
-
-            "catalog.import.batch.access_denied"
-                => StatusCodes.Status403Forbidden,
-
-            "catalog.import.batch.not_found"
-                => StatusCodes.Status404NotFound,
-
-            "catalog.import.product_type.not_found"
-                => StatusCodes.Status404NotFound,
-
-            "catalog.import.mapping.cannot_be_edited"
-                => StatusCodes.Status409Conflict,
-
-            "catalog.import.column.duplicate_mapping"
-                => StatusCodes.Status409Conflict,
-
-            "catalog.import.batch.concurrency_conflict"
-                => StatusCodes.Status409Conflict,
-
-            _ => StatusCodes.Status400BadRequest
-        };
-
-        return StatusCode(
-            statusCode,
-            new ProblemDetails
-            {
-                Status = statusCode,
-                Title = "Не удалось сохранить сопоставление колонок.",
-                Detail = error.Message,
-                Type = error.Code
-            });
     }
 }

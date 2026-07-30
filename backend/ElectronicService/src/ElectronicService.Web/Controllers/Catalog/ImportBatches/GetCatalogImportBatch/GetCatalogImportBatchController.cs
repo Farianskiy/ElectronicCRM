@@ -1,9 +1,9 @@
 using ElectronicService.Contracts.Catalog.ImportBatches;
 using ElectronicService.Core.Catalog.ImportBatches.GetCatalogImportBatch;
-using ElectronicService.Domain.Common;
 using ElectronicService.Web.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ElectronicService.Web.Controllers.Catalog.ImportBatches.Common;
 
 namespace ElectronicService.Web.Controllers.Catalog.ImportBatches.GetCatalogImportBatch;
 
@@ -15,6 +15,7 @@ public sealed class
     GetCatalogImportBatchController
     : ControllerBase
 {
+    private const string ProblemTitle = "Не удалось выполнить операцию.";
     [HttpGet("{batchId:guid}")]
     [ProducesResponseType(
         typeof(GetCatalogImportBatchResponse),
@@ -33,17 +34,9 @@ public sealed class
                 handler,
             CancellationToken cancellationToken)
     {
-        if (!User.TryGetUserId(
-                out var currentUserId))
+        if (!User.TryGetUserId(out var currentUserId))
         {
-            return Problem(
-                statusCode:
-                    StatusCodes.Status401Unauthorized,
-                title:
-                    "Пользователь не определён.",
-                detail:
-                    "В JWT отсутствует корректный " +
-                    "идентификатор пользователя.");
+            return this.ToCurrentUserProblem();
         }
 
         var query =
@@ -60,7 +53,7 @@ public sealed class
 
         if (result.IsFailure)
         {
-            return ToProblem(result.Error);
+            return this.ToCatalogImportProblem(result.Error, ProblemTitle);
         }
 
         var value = result.Value;
@@ -100,34 +93,5 @@ public sealed class
         return Ok(response);
     }
 
-    private ObjectResult ToProblem(
-        DomainError error)
-    {
-        var statusCode =
-            error.Code switch
-            {
-                "catalog.import.batch.not_found"
-                    => StatusCodes.Status404NotFound,
 
-                "catalog.import.batch.access_denied"
-                    => StatusCodes.Status403Forbidden,
-
-                "catalog.import.current_user.not_found"
-                    => StatusCodes.Status401Unauthorized,
-
-                _ => StatusCodes.Status400BadRequest
-            };
-
-        return StatusCode(
-            statusCode,
-            new ProblemDetails
-            {
-                Status = statusCode,
-                Title =
-                    "Не удалось получить " +
-                    "пакет импорта.",
-                Detail = error.Message,
-                Type = error.Code
-            });
-    }
 }

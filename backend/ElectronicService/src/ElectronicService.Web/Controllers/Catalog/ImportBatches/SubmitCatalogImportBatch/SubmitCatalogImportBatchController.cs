@@ -1,7 +1,7 @@
 using ElectronicService.Contracts.Catalog.ImportBatches;
 using ElectronicService.Core.Catalog.ImportBatches.SubmitCatalogImportBatch;
-using ElectronicService.Domain.Common;
 using ElectronicService.Web.Auth;
+using ElectronicService.Web.Controllers.Catalog.ImportBatches.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,6 +12,8 @@ namespace ElectronicService.Web.Controllers.Catalog.ImportBatches.SubmitCatalogI
 [Route("api/catalog/import-batches")]
 public sealed class SubmitCatalogImportBatchController : ControllerBase
 {
+    private const string ProblemTitle = "Не удалось отправить пакет импорта на проверку.";
+
     [HttpPost("{batchId:guid}/submit")]
     [ProducesResponseType(typeof(SubmitCatalogImportBatchResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -26,10 +28,7 @@ public sealed class SubmitCatalogImportBatchController : ControllerBase
     {
         if (!User.TryGetUserId(out var currentUserId))
         {
-            return Problem(
-                statusCode: StatusCodes.Status401Unauthorized,
-                title: "Пользователь не определён.",
-                detail: "В JWT отсутствует корректный идентификатор пользователя.");
+            return this.ToCurrentUserProblem();
         }
 
         var command = new SubmitCatalogImportBatchCommand(
@@ -42,7 +41,7 @@ public sealed class SubmitCatalogImportBatchController : ControllerBase
 
         if (result.IsFailure)
         {
-            return ToProblem(result.Error);
+            return this.ToCatalogImportProblem(result.Error, ProblemTitle);
         }
 
         var response = new SubmitCatalogImportBatchResponse(
@@ -52,41 +51,5 @@ public sealed class SubmitCatalogImportBatchController : ControllerBase
             result.Value.Version);
 
         return Ok(response);
-    }
-
-    private ObjectResult ToProblem(DomainError error)
-    {
-        var statusCode = error.Code switch
-        {
-            "catalog.import.current_user.not_found"
-                => StatusCodes.Status401Unauthorized,
-
-            "catalog.import.user.cannot_submit"
-                => StatusCodes.Status403Forbidden,
-
-            "catalog.import.batch.access_denied"
-                => StatusCodes.Status403Forbidden,
-
-            "catalog.import.batch.not_found"
-                => StatusCodes.Status404NotFound,
-
-            "catalog.import.batch.invalid_status_transition"
-                => StatusCodes.Status409Conflict,
-
-            "catalog.import.batch.product_type_required"
-                => StatusCodes.Status409Conflict,
-
-            _ => StatusCodes.Status400BadRequest
-        };
-
-        return StatusCode(
-            statusCode,
-            new ProblemDetails
-            {
-                Status = statusCode,
-                Title = "Не удалось отправить пакет импорта на проверку.",
-                Detail = error.Message,
-                Type = error.Code
-            });
     }
 }

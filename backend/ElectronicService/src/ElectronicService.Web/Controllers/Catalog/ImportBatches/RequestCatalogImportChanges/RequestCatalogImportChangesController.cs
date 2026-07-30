@@ -1,9 +1,9 @@
 using ElectronicService.Contracts.Catalog.ImportBatches;
 using ElectronicService.Core.Catalog.ImportBatches.RequestCatalogImportChanges;
-using ElectronicService.Domain.Common;
 using ElectronicService.Web.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ElectronicService.Web.Controllers.Catalog.ImportBatches.Common;
 
 namespace ElectronicService.Web.Controllers.Catalog.ImportBatches.RequestCatalogImportChanges;
 
@@ -12,6 +12,7 @@ namespace ElectronicService.Web.Controllers.Catalog.ImportBatches.RequestCatalog
 [Route("api/catalog/import-batches")]
 public sealed class RequestCatalogImportChangesController : ControllerBase
 {
+    private const string ProblemTitle = "Не удалось выполнить операцию.";
     [HttpPost("{batchId:guid}/review/request-changes")]
     [ProducesResponseType(typeof(RequestCatalogImportChangesResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -27,10 +28,7 @@ public sealed class RequestCatalogImportChangesController : ControllerBase
     {
         if (!User.TryGetUserId(out var currentUserId))
         {
-            return Problem(
-                statusCode: StatusCodes.Status401Unauthorized,
-                title: "Пользователь не определён.",
-                detail: "В JWT отсутствует корректный идентификатор пользователя.");
+            return this.ToCurrentUserProblem();
         }
 
         var command = new RequestCatalogImportChangesCommand(
@@ -44,7 +42,7 @@ public sealed class RequestCatalogImportChangesController : ControllerBase
 
         if (result.IsFailure)
         {
-            return ToProblem(result.Error);
+            return this.ToCatalogImportProblem(result.Error, ProblemTitle);
         }
 
         var response = new RequestCatalogImportChangesResponse(
@@ -56,47 +54,5 @@ public sealed class RequestCatalogImportChangesController : ControllerBase
             result.Value.Version);
 
         return Ok(response);
-    }
-
-    private ObjectResult ToProblem(DomainError error)
-    {
-        var statusCode = error.Code switch
-        {
-            "catalog.import.current_user.not_found"
-                => StatusCodes.Status401Unauthorized,
-
-            "catalog.import.user.cannot_review"
-                => StatusCodes.Status403Forbidden,
-
-            "catalog.import.batch.not_found"
-                => StatusCodes.Status404NotFound,
-
-            "catalog.import.batch.invalid_status_transition"
-                => StatusCodes.Status409Conflict,
-
-            "catalog.import.batch.review_assigned_to_another_user"
-                => StatusCodes.Status409Conflict,
-
-            "catalog.import.batch.concurrency_conflict"
-                => StatusCodes.Status409Conflict,
-
-            "catalog.import.batch.changes_request_comment_required"
-                => StatusCodes.Status400BadRequest,
-
-            "catalog.import.batch.changes_request_comment_too_long"
-                => StatusCodes.Status400BadRequest,
-
-            _ => StatusCodes.Status400BadRequest
-        };
-
-        return StatusCode(
-            statusCode,
-            new ProblemDetails
-            {
-                Status = statusCode,
-                Title = "Не удалось вернуть пакет импорта на исправление.",
-                Detail = error.Message,
-                Type = error.Code
-            });
     }
 }
