@@ -1,0 +1,141 @@
+name: electroniccrm
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:-postgres:18-alpine}
+    container_name: electroniccrm-postgres
+    restart: unless-stopped
+    shm_size: 128mb
+
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+
+    ports:
+      - "${POSTGRES_PORT:-5434}:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql
+
+    networks:
+      - electroniccrm
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+
+    image: electroniccrm-api:${APP_VERSION:-0.1.0-beta.1}
+    container_name: electroniccrm-api
+    restart: unless-stopped
+    init: true
+
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: "8080"
+
+      ConnectionStrings__Database: "Host=postgres;Port=5432;Database=${POSTGRES_DB:?POSTGRES_DB is required};Username=${POSTGRES_USER:?POSTGRES_USER is required};Password=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required};Include Error Detail=false"
+
+      Jwt__Issuer: ${JWT_ISSUER:?JWT_ISSUER is required}
+      Jwt__Audience: ${JWT_AUDIENCE:?JWT_AUDIENCE is required}
+      Jwt__SecretKey: ${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
+      Jwt__ExpirationMinutes: "${JWT_EXPIRATION_MINUTES:-120}"
+
+      Cors__AllowedOrigins__0: ${FRONTEND_ORIGIN:?FRONTEND_ORIGIN is required}
+
+      CatalogImportCleanup__RetentionDays: "${CATALOG_IMPORT_RETENTION_DAYS:-30}"
+
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+
+    volumes:
+      - api_dataprotection:/home/app/.aspnet/DataProtection-Keys
+
+    networks:
+      - electroniccrm
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "curl",
+          "--fail",
+          "--silent",
+          "--show-error",
+          "http://127.0.0.1:8080/health/ready"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+    stop_grace_period: 30s
+
+  web:
+    build:
+      context: ./frontend/electronic-service-web
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:?NEXT_PUBLIC_API_BASE_URL is required}
+
+    image: electroniccrm-web:${APP_VERSION:-0.1.0-beta.1}
+    container_name: electroniccrm-web
+    restart: unless-stopped
+    init: true
+
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:?NEXT_PUBLIC_API_BASE_URL is required}
+
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+
+    networks:
+      - electroniccrm
+
+    depends_on:
+      api:
+        condition: service_healthy
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/login').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+    stop_grace_period: 20s
+
+networks:
+  electroniccrm:
+    name: electroniccrm-network
+    driver: bridge
+
+volumes:
+  postgres_data:
+    external: true
+    name: ${POSTGRES_VOLUME_NAME:-backend_postgres_data}
+
+  api_dataprotection:
+    name: electroniccrm_api_dataprotection
