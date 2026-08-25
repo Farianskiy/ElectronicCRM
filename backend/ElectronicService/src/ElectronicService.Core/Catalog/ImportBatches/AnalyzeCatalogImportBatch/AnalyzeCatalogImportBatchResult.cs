@@ -1,3 +1,4 @@
+using ElectronicService.Core.Catalog.ImportBatches.Analysis;
 using ElectronicService.Domain.Catalog.ImportBatches;
 
 namespace ElectronicService.Core.Catalog.ImportBatches.AnalyzeCatalogImportBatch;
@@ -11,4 +12,7 @@ public sealed record AnalyzeCatalogImportBatchResult(
     int UnconfirmedColumnsCount,
     int RowsCount,
     int ValidRowsCount,
-    int ErrorRowsCount);
+    int ErrorRowsCount,
+    CatalogImportManufacturerResolutionSummary ManufacturerResolutionSummary,
+    CatalogImportRecognitionShadowResult? RecognitionShadow,
+    CatalogImportRecognitionEnrichmentSummary RecognitionEnrichment);

@@ -271,6 +271,27 @@ public static class CatalogImportErrors
             $"Строка импорта '{rowId}' не найдена.");
     }
 
+    public static DomainError BulkUpdateRowsAreRequired()
+    {
+        return new DomainError(
+            "catalog.import.rows.bulk_empty",
+            "Для массового обновления необходимо передать хотя бы одну строку.");
+    }
+
+    public static DomainError BulkUpdateRowsLimitExceeded(int maximumRows)
+    {
+        return new DomainError(
+            "catalog.import.rows.bulk_limit_exceeded",
+            $"За один запрос можно обновить не более '{maximumRows}' строк импорта.");
+    }
+
+    public static DomainError DuplicateBulkUpdateRow(Guid rowId)
+    {
+        return new DomainError(
+            "catalog.import.rows.bulk_duplicate_row",
+            $"Строка импорта '{rowId}' передана в массовом запросе несколько раз.");
+    }
+
     public static DomainError UserCannotEditCatalogImport()
     {
         return new DomainError(

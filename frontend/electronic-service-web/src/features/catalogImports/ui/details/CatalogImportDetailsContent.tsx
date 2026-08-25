@@ -53,6 +53,7 @@ export function CatalogImportDetailsContent({
       <CatalogImportRowsPreview
         batchId={batch.batchId}
         productTypeId={batch.productTypeId}
+        expectedVersion={batch.version}
         canEditRows={canEditRows}
       />
 

@@ -1,4 +1,5 @@
 using System.Globalization;
+using ElectronicService.Core.Catalog.Characteristics.Normalization;
 using ElectronicService.Domain.Catalog.Characteristics;
 using ElectronicService.Domain.Catalog.ImportBatches;
 using ElectronicService.Domain.Catalog.ProductTypes;
@@ -69,6 +70,10 @@ public sealed class CatalogImportRowValidator : ICatalogImportRowValidator
             characteristicDefinitions,
             issues);
 
+        var normalizedCharacteristicOrigins = NormalizeCharacteristicOrigins(
+            normalizedCharacteristics,
+            data.CharacteristicOrigins);
+
         var status = issues.Count == 0
             ? CatalogImportRowStatus.Valid
             : CatalogImportRowStatus.Error;
@@ -80,7 +85,10 @@ public sealed class CatalogImportRowValidator : ICatalogImportRowValidator
             data.Price,
             data.StockQuantity,
             normalizedCharacteristics,
-            data.ManufacturerId);
+            data.ManufacturerId,
+            data.ManufacturerResolutionSource,
+            data.ManufacturerAliasId,
+            normalizedCharacteristicOrigins);
 
         return new CatalogImportRowValidationResult(
             status,
@@ -149,6 +157,26 @@ public sealed class CatalogImportRowValidator : ICatalogImportRowValidator
         }
 
         return result.Value.Value;
+    }
+
+    private static Dictionary<string, CatalogImportCharacteristicValueOrigin> NormalizeCharacteristicOrigins(
+    IReadOnlyDictionary<string, string> normalizedCharacteristics,
+    IReadOnlyDictionary<string, CatalogImportCharacteristicValueOrigin>? sourceOrigins)
+    {
+        return normalizedCharacteristics.Keys.ToDictionary(
+            characteristicDefinitionId => characteristicDefinitionId,
+            characteristicDefinitionId =>
+            {
+                if (sourceOrigins is not null &&
+                    sourceOrigins.TryGetValue(characteristicDefinitionId, out var existingOrigin) &&
+                    existingOrigin.Source != CatalogImportCharacteristicValueSource.None)
+                {
+                    return existingOrigin;
+                }
+
+                return CatalogImportCharacteristicValueOrigin.FromManual();
+            },
+            StringComparer.Ordinal);
     }
 
     private static Dictionary<string, string> ValidateCharacteristics(
@@ -253,37 +281,35 @@ public sealed class CatalogImportRowValidator : ICatalogImportRowValidator
     }
 
     private static bool TryNormalizeCharacteristicValue(
-        string rawValue,
-        CharacteristicDefinition definition,
-        out string normalizedValue)
+    string rawValue,
+    CharacteristicDefinition definition,
+    out string normalizedValue)
     {
         switch (definition.DataType)
         {
             case CharacteristicDataType.Text:
                 normalizedValue = rawValue.Trim();
+
                 return normalizedValue.Length > 0;
 
             case CharacteristicDataType.Number:
-                var numberSource = rawValue
-                    .Trim()
-                    .Replace(",", ".", StringComparison.Ordinal);
-
-                if (decimal.TryParse(
-                    numberSource,
-                    NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint,
-                    CultureInfo.InvariantCulture,
-                    out var number))
+                if (CatalogCharacteristicNumericValueNormalizer
+                    .TryNormalizeToString(
+                        definition.Code,
+                        rawValue,
+                        out normalizedValue))
                 {
-                    normalizedValue = number.ToString(CultureInfo.InvariantCulture);
                     return true;
                 }
 
                 break;
 
             case CharacteristicDataType.Boolean:
-                if (TryParseBoolean(rawValue, out var boolean))
+                if (CatalogCharacteristicBooleanValueNormalizer.TryNormalizeToString(
+                        definition.Code,
+                        rawValue,
+                        out normalizedValue))
                 {
-                    normalizedValue = boolean ? "true" : "false";
                     return true;
                 }
 
@@ -291,41 +317,8 @@ public sealed class CatalogImportRowValidator : ICatalogImportRowValidator
         }
 
         normalizedValue = string.Empty;
+
         return false;
-    }
-
-    private static bool TryParseBoolean(string rawValue, out bool value)
-    {
-        var normalized = rawValue
-            .Trim()
-            .ToUpperInvariant()
-            .Replace("Ё", "Е", StringComparison.Ordinal)
-            .Replace(" ", string.Empty, StringComparison.Ordinal);
-
-        switch (normalized)
-        {
-            case "ДА":
-            case "YES":
-            case "TRUE":
-            case "1":
-            case "+":
-            case "ЕСТЬ":
-                value = true;
-                return true;
-
-            case "НЕТ":
-            case "NO":
-            case "FALSE":
-            case "0":
-            case "-":
-            case "ОТСУТСТВУЕТ":
-                value = false;
-                return true;
-
-            default:
-                value = false;
-                return false;
-        }
     }
 
     private static CatalogImportRowIssue CreateIssue(

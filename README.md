@@ -123,7 +123,7 @@ linux
 ```powershell
 git clone https://github.com/Farianskiy/ElectronicCRM.git
 cd ElectronicCRM
-git checkout release/v0.1.0-beta.1
+git checkout v0.1.0-beta.1
 ```
 
 ### Настройка окружения

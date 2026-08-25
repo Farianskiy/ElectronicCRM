@@ -134,6 +134,27 @@ public sealed class CatalogImportBatchRepository
                 cancellationToken);
     }
 
+    public async Task<IReadOnlyCollection<CatalogImportRow>> GetRowsByIdsAsync(Guid batchId, IReadOnlyCollection<Guid> rowIds, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(rowIds);
+
+        var normalizedRowIds = rowIds
+            .Where(rowId => rowId != Guid.Empty)
+            .Distinct()
+            .ToArray();
+
+        if (normalizedRowIds.Length == 0)
+        {
+            return [];
+        }
+
+        return await _dbContext.CatalogImportRows
+            .Where(row => row.BatchId == batchId && normalizedRowIds.Contains(row.Id))
+            .OrderBy(row => row.RowNumber)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     public Task<int> CountRowsAsync(
         Guid batchId,
         CatalogImportRowStatus? status,
@@ -237,10 +258,27 @@ public sealed class CatalogImportBatchRepository
          * объединяем одной транзакцией.
          */
         await using var transaction =
-            await _dbContext.Database
-                .BeginTransactionAsync(
-                    cancellationToken)
-                .ConfigureAwait(false);
+    await _dbContext.Database
+        .BeginTransactionAsync(
+            cancellationToken)
+        .ConfigureAwait(false);
+
+        /*
+         * До вызова ReplaceAnalysisAsync обработчик может:
+         *
+         * 1. пометить устаревшие Pending Feedback на удаление;
+         * 2. изменить статус и статистику CatalogImportBatch.
+         *
+         * ExecuteDeleteAsync выполняется непосредственно в PostgreSQL
+         * и не обрабатывает ожидающие изменения ChangeTracker.
+         *
+         * Поэтому сначала сохраняем отслеживаемые изменения внутри
+         * уже открытой транзакции. Если дальнейшая замена анализа
+         * завершится ошибкой, это сохранение также будет отменено.
+         */
+        await _dbContext
+            .SaveChangesAsync(cancellationToken)
+            .ConfigureAwait(false);
 
         /*
          * Сначала удаляем строки.
@@ -248,9 +286,14 @@ public sealed class CatalogImportBatchRepository
          *
          * Старый анализ полностью заменяется
          * новым результатом.
+         *
+         * Pending Feedback уже удалены предыдущим SaveChangesAsync.
+         * Finalized Feedback не удаляются. PostgreSQL обнулит их
+         * ImportRowId через внешний ключ ON DELETE SET NULL,
+         * сохранив ImportBatchId как источник происхождения.
          */
         await _dbContext.CatalogImportRows
-            .Where(row =>
+                    .Where(row =>
                 row.BatchId == batch.Id)
             .ExecuteDeleteAsync(
                 cancellationToken)

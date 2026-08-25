@@ -80,9 +80,7 @@ public sealed class ApplyCatalogImportBatchCommandHandler
                 CatalogImportErrors.BatchCannotBeAppliedByCurrentUser());
         }
 
-        var applyResult = await _batchApplier
-            .ApplyAsync(batch, currentUser.Id, cancellationToken)
-            .ConfigureAwait(false);
+        var applyResult = await _batchApplier.ApplyAsync(batch, currentUser.Id, currentUser.Type, cancellationToken).ConfigureAwait(false);
 
         if (applyResult.IsFailure)
         {

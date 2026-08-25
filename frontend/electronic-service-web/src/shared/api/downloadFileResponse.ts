@@ -37,7 +37,7 @@ function getDownloadFileName(
 export function downloadFileResponse(
   response: AxiosResponse<Blob>,
   fallbackFileName: string,
-): void {
+): string {
   const contentDisposition =
     response.headers["content-disposition"];
 
@@ -66,4 +66,6 @@ export function downloadFileResponse(
   window.setTimeout(() => {
     URL.revokeObjectURL(objectUrl);
   }, 1000);
+
+  return fileName;
 }

@@ -6,9 +6,11 @@ using CSharpFunctionalExtensions;
 using ElectronicService.Core.Catalog.ImportBatches.Analysis;
 using ElectronicService.Domain.Catalog.Characteristics;
 using ElectronicService.Domain.Catalog.ImportBatches;
-using ElectronicService.Domain.Catalog.ProductTypes;
-using ElectronicService.Domain.Common;
 using ElectronicService.Domain.Catalog.Manufacturers;
+using ElectronicService.Domain.Catalog.ProductTypes;
+using ElectronicService.Core.Catalog.Characteristics.Normalization;
+using ElectronicService.Domain.Common;
+using ElectronicService.Core.Catalog.Manufacturers.Resolution;
 
 namespace ElectronicService.Infrastructure.Postgres.Catalog.ImportBatches;
 
@@ -18,68 +20,46 @@ public sealed class CatalogImportWorkbookAnalyzer
     private const int MaximumColumns = 200;
     private const int MaximumRows = 20_000;
     private const int HeaderSearchRowsLimit = 20;
-
+    private const int MaximumManufacturerResolutionExamples = 5;
     private static readonly JsonSerializerOptions
         JsonOptions =
             new(JsonSerializerDefaults.Web);
 
-    private static readonly Dictionary<
-     string,
-     CatalogImportColumnTargetKind>
-     StandardHeaderMappings =
-         new(StringComparer.Ordinal)
-         {
-             ["НАИМЕНОВАНИЕ"] =
-                    CatalogImportColumnTargetKind.Name,
+    private static readonly Dictionary<string, CatalogImportColumnTargetKind> StandardHeaderMappings = new(StringComparer.Ordinal)
+    {
+        ["НАИМЕНОВАНИЕ"] = CatalogImportColumnTargetKind.Name,
+        ["НАЗВАНИЕ"] = CatalogImportColumnTargetKind.Name,
+        ["НАИМЕНОВАНИЕ ТОВАРА"] = CatalogImportColumnTargetKind.Name,
+        ["НАЗВАНИЕ ТОВАРА"] = CatalogImportColumnTargetKind.Name,
+        ["АРТИКУЛ"] = CatalogImportColumnTargetKind.Article,
+        ["КОД"] = CatalogImportColumnTargetKind.Article,
+        ["КОД ТОВАРА"] = CatalogImportColumnTargetKind.Article,
+        ["SKU"] = CatalogImportColumnTargetKind.Article,
+        ["ПРОИЗВОДИТЕЛЬ"] = CatalogImportColumnTargetKind.Manufacturer,
+        ["БРЕНД"] = CatalogImportColumnTargetKind.Manufacturer,
+        ["МАРКА"] = CatalogImportColumnTargetKind.Manufacturer,
+        ["ЦЕНА"] = CatalogImportColumnTargetKind.Price,
+        ["СТОИМОСТЬ"] = CatalogImportColumnTargetKind.Price,
+        ["ЦЕНА РУБ"] = CatalogImportColumnTargetKind.Price,
+        ["ОСТАТОК"] = CatalogImportColumnTargetKind.StockQuantity,
+        ["КОЛИЧЕСТВО НА СКЛАДЕ"] = CatalogImportColumnTargetKind.StockQuantity,
+        ["СКЛАДСКОЙ ОСТАТОК"] = CatalogImportColumnTargetKind.StockQuantity
+    };
 
-             ["НАЗВАНИЕ"] =
-                    CatalogImportColumnTargetKind.Name,
+    private static readonly HashSet<string> IgnoredHeaderMappings = new(StringComparer.Ordinal)
+    {
+        "ТИП ОБОРУДОВАНИЯ"
+    };
 
-             ["НАИМЕНОВАНИЕ ТОВАРА"] =
-                    CatalogImportColumnTargetKind.Name,
-
-             ["НАЗВАНИЕ ТОВАРА"] =
-                    CatalogImportColumnTargetKind.Name,
-
-             ["АРТИКУЛ"] =
-                    CatalogImportColumnTargetKind.Article,
-
-             ["КОД"] =
-                    CatalogImportColumnTargetKind.Article,
-
-             ["КОД ТОВАРА"] =
-                    CatalogImportColumnTargetKind.Article,
-
-             ["SKU"] =
-                    CatalogImportColumnTargetKind.Article,
-
-             ["ПРОИЗВОДИТЕЛЬ"] =
-                    CatalogImportColumnTargetKind.Manufacturer,
-
-             ["БРЕНД"] =
-                    CatalogImportColumnTargetKind.Manufacturer,
-
-             ["МАРКА"] =
-                    CatalogImportColumnTargetKind.Manufacturer,
-
-             ["ЦЕНА"] =
-                    CatalogImportColumnTargetKind.Price,
-
-             ["СТОИМОСТЬ"] =
-                    CatalogImportColumnTargetKind.Price,
-
-             ["ЦЕНА РУБ"] =
-                    CatalogImportColumnTargetKind.Price,
-
-             ["ОСТАТОК"] =
-                    CatalogImportColumnTargetKind.StockQuantity,
-
-             ["КОЛИЧЕСТВО НА СКЛАДЕ"] =
-                    CatalogImportColumnTargetKind.StockQuantity,
-
-             ["СКЛАДСКОЙ ОСТАТОК"] =
-                    CatalogImportColumnTargetKind.StockQuantity
-         };
+    private static readonly Dictionary<string, string> CharacteristicHeaderAliases = new(StringComparer.Ordinal)
+    {
+        ["НАЛИЧИЕ ТЕПЛОВОГО РСЦЕП"] = "НАЛИЧИЕ ТЕПЛОВОГО РАСЦЕПИТЕЛЯ",
+        ["НАЛИЧИЕ ТЕПЛОВОГО РАСЦЕП"] = "НАЛИЧИЕ ТЕПЛОВОГО РАСЦЕПИТЕЛЯ",
+        ["ТЕПЛОВОЙ РАСЦЕПИТЕЛЬ"] = "НАЛИЧИЕ ТЕПЛОВОГО РАСЦЕПИТЕЛЯ",
+        ["ПРОИЗВОДИТЕЛЬ СЕРИЯ"] = "СЕРИЯ ТОВАРА",
+        ["СЕРИЯ ПРОИЗВОДИТЕЛЯ"] = "СЕРИЯ ТОВАРА",
+        ["СЕРИЯ"] = "СЕРИЯ ТОВАРА"
+    };
 
     private static readonly
         CatalogImportColumnTargetKind[]
@@ -95,7 +75,7 @@ public sealed class CatalogImportWorkbookAnalyzer
         ReadOnlyMemory<byte> workbookContent,
         ProductType? productType,
         IReadOnlyCollection<CharacteristicDefinition> characteristicDefinitions,
-        IReadOnlyCollection<Manufacturer> manufacturers,
+        ManufacturerResolutionIndex manufacturerResolutionIndex,
         IReadOnlyCollection<CatalogImportColumn> existingColumns,
         CancellationToken cancellationToken = default)
     {
@@ -119,7 +99,7 @@ public sealed class CatalogImportWorkbookAnalyzer
 
         ArgumentNullException.ThrowIfNull(characteristicDefinitions);
 
-        ArgumentNullException.ThrowIfNull(manufacturers);
+        ArgumentNullException.ThrowIfNull(manufacturerResolutionIndex);
 
         ArgumentNullException.ThrowIfNull(existingColumns);
 
@@ -257,18 +237,8 @@ public sealed class CatalogImportWorkbookAnalyzer
                         definition =>
                             definition.Id);
 
-            var manufacturersByNormalizedName = manufacturers
-                .GroupBy(
-                    manufacturer => manufacturer.NormalizedName,
-                    StringComparer.Ordinal)
-                .Where(group => group.Count() == 1)
-                .ToDictionary(
-                    group => group.Key,
-                    group => group.Single(),
-                    StringComparer.Ordinal);
-
-            var rows = new List<
-                CatalogImportRow>();
+            var rows = new List<CatalogImportRow>();
+            var manufacturerResolutionSamples = new List<ManufacturerResolutionSample>();
 
             var validRowsCount = 0;
             var errorRowsCount = 0;
@@ -308,7 +278,7 @@ public sealed class CatalogImportWorkbookAnalyzer
                     columnCandidates,
                     productType,
                     definitionsById,
-                    manufacturersByNormalizedName,
+                    manufacturerResolutionIndex,
                     mappingRequired);
 
                 var rowResult =
@@ -339,8 +309,16 @@ public sealed class CatalogImportWorkbookAnalyzer
 
                 rows.Add(rowResult.Value);
 
-                if (rowBuildResult.Status
-                    == CatalogImportRowStatus.Valid)
+                if (rowBuildResult.ManufacturerResolution is not null)
+                {
+                    manufacturerResolutionSamples.Add(
+                        new ManufacturerResolutionSample(
+                            rowNumber,
+                            rowBuildResult.Data.Name,
+                            rowBuildResult.ManufacturerResolution));
+                }
+
+                if (rowBuildResult.Status == CatalogImportRowStatus.Valid)
                 {
                     validRowsCount++;
                 }
@@ -369,7 +347,8 @@ public sealed class CatalogImportWorkbookAnalyzer
                         rows,
                         mappingRequired,
                         validRowsCount,
-                        errorRowsCount));
+                        errorRowsCount,
+                        BuildManufacturerResolutionSummary(manufacturerResolutionSamples)));
         }
         catch (Exception exception)
             when (exception
@@ -648,17 +627,21 @@ public sealed class CatalogImportWorkbookAnalyzer
                 definition.Id == definitionId);
     }
 
-    private static ColumnMapping
-        ResolveMapping(
-            string normalizedHeader,
-            DefinitionLookups definitionLookups)
+    private static ColumnMapping ResolveMapping(string normalizedHeader, DefinitionLookups definitionLookups)
     {
-        if (StandardHeaderMappings.TryGetValue(
-                normalizedHeader,
-                out var standardTarget))
+        if (StandardHeaderMappings.TryGetValue(normalizedHeader, out var standardTarget))
         {
             return new ColumnMapping(
                 standardTarget,
+                null,
+                1.0000m,
+                true);
+        }
+
+        if (IgnoredHeaderMappings.Contains(normalizedHeader))
+        {
+            return new ColumnMapping(
+                CatalogImportColumnTargetKind.Ignore,
                 null,
                 1.0000m,
                 true);
@@ -674,24 +657,17 @@ public sealed class CatalogImportWorkbookAnalyzer
          * Но "Производитель серия" не является
          * производителем самого товара.
          */
-        if (normalizedHeader.StartsWith(
-                "ПРОИЗВОДИТЕЛЬ ",
-                StringComparison.Ordinal)
-            && !normalizedHeader.Contains(
-                "СЕРИЯ",
-                StringComparison.Ordinal))
+        if (normalizedHeader.StartsWith("ПРОИЗВОДИТЕЛЬ ", StringComparison.Ordinal)
+            && !normalizedHeader.Contains("СЕРИЯ", StringComparison.Ordinal))
         {
             return new ColumnMapping(
-                CatalogImportColumnTargetKind
-                    .Manufacturer,
+                CatalogImportColumnTargetKind.Manufacturer,
                 null,
                 0.9000m,
                 false);
         }
 
-        if (normalizedHeader.StartsWith(
-                "ЦЕНА ",
-                StringComparison.Ordinal))
+        if (normalizedHeader.StartsWith("ЦЕНА ", StringComparison.Ordinal))
         {
             return new ColumnMapping(
                 CatalogImportColumnTargetKind.Price,
@@ -700,55 +676,63 @@ public sealed class CatalogImportWorkbookAnalyzer
                 false);
         }
 
-        if (definitionLookups
-            .ByNormalizedCode
-            .TryGetValue(
-                normalizedHeader,
-                out var definitionByCode))
+        if (definitionLookups.ByNormalizedCode.TryGetValue(normalizedHeader, out var definitionByCode))
         {
             return new ColumnMapping(
-                CatalogImportColumnTargetKind
-                    .Characteristic,
+                CatalogImportColumnTargetKind.Characteristic,
                 definitionByCode.Id,
                 1.0000m,
                 true);
         }
 
-        if (definitionLookups
-            .ByNormalizedName
-            .TryGetValue(
-                normalizedHeader,
-                out var definitionByName))
+        if (definitionLookups.ByNormalizedName.TryGetValue(normalizedHeader, out var definitionByName))
         {
             return new ColumnMapping(
-                CatalogImportColumnTargetKind
-                    .Characteristic,
+                CatalogImportColumnTargetKind.Characteristic,
                 definitionByName.Id,
                 0.9800m,
                 true);
         }
 
-        var prefixDefinition =
-            FindCharacteristicByPrefix(
-                normalizedHeader,
-                definitionLookups);
+        var definitionByAlias = FindCharacteristicByAlias(normalizedHeader, definitionLookups);
+
+        if (definitionByAlias is not null)
+        {
+            return new ColumnMapping(
+                CatalogImportColumnTargetKind.Characteristic,
+                definitionByAlias.Id,
+                0.9500m,
+                true);
+        }
+
+        var prefixDefinition = FindCharacteristicByPrefix(normalizedHeader, definitionLookups);
 
         if (prefixDefinition is not null)
         {
             return new ColumnMapping(
-                CatalogImportColumnTargetKind
-                    .Characteristic,
+                CatalogImportColumnTargetKind.Characteristic,
                 prefixDefinition.Id,
                 0.9000m,
                 false);
         }
 
         return new ColumnMapping(
-            CatalogImportColumnTargetKind
-                .Unmapped,
+            CatalogImportColumnTargetKind.Unmapped,
             null,
             0.0000m,
             false);
+    }
+
+    private static CharacteristicDefinition? FindCharacteristicByAlias(string normalizedHeader, DefinitionLookups definitionLookups)
+    {
+        if (!CharacteristicHeaderAliases.TryGetValue(normalizedHeader, out var normalizedDefinitionName))
+        {
+            return null;
+        }
+
+        return definitionLookups.ByNormalizedName.TryGetValue(normalizedDefinitionName, out var definition)
+            ? definition
+            : null;
     }
 
     private static CharacteristicDefinition?
@@ -1018,12 +1002,81 @@ public sealed class CatalogImportWorkbookAnalyzer
                         .Trim());
     }
 
+    private static CatalogImportManufacturerResolutionSummary BuildManufacturerResolutionSummary(List<ManufacturerResolutionSample> samples)
+    {
+        var groups = samples
+            .GroupBy(sample =>
+                new ManufacturerResolutionGroupKey(
+                    sample.Resolution.NormalizedInputName,
+                    sample.Resolution.Status,
+                    sample.Resolution.ManufacturerId,
+                    sample.Resolution.Source,
+                    sample.Resolution.ManufacturerAliasId,
+                    sample.Resolution.ManufacturerNoisePhraseId))
+            .Select(group =>
+            {
+                var firstSample = group.First();
+
+                var exampleRowNumbers = group
+                    .Select(sample => sample.RowNumber)
+                    .OrderBy(rowNumber => rowNumber)
+                    .Take(MaximumManufacturerResolutionExamples)
+                    .ToArray();
+
+                var exampleProductNames = group
+                    .Select(sample => sample.ProductName)
+                    .Where(productName => !string.IsNullOrWhiteSpace(productName))
+                    .Select(productName => productName!)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Take(MaximumManufacturerResolutionExamples)
+                    .ToArray();
+
+                return new CatalogImportManufacturerResolutionGroup(
+                    firstSample.Resolution.InputName,
+                    firstSample.Resolution.NormalizedInputName,
+                    firstSample.Resolution.Status,
+                    firstSample.Resolution.ManufacturerId,
+                    firstSample.Resolution.ManufacturerName,
+                    firstSample.Resolution.Source,
+                    firstSample.Resolution.ManufacturerAliasId,
+                    firstSample.Resolution.ManufacturerNoisePhraseId,
+                    firstSample.Resolution.NoiseReason,
+                    group.Count(),
+                    exampleRowNumbers,
+                    exampleProductNames);
+            })
+            .OrderByDescending(group => group.OccurrenceCount)
+            .ThenBy(group => group.SourceValue, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        return new CatalogImportManufacturerResolutionSummary(
+            samples.Count,
+            samples.Count(sample => sample.Resolution.Source == ManufacturerResolutionSource.ExactName),
+            samples.Count(sample => sample.Resolution.Source == ManufacturerResolutionSource.ApprovedAlias),
+            samples.Count(sample => sample.Resolution.Status == ManufacturerResolutionStatus.IgnoredNoise),
+            samples.Count(sample => sample.Resolution.Status == ManufacturerResolutionStatus.Unresolved),
+            groups);
+    }
+
+    private sealed record ManufacturerResolutionSample(
+        int RowNumber,
+        string? ProductName,
+        ManufacturerResolutionResult Resolution);
+
+    private sealed record ManufacturerResolutionGroupKey(
+        string NormalizedSourceValue,
+        ManufacturerResolutionStatus Status,
+        Guid? ManufacturerId,
+        ManufacturerResolutionSource Source,
+        Guid? ManufacturerAliasId,
+        Guid? ManufacturerNoisePhraseId);
+
     private static RowBuildResult BuildRow(
         Dictionary<int, string> rawValues,
         IReadOnlyCollection<ColumnCandidate> candidates,
         ProductType? productType,
         Dictionary<Guid, CharacteristicDefinition> definitionsById,
-        Dictionary<string, Manufacturer> manufacturersByNormalizedName,
+        ManufacturerResolutionIndex manufacturerResolutionIndex,
         bool mappingRequired)
     {
         var issues =
@@ -1052,28 +1105,54 @@ public sealed class CatalogImportWorkbookAnalyzer
                 candidates);
 
         Guid? manufacturerId = null;
+        string? manufacturerResolutionSource = null;
+        Guid? manufacturerAliasId = null;
+        ManufacturerResolutionResult? manufacturerResolution = null;
 
         if (!string.IsNullOrWhiteSpace(manufacturer))
         {
-            var normalizedManufacturerName = NormalizeManufacturerName(manufacturer);
+            var sourceManufacturerName = manufacturer;
+            manufacturerResolution = manufacturerResolutionIndex.Resolve(sourceManufacturerName);
 
-            if (manufacturersByNormalizedName.TryGetValue(
-                normalizedManufacturerName,
-                out var resolvedManufacturer))
+            if (manufacturerResolution.IsResolved)
             {
-                manufacturerId = resolvedManufacturer.Id;
-                manufacturer = resolvedManufacturer.Name;
+                manufacturerId = manufacturerResolution.ManufacturerId;
+                manufacturer = manufacturerResolution.ManufacturerName;
+                manufacturerResolutionSource = manufacturerResolution.Source.ToString();
+                manufacturerAliasId = manufacturerResolution.ManufacturerAliasId;
+
+                if (manufacturerResolution.Source == ManufacturerResolutionSource.ApprovedAlias)
+                {
+                    warnings.Add(
+                        CreateIssue(
+                            "manufacturer.resolved_by_alias",
+                            $"Производитель '{sourceManufacturerName}' определён как '{manufacturerResolution.ManufacturerName}' по подтверждённому псевдониму.",
+                            "manufacturerId",
+                            FindColumnNumber(CatalogImportColumnTargetKind.Manufacturer, candidates)));
+                }
+            }
+            else if (manufacturerResolution.IsIgnoredNoise)
+            {
+                manufacturerResolutionSource = manufacturerResolution.Source.ToString();
+
+                if (!mappingRequired)
+                {
+                    issues.Add(
+                        CreateIssue(
+                            "manufacturer.ignored_noise",
+                            $"Значение '{sourceManufacturerName}' подтверждено Technical-пользователем как шум и не может использоваться как производитель товара. Выберите настоящего производителя вручную.",
+                            "manufacturerId",
+                            FindColumnNumber(CatalogImportColumnTargetKind.Manufacturer, candidates)));
+                }
             }
             else if (!mappingRequired)
             {
                 issues.Add(
                     CreateIssue(
                         "manufacturer.not_resolved",
-                        $"Производитель '{manufacturer}' не найден в справочнике.",
+                        $"Производитель '{sourceManufacturerName}' не найден в справочнике и среди подтверждённых псевдонимов.",
                         "manufacturerId",
-                        FindColumnNumber(
-                            CatalogImportColumnTargetKind.Manufacturer,
-                            candidates)));
+                        FindColumnNumber(CatalogImportColumnTargetKind.Manufacturer, candidates)));
             }
         }
 
@@ -1147,6 +1226,10 @@ public sealed class CatalogImportWorkbookAnalyzer
             new Dictionary<string, string>(
                 StringComparer.Ordinal);
 
+        var characteristicOrigins =
+            new Dictionary<string, CatalogImportCharacteristicValueOrigin>(
+                StringComparer.Ordinal);
+
         foreach (var candidate in candidates
                      .Where(candidate =>
                          candidate.TargetKind
@@ -1178,13 +1261,17 @@ public sealed class CatalogImportWorkbookAnalyzer
             }
 
             if (TryNormalizeCharacteristicValue(
-                    rawValue,
-                    definition,
-                    out var normalizedValue))
+                rawValue,
+                definition,
+                out var normalizedValue))
             {
-                characteristics[
-                    definitionId.ToString()] =
-                        normalizedValue;
+                var definitionKey = definitionId.ToString();
+
+                characteristics[definitionKey] = normalizedValue;
+
+                characteristicOrigins[definitionKey] =
+                    CatalogImportCharacteristicValueOrigin.FromExcel(
+                        candidate.SourceColumnNumber);
             }
             else
             {
@@ -1246,9 +1333,13 @@ public sealed class CatalogImportWorkbookAnalyzer
                 price,
                 stockQuantity,
                 characteristics,
-                manufacturerId),
+                manufacturerId,
+                manufacturerResolutionSource,
+                manufacturerAliasId,
+                characteristicOrigins),
             issues,
-            warnings);
+            warnings,
+            manufacturerResolution);
     }
 
     private static void AddRequiredValueIssues(
@@ -1420,44 +1511,35 @@ public sealed class CatalogImportWorkbookAnalyzer
             sourceColumnNumber);
     }
 
-    private static bool
-        TryNormalizeCharacteristicValue(
-            string rawValue,
-            CharacteristicDefinition definition,
-            out string normalizedValue)
+    private static bool TryNormalizeCharacteristicValue(
+    string rawValue,
+    CharacteristicDefinition definition,
+    out string normalizedValue)
     {
         switch (definition.DataType)
         {
             case CharacteristicDataType.Text:
-                normalizedValue =
-                    rawValue.Trim();
+                normalizedValue = rawValue.Trim();
 
                 return normalizedValue.Length > 0;
 
             case CharacteristicDataType.Number:
-                if (TryParseDecimal(
+                if (CatalogCharacteristicNumericValueNormalizer.TryNormalizeToString(
+                        definition.Code,
                         rawValue,
-                        out var number))
+                        out normalizedValue))
                 {
-                    normalizedValue =
-                        number.ToString(
-                            CultureInfo.InvariantCulture);
-
                     return true;
                 }
 
                 break;
 
             case CharacteristicDataType.Boolean:
-                if (TryParseBoolean(
+                if (CatalogCharacteristicBooleanValueNormalizer.TryNormalizeToString(
+                        definition.Code,
                         rawValue,
-                        out var boolean))
+                        out normalizedValue))
                 {
-                    normalizedValue =
-                        boolean
-                            ? "true"
-                            : "false";
-
                     return true;
                 }
 
@@ -1465,6 +1547,7 @@ public sealed class CatalogImportWorkbookAnalyzer
         }
 
         normalizedValue = string.Empty;
+
         return false;
     }
 
@@ -1559,44 +1642,6 @@ public sealed class CatalogImportWorkbookAnalyzer
         return true;
     }
 
-    private static bool TryParseBoolean(
-        string rawValue,
-        out bool value)
-    {
-        var normalized =
-            NormalizeHeader(rawValue)
-                .Replace(
-                    " ",
-                    string.Empty,
-                    StringComparison.Ordinal);
-
-        switch (normalized)
-        {
-            case "ДА":
-            case "YES":
-            case "TRUE":
-            case "1":
-            case "+":
-            case "ЕСТЬ":
-            case "ИМЕЕТСЯ":
-                value = true;
-                return true;
-
-            case "НЕТ":
-            case "NO":
-            case "FALSE":
-            case "0":
-            case "-":
-            case "ОТСУТСТВУЕТ":
-                value = false;
-                return true;
-
-            default:
-                value = false;
-                return false;
-        }
-    }
-
     private static DefinitionLookups
         BuildDefinitionLookups(
             IReadOnlyCollection<
@@ -1687,14 +1732,6 @@ public sealed class CatalogImportWorkbookAnalyzer
             : value.Trim();
     }
 
-    private static string NormalizeManufacturerName(string value)
-    {
-        return value
-            .Trim()
-            .ToUpperInvariant()
-            .Replace("Ё", "Е", StringComparison.Ordinal);
-    }
-
     private sealed record DefinitionLookups(
         IReadOnlyDictionary<
             string,
@@ -1723,8 +1760,7 @@ public sealed class CatalogImportWorkbookAnalyzer
     private sealed record RowBuildResult(
         CatalogImportRowStatus Status,
         CatalogImportNormalizedRowData Data,
-        IReadOnlyCollection<
-            CatalogImportRowIssue> Issues,
-        IReadOnlyCollection<
-            CatalogImportRowIssue> Warnings);
+        IReadOnlyCollection<CatalogImportRowIssue> Issues,
+        IReadOnlyCollection<CatalogImportRowIssue> Warnings,
+        ManufacturerResolutionResult? ManufacturerResolution);
 }

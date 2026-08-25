@@ -1,57 +1,59 @@
 using CSharpFunctionalExtensions;
-using ElectronicService.Core.Catalog
-    .ImportBatches.Abstractions;
-using ElectronicService.Core.Catalog
-    .ImportBatches.Analysis;
-using ElectronicService.Core.Catalog.Products
-    .Abstractions;
+using ElectronicService.Core.Catalog.ImportBatches.Abstractions;
+using ElectronicService.Core.Catalog.ImportBatches.Analysis;
+using ElectronicService.Core.Catalog.Products.Abstractions;
 using ElectronicService.Core.Users;
-using ElectronicService.Domain.Catalog
-    .Characteristics;
-using ElectronicService.Domain.Catalog
-    .ImportBatches;
-using ElectronicService.Domain.Catalog
-    .ProductTypes;
+using ElectronicService.Domain.Catalog.Characteristics;
+using ElectronicService.Domain.Catalog.ImportBatches;
+using ElectronicService.Domain.Catalog.ProductTypes;
 using ElectronicService.Domain.Common;
+using ElectronicService.Core.Catalog.Manufacturers.Resolution;
 
 namespace ElectronicService.Core.Catalog
     .ImportBatches.AnalyzeCatalogImportBatch;
 
-public sealed class
-    AnalyzeCatalogImportBatchCommandHandler
+public sealed class AnalyzeCatalogImportBatchCommandHandler
 {
-    private readonly ICatalogImportBatchRepository
-        _importBatchRepository;
+    private readonly ICatalogImportBatchRepository _importBatchRepository;
 
-    private readonly IUserRepository
-        _userRepository;
+    private readonly IUserRepository _userRepository;
 
-    private readonly ICatalogProductMetadataRepository
-        _metadataRepository;
+    private readonly ICatalogProductMetadataRepository _metadataRepository;
 
-    private readonly ICatalogImportWorkbookAnalyzer
-        _workbookAnalyzer;
+    private readonly ICatalogImportWorkbookAnalyzer _workbookAnalyzer;
+
+    private readonly ICatalogImportRecognitionShadowService _recognitionShadowService;
+    private readonly ICatalogImportRecognitionEnrichmentService _recognitionEnrichmentService;
+    private readonly ICatalogImportRecognitionFeedbackCollector _recognitionFeedbackCollector;
+    private readonly IManufacturerResolver _manufacturerResolver;
 
     public AnalyzeCatalogImportBatchCommandHandler(
-        ICatalogImportBatchRepository
-            importBatchRepository,
+        ICatalogImportBatchRepository importBatchRepository,
         IUserRepository userRepository,
-        ICatalogProductMetadataRepository
-            metadataRepository,
-        ICatalogImportWorkbookAnalyzer
-            workbookAnalyzer)
+        ICatalogProductMetadataRepository metadataRepository,
+        ICatalogImportWorkbookAnalyzer workbookAnalyzer,
+        ICatalogImportRecognitionShadowService recognitionShadowService,
+        ICatalogImportRecognitionEnrichmentService recognitionEnrichmentService,
+        ICatalogImportRecognitionFeedbackCollector recognitionFeedbackCollector,
+        IManufacturerResolver manufacturerResolver)
     {
-        _importBatchRepository =
-            importBatchRepository;
+        ArgumentNullException.ThrowIfNull(importBatchRepository);
+        ArgumentNullException.ThrowIfNull(userRepository);
+        ArgumentNullException.ThrowIfNull(metadataRepository);
+        ArgumentNullException.ThrowIfNull(workbookAnalyzer);
+        ArgumentNullException.ThrowIfNull(recognitionShadowService);
+        ArgumentNullException.ThrowIfNull(recognitionEnrichmentService);
+        ArgumentNullException.ThrowIfNull(recognitionFeedbackCollector);
+        ArgumentNullException.ThrowIfNull(manufacturerResolver);
 
-        _userRepository =
-            userRepository;
-
-        _metadataRepository =
-            metadataRepository;
-
-        _workbookAnalyzer =
-            workbookAnalyzer;
+        _importBatchRepository = importBatchRepository;
+        _userRepository = userRepository;
+        _metadataRepository = metadataRepository;
+        _workbookAnalyzer = workbookAnalyzer;
+        _recognitionShadowService = recognitionShadowService;
+        _recognitionEnrichmentService = recognitionEnrichmentService;
+        _recognitionFeedbackCollector = recognitionFeedbackCollector;
+        _manufacturerResolver = manufacturerResolver;
     }
 
     public async Task<Result<
@@ -240,8 +242,8 @@ public sealed class
                     cancellationToken)
                 .ConfigureAwait(false);
 
-        var manufacturers = await _metadataRepository
-            .GetManufacturersAsync(cancellationToken)
+        var manufacturerResolutionIndex = await _manufacturerResolver
+            .LoadIndexAsync(cancellationToken)
             .ConfigureAwait(false);
 
         var analysisResult = _workbookAnalyzer.Analyze(
@@ -249,7 +251,7 @@ public sealed class
             batch.File.Content,
             productType,
             definitions,
-            manufacturers,
+            manufacturerResolutionIndex,
             existingColumns,
             cancellationToken);
 
@@ -261,15 +263,45 @@ public sealed class
                     analysisResult.Error);
         }
 
-        var analysis =
-            analysisResult.Value;
+        var analysis = analysisResult.Value;
 
-        var registerResult =
-            batch.RegisterAnalysisResult(
-                analysis.Rows.Count,
-                analysis.ValidRowsCount,
-                analysis.ErrorRowsCount,
-                analysis.MappingRequired);
+        CatalogImportRecognitionShadowResult? recognitionShadow = null;
+        var recognitionEnrichment = CatalogImportRecognitionEnrichmentSummary.Empty;
+        var effectiveAnalysis = analysis;
+
+        if (productType is not null && definitions.Count > 0)
+        {
+            recognitionShadow = await _recognitionShadowService
+                .AnalyzeAsync(
+                    analysis,
+                    productType,
+                    definitions,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            var enrichmentResult = await _recognitionEnrichmentService
+                .EnrichAsync(
+                    analysis,
+                    productType,
+                    definitions,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            if (enrichmentResult.IsFailure)
+            {
+                return Result.Failure<AnalyzeCatalogImportBatchResult, DomainError>(
+                    enrichmentResult.Error);
+            }
+
+            effectiveAnalysis = enrichmentResult.Value.Analysis;
+            recognitionEnrichment = enrichmentResult.Value.Summary;
+        }
+
+        var registerResult = batch.RegisterAnalysisResult(
+                effectiveAnalysis.Rows.Count,
+                effectiveAnalysis.ValidRowsCount,
+                effectiveAnalysis.ErrorRowsCount,
+                effectiveAnalysis.MappingRequired);
 
         if (registerResult.IsFailure)
         {
@@ -279,28 +311,39 @@ public sealed class
                     registerResult.Error);
         }
 
+        var pendingFeedbackRemovalResult = await _recognitionFeedbackCollector
+            .RemovePendingForBatchAsync(batch.Id, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (pendingFeedbackRemovalResult.IsFailure)
+        {
+            return Result.Failure<
+                AnalyzeCatalogImportBatchResult,
+                DomainError>(
+                    pendingFeedbackRemovalResult.Error);
+        }
+
         await _importBatchRepository
             .ReplaceAnalysisAsync(
                 batch,
-                analysis.Columns,
-                analysis.Rows,
+                effectiveAnalysis.Columns,
+                effectiveAnalysis.Rows,
                 cancellationToken)
             .ConfigureAwait(false);
 
-        return Result.Success<
-            AnalyzeCatalogImportBatchResult,
-            DomainError>(
-                new AnalyzeCatalogImportBatchResult(
-                    batch.Id,
-                    batch.Status,
-                    batch.ProductTypeId,
-                    analysis.Columns.Count,
-                    analysis.Columns.Count(column =>
-                        !column.IsMapped),
-                    analysis.Columns.Count(column =>
-                        !column.IsConfirmed),
-                    analysis.Rows.Count,
-                    analysis.ValidRowsCount,
-                    analysis.ErrorRowsCount));
+        return Result.Success<AnalyzeCatalogImportBatchResult, DomainError>(
+            new AnalyzeCatalogImportBatchResult(
+                batch.Id,
+                batch.Status,
+                batch.ProductTypeId,
+                effectiveAnalysis.Columns.Count,
+                effectiveAnalysis.Columns.Count(column => !column.IsMapped),
+                effectiveAnalysis.Columns.Count(column => !column.IsConfirmed),
+                effectiveAnalysis.Rows.Count,
+                effectiveAnalysis.ValidRowsCount,
+                effectiveAnalysis.ErrorRowsCount,
+                effectiveAnalysis.ManufacturerResolutionSummary,
+                recognitionShadow,
+                recognitionEnrichment));
     }
 }

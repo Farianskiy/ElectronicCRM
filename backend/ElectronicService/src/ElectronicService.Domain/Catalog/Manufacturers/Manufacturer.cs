@@ -6,7 +6,7 @@ namespace ElectronicService.Domain.Catalog.Manufacturers;
 
 public sealed class Manufacturer : AggregateRoot
 {
-    private const int NameMaxLength = 200;
+    public const int NameMaxLength = 200;
 
     private Manufacturer(
         Guid id,
@@ -33,20 +33,19 @@ public sealed class Manufacturer : AggregateRoot
             return GeneralErrors.ValueIsRequired(nameof(name));
         }
 
-        var normalizedName = name.Trim();
+        var trimmedName = name.Trim();
 
-        if (normalizedName.Length > NameMaxLength)
+        if (trimmedName.Length > NameMaxLength)
         {
             return GeneralErrors.ValueIsTooLong(nameof(name), NameMaxLength);
         }
 
         return new Manufacturer(
             Guid.CreateVersion7(),
-            normalizedName,
-            Normalize(name));
+            trimmedName,
+            ManufacturerNameNormalizer.Normalize(trimmedName));
     }
 
-    // Метод переименовывает производителя
     public UnitResult<DomainError> Rename(string name)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -54,24 +53,16 @@ public sealed class Manufacturer : AggregateRoot
             return UnitResult.Failure(GeneralErrors.ValueIsRequired(nameof(name)));
         }
 
-        var normalizedName = name.Trim();
+        var trimmedName = name.Trim();
 
-        if (normalizedName.Length > NameMaxLength)
+        if (trimmedName.Length > NameMaxLength)
         {
             return UnitResult.Failure(GeneralErrors.ValueIsTooLong(nameof(name), NameMaxLength));
         }
 
-        Name = normalizedName;
-        NormalizedName = Normalize(name);
+        Name = trimmedName;
+        NormalizedName = ManufacturerNameNormalizer.Normalize(trimmedName);
 
         return UnitResult.Success<DomainError>();
-    }
-
-    private static string Normalize(string value)
-    {
-        return value
-            .Trim()
-            .ToUpperInvariant()
-            .Replace("Ё", "Е", StringComparison.Ordinal);
     }
 }

@@ -102,6 +102,20 @@ public static class CatalogErrors
             $"'{characteristicDefinitionId}' не найдена.");
     }
 
+    public static DomainError CharacteristicDefinitionCannotBeDeleted(
+        string characteristicCode,
+        int productTypesCount,
+        int productsWithValueCount,
+        int importColumnsCount)
+    {
+        return new DomainError(
+            "catalog.characteristic_definition.cannot_be_deleted",
+            $"Характеристику '{characteristicCode}' нельзя удалить. " +
+            $"Используется типами товаров: {productTypesCount}; " +
+            $"заполнена у товаров: {productsWithValueCount}; " +
+            $"используется в сопоставлениях импорта: {importColumnsCount}.");
+    }
+
     public static DomainError ProductTypeCharacteristicNotFound(
     Guid productTypeId,
     Guid characteristicDefinitionId)
@@ -150,6 +164,13 @@ public static class CatalogErrors
         return new DomainError(
             "catalog.dictionary_suggestion.not_found",
             $"Предложение словаря '{suggestionId}' не найдено.");
+    }
+
+    public static DomainError RecognitionCandidateForSuggestionNotFound(Guid suggestionId)
+    {
+        return new DomainError(
+            "catalog.recognition_candidate.for_suggestion_not_found",
+            $"Для предложения словаря '{suggestionId}' не найден связанный кандидат распознавания.");
     }
 
     public static DomainError OnlyTechnicalUserCanReviewDictionarySuggestions()
@@ -290,5 +311,21 @@ public static class CatalogErrors
             $"Товар '{productId}' был изменён другим " +
             "пользователем или процессом. " +
             "Обновите данные и повторите операцию.");
+    }
+
+    public static DomainError DictionaryTargetCharacteristicIsNotAllowedForProductType(
+        string targetCode,
+        string productTypeCode)
+    {
+        return new DomainError(
+            "catalog.dictionary_term.target_not_allowed_for_product_type",
+            $"Характеристика словарного термина '{targetCode}' не входит в схему типа товара '{productTypeCode}'.");
+    }
+
+    public static DomainError OnlyTechnicalUserCanManageManufacturers()
+    {
+        return new DomainError(
+            "catalog.manufacturer.technical_user_required",
+            "Только технический пользователь может управлять производителями и их псевдонимами.");
     }
 }

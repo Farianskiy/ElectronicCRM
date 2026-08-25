@@ -2,15 +2,18 @@ using System.Data;
 using System.Globalization;
 using System.Text.Json;
 using CSharpFunctionalExtensions;
+using ElectronicService.Core.Catalog.Characteristics.Normalization;
 using ElectronicService.Core.Catalog.ImportBatches.Analysis;
 using ElectronicService.Core.Catalog.ImportBatches.ApplyCatalogImportBatch;
 using ElectronicService.Core.Catalog.Products.Audit;
+using ElectronicService.Core.Catalog.Recognition.Learning;
 using ElectronicService.Domain.Catalog.Audit;
 using ElectronicService.Domain.Catalog.Characteristics;
 using ElectronicService.Domain.Catalog.ImportBatches;
 using ElectronicService.Domain.Catalog.Products;
 using ElectronicService.Domain.Catalog.ValueObjects;
 using ElectronicService.Domain.Common;
+using ElectronicService.Domain.Users.Enums;
 using ElectronicService.Infrastructure.Postgres.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -26,25 +29,77 @@ public sealed class CatalogImportBatchApplier : ICatalogImportBatchApplier
     };
 
     private static readonly Action<ILogger, Guid, Exception?> LogApplyFailed =
+    LoggerMessage.Define<Guid>(
+        LogLevel.Error,
+        new EventId(1, nameof(CatalogImportBatchApplier)),
+        "Catalog import batch {BatchId} application failed.");
+
+    private static readonly Action<ILogger, Guid, string, string, Exception?> LogCandidateAggregationRejected =
+        LoggerMessage.Define<Guid, string, string>(
+            LogLevel.Warning,
+            new EventId(2, nameof(CatalogImportBatchApplier)),
+            "Catalog recognition candidate aggregation after batch {BatchId} was rejected. Error code: {ErrorCode}. Error message: {ErrorMessage}");
+
+    private static readonly Action<ILogger, Guid, int, int, int, int, Exception?> LogCandidateAggregationCompleted =
+        LoggerMessage.Define<Guid, int, int, int, int>(
+            LogLevel.Information,
+            new EventId(3, nameof(CatalogImportBatchApplier)),
+            "Catalog recognition candidate aggregation after batch {BatchId} completed. Scanned feedback: {ScannedFeedbackCount}, created candidates: {CreatedCandidateCount}, updated candidates: {UpdatedCandidateCount}, added evidence: {AddedEvidenceCount}.");
+
+    private static readonly Action<ILogger, Guid, Exception?> LogCandidateAggregationFailed =
         LoggerMessage.Define<Guid>(
             LogLevel.Error,
-            new EventId(1, nameof(CatalogImportBatchApplier)),
-            "Catalog import batch {BatchId} application failed.");
+            new EventId(4, nameof(CatalogImportBatchApplier)),
+            "Catalog recognition candidate aggregation after batch {BatchId} failed. The catalog import batch remains successfully applied.");
+
+    private static readonly Action<ILogger, Guid, string, string, Exception?> LogSuggestionPromotionRejected =
+    LoggerMessage.Define<Guid, string, string>(
+        LogLevel.Warning,
+        new EventId(5, nameof(CatalogImportBatchApplier)),
+        "Catalog recognition candidate suggestion promotion after batch {BatchId} was rejected. Error code: {ErrorCode}. Error message: {ErrorMessage}");
+
+    private static readonly Action<ILogger, Guid, int, int, int, int, Exception?> LogSuggestionPromotionCompleted =
+        LoggerMessage.Define<Guid, int, int, int, int>(
+            LogLevel.Information,
+            new EventId(6, nameof(CatalogImportBatchApplier)),
+            "Catalog recognition candidate suggestion promotion after batch {BatchId} completed. Scanned candidates: {ScannedCandidateCount}, eligible candidates: {EligibleCandidateCount}, created suggestions: {CreatedSuggestionCount}, attached existing suggestions: {AttachedExistingSuggestionCount}.");
+
+    private static readonly Action<ILogger, Guid, Exception?> LogSuggestionPromotionFailed =
+        LoggerMessage.Define<Guid>(
+            LogLevel.Error,
+            new EventId(7, nameof(CatalogImportBatchApplier)),
+            "Catalog recognition candidate suggestion promotion after batch {BatchId} failed. The catalog import batch remains successfully applied.");
 
     private readonly ElectronicDbContext _dbContext;
+    private readonly ICatalogImportRecognitionFeedbackFinalizer _recognitionFeedbackFinalizer;
+    private readonly ICatalogRecognitionCandidateAggregator _recognitionCandidateAggregator;
+    private readonly ICatalogRecognitionCandidateSuggestionPromoter _recognitionCandidateSuggestionPromoter;
     private readonly ILogger<CatalogImportBatchApplier> _logger;
 
     public CatalogImportBatchApplier(
         ElectronicDbContext dbContext,
+        ICatalogImportRecognitionFeedbackFinalizer recognitionFeedbackFinalizer,
+        ICatalogRecognitionCandidateAggregator recognitionCandidateAggregator,
+        ICatalogRecognitionCandidateSuggestionPromoter recognitionCandidateSuggestionPromoter,
         ILogger<CatalogImportBatchApplier> logger)
     {
+        ArgumentNullException.ThrowIfNull(dbContext);
+        ArgumentNullException.ThrowIfNull(recognitionFeedbackFinalizer);
+        ArgumentNullException.ThrowIfNull(recognitionCandidateAggregator);
+        ArgumentNullException.ThrowIfNull(recognitionCandidateSuggestionPromoter);
+        ArgumentNullException.ThrowIfNull(logger);
+
         _dbContext = dbContext;
+        _recognitionFeedbackFinalizer = recognitionFeedbackFinalizer;
+        _recognitionCandidateAggregator = recognitionCandidateAggregator;
+        _recognitionCandidateSuggestionPromoter = recognitionCandidateSuggestionPromoter;
         _logger = logger;
     }
 
     public async Task<Result<CatalogImportApplyExecutionResult, DomainError>> ApplyAsync(
         CatalogImportBatch batch,
         Guid appliedByUserId,
+        UserType appliedByUserType,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(batch);
@@ -53,6 +108,12 @@ public sealed class CatalogImportBatchApplier : ICatalogImportBatchApplier
         {
             return Result.Failure<CatalogImportApplyExecutionResult, DomainError>(
                 CatalogImportErrors.CurrentUserNotFound());
+        }
+
+        if (appliedByUserType != UserType.Technical)
+        {
+            return Result.Failure<CatalogImportApplyExecutionResult, DomainError>(
+                CatalogImportErrors.UserCannotApplyCatalogImport());
         }
 
         if (_dbContext.Entry(batch).State == EntityState.Detached)
@@ -74,34 +135,37 @@ public sealed class CatalogImportBatchApplier : ICatalogImportBatchApplier
 
         if (prepareResult.IsFailure)
         {
-            await transaction
-                .RollbackAsync(cancellationToken)
-                .ConfigureAwait(false);
+            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
 
             return Result.Failure<CatalogImportApplyExecutionResult, DomainError>(
                 prepareResult.Error);
         }
 
+        var feedbackFinalizationResult = await _recognitionFeedbackFinalizer.FinalizeForAppliedBatchAsync(
+            batch.Id,
+            appliedByUserId,
+            appliedByUserType,
+            cancellationToken).ConfigureAwait(false);
+
+        if (feedbackFinalizationResult.IsFailure)
+        {
+            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+
+            return Result.Failure<CatalogImportApplyExecutionResult, DomainError>(
+                feedbackFinalizationResult.Error);
+        }
+
         try
         {
-            await _dbContext
-                .SaveChangesAsync(cancellationToken)
-                .ConfigureAwait(false);
+            await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
-            await transaction
-                .CommitAsync(cancellationToken)
-                .ConfigureAwait(false);
-
-            return Result.Success<CatalogImportApplyExecutionResult, DomainError>(
-                prepareResult.Value);
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (DbUpdateConcurrencyException exception)
         {
             LogApplyFailed(_logger, batch.Id, exception);
 
-            await transaction
-                .RollbackAsync(cancellationToken)
-                .ConfigureAwait(false);
+            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
 
             return Result.Failure<CatalogImportApplyExecutionResult, DomainError>(
                 CatalogImportErrors.ApplyConcurrencyConflict());
@@ -110,9 +174,7 @@ public sealed class CatalogImportBatchApplier : ICatalogImportBatchApplier
         {
             LogApplyFailed(_logger, batch.Id, exception);
 
-            await transaction
-                .RollbackAsync(cancellationToken)
-                .ConfigureAwait(false);
+            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
 
             return Result.Failure<CatalogImportApplyExecutionResult, DomainError>(
                 CatalogImportErrors.ApplyDatabaseFailure());
@@ -125,12 +187,96 @@ public sealed class CatalogImportBatchApplier : ICatalogImportBatchApplier
         {
             LogApplyFailed(_logger, batch.Id, exception);
 
-            await transaction
-                .RollbackAsync(cancellationToken)
-                .ConfigureAwait(false);
+            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
 
             return Result.Failure<CatalogImportApplyExecutionResult, DomainError>(
                 CatalogImportErrors.ApplyConcurrencyConflict());
+        }
+
+        await TryAggregateRecognitionCandidatesAfterCommitAsync(batch.Id).ConfigureAwait(false);
+        await TryPromoteRecognitionCandidatesAfterCommitAsync(batch.Id, appliedByUserId).ConfigureAwait(false);
+
+        return Result.Success<CatalogImportApplyExecutionResult, DomainError>(
+            prepareResult.Value);
+    }
+
+    private async Task TryAggregateRecognitionCandidatesAfterCommitAsync(Guid batchId)
+    {
+        try
+        {
+            var aggregationResult = await _recognitionCandidateAggregator.AggregateAsync(cancellationToken: CancellationToken.None).ConfigureAwait(false);
+
+            if (aggregationResult.IsFailure)
+            {
+                LogCandidateAggregationRejected(
+                    _logger,
+                    batchId,
+                    aggregationResult.Error.Code,
+                    aggregationResult.Error.Message,
+                    null);
+
+                return;
+            }
+
+            var aggregation = aggregationResult.Value;
+
+            LogCandidateAggregationCompleted(
+                _logger,
+                batchId,
+                aggregation.ScannedFeedbackCount,
+                aggregation.CreatedCandidateCount,
+                aggregation.UpdatedCandidateCount,
+                aggregation.AddedEvidenceCount,
+                null);
+        }
+        catch (DbUpdateException exception)
+        {
+            LogCandidateAggregationFailed(_logger, batchId, exception);
+        }
+        catch (NpgsqlException exception)
+        {
+            LogCandidateAggregationFailed(_logger, batchId, exception);
+        }
+    }
+
+    private async Task TryPromoteRecognitionCandidatesAfterCommitAsync(Guid batchId, Guid createdByUserId)
+    {
+        try
+        {
+            var promotionResult = await _recognitionCandidateSuggestionPromoter.PromoteEligibleAsync(
+                createdByUserId,
+                cancellationToken: CancellationToken.None).ConfigureAwait(false);
+
+            if (promotionResult.IsFailure)
+            {
+                LogSuggestionPromotionRejected(
+                    _logger,
+                    batchId,
+                    promotionResult.Error.Code,
+                    promotionResult.Error.Message,
+                    null);
+
+                return;
+            }
+
+            var promotion = promotionResult.Value;
+
+            LogSuggestionPromotionCompleted(
+                _logger,
+                batchId,
+                promotion.ScannedCandidateCount,
+                promotion.EligibleCandidateCount,
+                promotion.CreatedSuggestionCount,
+                promotion.AttachedExistingSuggestionCount,
+                null);
+        }
+        catch (DbUpdateException exception)
+        {
+            LogSuggestionPromotionFailed(_logger, batchId, exception);
+        }
+        catch (NpgsqlException exception)
+        {
+            LogSuggestionPromotionFailed(_logger, batchId, exception);
         }
     }
 
@@ -507,7 +653,10 @@ public sealed class CatalogImportBatchApplier : ICatalogImportBatchApplier
                 break;
 
             case CharacteristicDataType.Boolean:
-                if (bool.TryParse(rawValue, out var boolean))
+                if (CatalogCharacteristicBooleanValueNormalizer.TryNormalize(
+                        definition.Code,
+                        rawValue,
+                        out var boolean))
                 {
                     return CharacteristicValue.CreateBoolean(boolean);
                 }

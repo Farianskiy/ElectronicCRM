@@ -2,34 +2,34 @@ using System.Text.RegularExpressions;
 using ElectronicService.Core.Catalog.Assistant.Abstractions;
 using ElectronicService.Core.Catalog.Assistant.AskCatalogAssistant;
 using ElectronicService.Core.Catalog.Dictionaries.Abstractions;
-using ElectronicService.Core.Catalog.Products.SearchProducts;
-using ElectronicService.Domain.Catalog.Dictionaries;
 using ElectronicService.Core.Catalog.Dictionaries.GetTerms;
+using ElectronicService.Core.Catalog.Products.SearchProducts;
+using ElectronicService.Core.Catalog.Recognition.Abstractions;
+using ElectronicService.Core.Catalog.Recognition.Models;
+using ElectronicService.Domain.Catalog.Dictionaries;
 
 namespace ElectronicService.Core.Catalog.Assistant.Parsing;
 
-public sealed partial class RuleBasedCatalogAssistantMessageParser
-    : ICatalogAssistantMessageParser
+public sealed partial class RuleBasedCatalogAssistantMessageParser : ICatalogAssistantMessageParser
 {
+    private const int RegexTimeoutMilliseconds = 100;
+
     private readonly ICatalogDictionaryReader _dictionaryReader;
     private readonly ICatalogAssistantUnknownTermResolver _unknownTermResolver;
+    private readonly ICatalogProductNameRecognitionService _productNameRecognitionService;
 
-    public RuleBasedCatalogAssistantMessageParser(
-    ICatalogDictionaryReader dictionaryReader,
-    ICatalogAssistantUnknownTermResolver unknownTermResolver)
+    public RuleBasedCatalogAssistantMessageParser(ICatalogDictionaryReader dictionaryReader, ICatalogAssistantUnknownTermResolver unknownTermResolver, ICatalogProductNameRecognitionService productNameRecognitionService)
     {
         _dictionaryReader = dictionaryReader;
         _unknownTermResolver = unknownTermResolver;
+        _productNameRecognitionService = productNameRecognitionService;
     }
 
-    public async Task<CatalogAssistantParsedRequest> ParseAsync(
-        string message,
-        CancellationToken cancellationToken = default)
+    public async Task<CatalogAssistantParsedRequest> ParseAsync(string message, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
 
         var normalizedMessage = NormalizeText(message);
-
         var intent = ResolveIntent(normalizedMessage);
 
         var terms = await _dictionaryReader
@@ -44,17 +44,12 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser
 
         foreach (var term in terms)
         {
-            if (!normalizedMessage.Contains(
-                    term.NormalizedPhrase,
-                    StringComparison.Ordinal))
+            if (!normalizedMessage.Contains(term.NormalizedPhrase, StringComparison.Ordinal))
             {
                 continue;
             }
 
-            if (!Enum.TryParse<CatalogDictionaryTermKind>(
-                    term.Kind,
-                    ignoreCase: true,
-                    out var kind))
+            if (!Enum.TryParse<CatalogDictionaryTermKind>(term.Kind, ignoreCase: true, out var kind))
             {
                 continue;
             }
@@ -86,9 +81,19 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser
             }
         }
 
-        ExtractRegexCharacteristics(
-            normalizedMessage,
-            characteristics);
+        var recognitionResult = await _productNameRecognitionService
+            .RecognizeAsync(
+                new CatalogProductNameRecognitionRequest(message),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        foreach (var recognizedCharacteristic in recognitionResult.Characteristics)
+        {
+            AddOrReplaceCharacteristic(
+                characteristics,
+                recognizedCharacteristic.CharacteristicCode,
+                recognizedCharacteristic.NormalizedValue);
+        }
 
         search ??= ExtractSearchToken(normalizedMessage);
 
@@ -131,81 +136,6 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser
         return CatalogAssistantIntent.SearchProducts;
     }
 
-    private static void ExtractRegexCharacteristics(
-        string normalizedMessage,
-        List<SearchProductCharacteristicFilter> characteristics)
-    {
-        var polesMatch = PolesRegex().Match(normalizedMessage);
-
-        if (polesMatch.Success)
-        {
-            AddOrReplaceCharacteristic(
-                characteristics,
-                "POLES",
-                polesMatch.Groups["value"].Value);
-        }
-
-        var breakingCapacityMatch = BreakingCapacityRegex().Match(normalizedMessage);
-
-        if (breakingCapacityMatch.Success)
-        {
-            AddOrReplaceCharacteristic(
-                characteristics,
-                "BREAKING_CAPACITY",
-                breakingCapacityMatch.Groups["value"].Value);
-        }
-
-        var leakageCurrentMatch = LeakageCurrentRegex().Match(normalizedMessage);
-
-        if (leakageCurrentMatch.Success)
-        {
-            AddOrReplaceCharacteristic(
-                characteristics,
-                "LEAKAGE_CURRENT",
-                leakageCurrentMatch.Groups["value"].Value);
-        }
-
-        var ratedCurrentMatch = RatedCurrentRegex().Match(normalizedMessage);
-
-        if (ratedCurrentMatch.Success)
-        {
-            AddOrReplaceCharacteristic(
-                characteristics,
-                "RATED_CURRENT",
-                ratedCurrentMatch.Groups["value"].Value);
-        }
-
-        var curveMatch = CurveRegex().Match(normalizedMessage);
-
-        if (curveMatch.Success)
-        {
-            AddOrReplaceCharacteristic(
-                characteristics,
-                "CURVE",
-                NormalizeCurve(curveMatch.Groups["value"].Value));
-        }
-
-        var curveBeforeCurrentMatch = CurveBeforeCurrentRegex().Match(normalizedMessage);
-
-        if (curveBeforeCurrentMatch.Success)
-        {
-            AddOrReplaceCharacteristic(
-                characteristics,
-                "CURVE",
-                NormalizeCurve(curveBeforeCurrentMatch.Groups["value"].Value));
-        }
-
-        var ipRatingMatch = IpRatingRegex().Match(normalizedMessage);
-
-        if (ipRatingMatch.Success)
-        {
-            AddOrReplaceCharacteristic(
-                characteristics,
-                "IP_RATING",
-                $"IP{ipRatingMatch.Groups["value"].Value}");
-        }
-    }
-
     private static string? ExtractSearchToken(string normalizedMessage)
     {
         var seriesMatch = SeriesTokenRegex().Match(normalizedMessage);
@@ -225,10 +155,7 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser
         return value;
     }
 
-    private static void AddOrReplaceCharacteristic(
-        List<SearchProductCharacteristicFilter> characteristics,
-        string code,
-        string value)
+    private static void AddOrReplaceCharacteristic(List<SearchProductCharacteristicFilter> characteristics, string code, string value)
     {
         var normalizedCode = NormalizeText(code);
         var normalizedValue = NormalizeCharacteristicValue(value);
@@ -246,6 +173,7 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser
         if (existingIndex < 0)
         {
             characteristics.Add(characteristic);
+
             return;
         }
 
@@ -269,76 +197,10 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser
             .Replace("Ё", "Е", StringComparison.Ordinal);
     }
 
-    private static string NormalizeCurve(string value)
-    {
-        var normalizedValue = NormalizeText(value);
-
-        return normalizedValue switch
-        {
-            "С" => "C",
-            "В" => "B",
-            _ => normalizedValue
-        };
-    }
-
-    private const int RegexTimeoutMilliseconds = 100;
-
-    [GeneratedRegex(
-        @"(?<value>\d+)\s*(?:П|P)\b",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
-        RegexTimeoutMilliseconds)]
-    private static partial Regex PolesRegex();
-
-    [GeneratedRegex(
-        @"(?<value>\d+(?:[,.]\d+)?)\s*(?:К|K)\s*(?:А|A)\b",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
-        RegexTimeoutMilliseconds)]
-    private static partial Regex BreakingCapacityRegex();
-
-    [GeneratedRegex(
-        @"(?<value>\d+(?:[,.]\d+)?)\s*(?:М|M)\s*(?:А|A)\b",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
-        RegexTimeoutMilliseconds)]
-    private static partial Regex LeakageCurrentRegex();
-
-    [GeneratedRegex(
-        @"(?<value>\d+(?:[,.]\d+)?)\s*(?:А|A)\b",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
-        RegexTimeoutMilliseconds)]
-    private static partial Regex RatedCurrentRegex();
-
-    [GeneratedRegex(
-        @"\b(?<value>[BCDСВ])\b",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
-        RegexTimeoutMilliseconds)]
-    private static partial Regex CurveRegex();
-
-    [GeneratedRegex(
-        @"\b(?<value>[BCDСВ])\s*\d+",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
-        RegexTimeoutMilliseconds)]
-    private static partial Regex CurveBeforeCurrentRegex();
-
-    [GeneratedRegex(
-        @"\bIP\s*(?<value>\d{2})\b",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
-        RegexTimeoutMilliseconds)]
-    private static partial Regex IpRatingRegex();
-
-    [GeneratedRegex(
-        @"\b(?<value>[А-ЯA-Z]{1,8}\d+[А-ЯA-Z0-9\-]*)\b",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
-        RegexTimeoutMilliseconds)]
-    private static partial Regex SeriesTokenRegex();
-
-    private static string? FindFirstUnknownPhrase(
-    string normalizedMessage,
-    IReadOnlyCollection<CatalogDictionaryTermResult> terms)
+    private static string? FindFirstUnknownPhrase(string normalizedMessage, IReadOnlyCollection<CatalogDictionaryTermResult> terms)
     {
         var recognizedWords = terms
-            .Where(term => normalizedMessage.Contains(
-                term.NormalizedPhrase,
-                StringComparison.Ordinal))
+            .Where(term => normalizedMessage.Contains(term.NormalizedPhrase, StringComparison.Ordinal))
             .SelectMany<CatalogDictionaryTermResult, string>(term =>
                 term.NormalizedPhrase.Split(
                     ' ',
@@ -346,9 +208,9 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser
             .ToHashSet(StringComparer.Ordinal);
 
         foreach (var word in WordRegex()
-                    .Matches(normalizedMessage)
-                    .Cast<Match>()
-                    .Select(match => match.Value))
+                     .Matches(normalizedMessage)
+                     .Cast<Match>()
+                     .Select(match => match.Value))
         {
             if (word.Length < 3)
             {
@@ -403,6 +265,12 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser
         "СЕРИЯ",
         "ТИПА"
     };
+
+    [GeneratedRegex(
+        @"\b(?<value>[А-ЯA-Z]{1,8}\d+[А-ЯA-Z0-9\-]*)\b",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+        RegexTimeoutMilliseconds)]
+    private static partial Regex SeriesTokenRegex();
 
     [GeneratedRegex(
         @"[А-ЯA-Z0-9\-]+",

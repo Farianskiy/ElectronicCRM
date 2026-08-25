@@ -1,20 +1,22 @@
 using ElectronicService.Domain.Catalog.Characteristics;
 
-namespace ElectronicService.Core.Catalog
-    .CharacteristicDefinitions.Abstractions;
+namespace ElectronicService.Core.Catalog.CharacteristicDefinitions.Abstractions;
 
 public interface ICharacteristicDefinitionRepository
 {
-    Task<CharacteristicDefinition?> GetByIdAsync(
-        Guid characteristicDefinitionId,
-        CancellationToken cancellationToken = default);
+    Task<CharacteristicDefinition?> GetByIdAsync(Guid characteristicDefinitionId, CancellationToken cancellationToken = default);
 
-    Task<bool> ExistsByCodeAsync(
-        string normalizedCode,
-        CancellationToken cancellationToken = default);
+    Task<bool> ExistsByCodeAsync(string normalizedCode, CancellationToken cancellationToken = default);
+
+    Task<int> CountProductTypesUsingAsync(Guid characteristicDefinitionId, CancellationToken cancellationToken = default);
+
+    Task<int> CountProductsWithValueAsync(Guid characteristicDefinitionId, CancellationToken cancellationToken = default);
+
+    Task<int> CountImportColumnsUsingAsync(Guid characteristicDefinitionId, CancellationToken cancellationToken = default);
 
     void Add(CharacteristicDefinition definition);
 
-    Task SaveChangesAsync(
-        CancellationToken cancellationToken = default);
+    void Remove(CharacteristicDefinition definition);
+
+    Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }

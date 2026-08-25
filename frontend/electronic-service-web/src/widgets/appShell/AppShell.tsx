@@ -24,6 +24,10 @@ const technicalNavigation = [
     label: "Проверка импортов",
   },
   {
+    href: "/catalog/recognition",
+    label: "Проверка распознавания",
+  },
+  {
     href: "/catalog/characteristics",
     label: "Характеристики каталога",
   },
@@ -47,7 +51,7 @@ export function AppShell({ children }: AppShellProps) {
     ? [...regularNavigation, ...technicalNavigation]
     : regularNavigation;
 
-  function handleLogout() {
+  function handleLogout(): void {
     clearAuthSession();
     router.push("/login");
   }
@@ -57,6 +61,7 @@ export function AppShell({ children }: AppShellProps) {
       <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-white/10 bg-[#111318] p-5 lg:block">
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
           <p className="text-sm font-semibold text-teal-300">Electronic CRM</p>
+
           <p className="mt-1 text-xs text-slate-400">Каталог и assistant</p>
         </div>
 
@@ -88,6 +93,7 @@ export function AppShell({ children }: AppShellProps) {
           <p className="text-sm font-semibold text-white">
             {session?.displayName ?? "Пользователь"}
           </p>
+
           <p className="mt-1 text-xs text-slate-400">
             {session?.userType ?? "Unknown"}
           </p>
@@ -109,6 +115,7 @@ export function AppShell({ children }: AppShellProps) {
                 <p className="text-sm font-semibold text-white">
                   {session?.displayName ?? "Пользователь"}
                 </p>
+
                 <p className="text-xs text-slate-400">
                   {session?.userType ?? "Unknown"}
                 </p>

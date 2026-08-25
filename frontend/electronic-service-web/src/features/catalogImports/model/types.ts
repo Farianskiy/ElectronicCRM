@@ -92,6 +92,152 @@ export interface CreateCatalogImportBatchResponse {
   status: CatalogImportBatchStatus;
 }
 
+export const catalogImportRecognitionShadowSampleKinds = [
+  "None",
+  "Conflict",
+  "NotRecognized",
+  "RecognitionWithoutExplicitValue",
+  "Ambiguous",
+] as const;
+
+export type CatalogImportRecognitionShadowSampleKind =
+  (typeof catalogImportRecognitionShadowSampleKinds)[number];
+
+export interface CatalogImportRecognitionShadowCharacteristic {
+  characteristicCode: string;
+  characteristicName: string;
+  explicitValuesCount: number;
+  recognizedValuesCount: number;
+  matchesCount: number;
+  conflictsCount: number;
+  notRecognizedCount: number;
+  recognitionWithoutExplicitValueCount: number;
+  ambiguousCount: number;
+}
+
+export interface CatalogImportRecognitionShadowConflictGroup {
+  characteristicCode: string;
+  characteristicName: string;
+  excelValue: string;
+  recognizedValue: string;
+  rawRecognizedValue: string;
+  recognitionSource: string;
+  confidence: number;
+  spanStart: number;
+  spanLength: number;
+  priority: number;
+  recognizerKey: string;
+  occurrenceCount: number;
+  exampleRowNumbers: number[];
+  exampleProductNames: string[];
+}
+
+export interface CatalogImportRecognitionShadowSample {
+  rowNumber: number;
+  productName: string;
+  characteristicCode: string;
+  characteristicName: string;
+  kind: CatalogImportRecognitionShadowSampleKind;
+  excelValue?: string | null;
+  recognizedValue?: string | null;
+  rawRecognizedValue?: string | null;
+  confidence?: number | null;
+  recognitionSource?: string | null;
+  recognizerKey?: string | null;
+  spanStart?: number | null;
+  spanLength?: number | null;
+  priority?: number | null;
+  details?: string | null;
+}
+
+export interface CatalogImportRecognitionShadow {
+  rowsAnalyzed: number;
+  rowsWithRecognition: number;
+  failedRowsCount: number;
+  explicitValuesCount: number;
+  recognizedValuesCount: number;
+  matchesCount: number;
+  conflictsCount: number;
+  notRecognizedCount: number;
+  recognitionWithoutExplicitValueCount: number;
+  ambiguousCount: number;
+  characteristics: CatalogImportRecognitionShadowCharacteristic[];
+  conflictGroups: CatalogImportRecognitionShadowConflictGroup[];
+  samples: CatalogImportRecognitionShadowSample[];
+}
+
+export const catalogImportManufacturerResolutionStatuses = [
+  "Unresolved",
+  "Resolved",
+  "IgnoredNoise",
+] as const;
+
+export type CatalogImportManufacturerResolutionStatus =
+  (typeof catalogImportManufacturerResolutionStatuses)[number];
+
+export const catalogImportManufacturerResolutionSources = [
+  "None",
+  "ExactName",
+  "ApprovedAlias",
+  "IgnoredNoise",
+] as const;
+
+export type CatalogImportManufacturerResolutionSource =
+  (typeof catalogImportManufacturerResolutionSources)[number];
+
+export interface CatalogImportManufacturerResolutionGroup {
+  sourceValue: string;
+  normalizedSourceValue: string;
+  status: CatalogImportManufacturerResolutionStatus;
+  manufacturerId?: string | null;
+  resolvedManufacturerName?: string | null;
+  source: CatalogImportManufacturerResolutionSource;
+  manufacturerAliasId?: string | null;
+  manufacturerNoisePhraseId?: string | null;
+  noiseReason?: string | null;
+  occurrenceCount: number;
+  exampleRowNumbers: number[];
+  exampleProductNames: string[];
+}
+
+export interface CatalogImportManufacturerResolutionSummary {
+  rowsWithManufacturerValueCount: number;
+  resolvedByExactNameRowsCount: number;
+  resolvedByApprovedAliasRowsCount: number;
+  ignoredNoiseRowsCount: number;
+  unresolvedRowsCount: number;
+  groups: CatalogImportManufacturerResolutionGroup[];
+}
+
+export interface CatalogImportRecognitionAppliedValue {
+  rowNumber: number;
+  characteristicDefinitionId: string;
+  characteristicCode: string;
+  characteristicName: string;
+  value: string;
+  rawValue: string;
+  recognitionSource: string;
+  confidence: number;
+  spanStart: number;
+  spanLength: number;
+  priority: number;
+  recognizerKey: string;
+}
+
+export interface CatalogImportRecognitionEnrichment {
+  rowsAnalyzedCount: number;
+  filledRowsCount: number;
+  filledValuesCount: number;
+  blockedByRecognitionConflictCount: number;
+  blockedByLowConfidenceCount: number;
+  blockedByUnsupportedSourceCount: number;
+  blockedByInvalidExcelValueCount: number;
+  blockedByInvalidRecognizedValueCount: number;
+  failedRecognitionRowsCount: number;
+  appliedValuesDetailsTruncated: boolean;
+  appliedValues: CatalogImportRecognitionAppliedValue[];
+}
+
 export interface AnalyzeCatalogImportBatchResponse {
   batchId: string;
   status: CatalogImportBatchStatus;
@@ -102,6 +248,9 @@ export interface AnalyzeCatalogImportBatchResponse {
   rowsCount: number;
   validRowsCount: number;
   errorRowsCount: number;
+  manufacturerResolutionSummary: CatalogImportManufacturerResolutionSummary;
+  recognitionShadow?: CatalogImportRecognitionShadow | null;
+  recognitionEnrichment: CatalogImportRecognitionEnrichment;
 }
 
 export const catalogImportRowStatuses = [
@@ -241,6 +390,39 @@ export interface UpdateCatalogImportRowResponse {
   data: CatalogImportNormalizedRow;
   issues: CatalogImportRowIssue[];
   warnings: CatalogImportRowIssue[];
+  batchStatus: CatalogImportBatchStatus;
+  rowsCount: number;
+  validRowsCount: number;
+  errorRowsCount: number;
+  version: number;
+}
+
+export interface BulkUpdateCatalogImportRowRequest {
+  rowId: string;
+  name: string | null;
+  article: string | null;
+  manufacturerId: string | null;
+  price: number | null;
+  stockQuantity: number | null;
+  characteristics: Record<string, string>;
+}
+
+export interface BulkUpdateCatalogImportRowsRequest {
+  expectedVersion: number;
+  rows: BulkUpdateCatalogImportRowRequest[];
+}
+
+export interface BulkUpdatedCatalogImportRowResponse {
+  rowId: string;
+  rowNumber: number;
+  rowStatus: CatalogImportRowStatus;
+  data: CatalogImportNormalizedRow;
+  issues: CatalogImportRowIssue[];
+  warnings: CatalogImportRowIssue[];
+}
+
+export interface BulkUpdateCatalogImportRowsResponse {
+  rows: BulkUpdatedCatalogImportRowResponse[];
   batchStatus: CatalogImportBatchStatus;
   rowsCount: number;
   validRowsCount: number;
@@ -393,3 +575,4 @@ export interface GetCatalogImportAppliedProductsParams {
   page: number;
   pageSize: number;
 }
+

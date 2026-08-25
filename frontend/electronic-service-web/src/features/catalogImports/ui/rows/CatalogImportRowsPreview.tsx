@@ -2,23 +2,25 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { Fragment, useState } from "react";
+import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
+import { AppSelect } from "@/shared/ui/AppSelect";
 import { getCatalogImportRows } from "../../api/getCatalogImportRows";
+import { getCatalogImportRowFilterStatusLabel } from "../../model/catalogImportRowStatus";
+import { catalogImportQueryKeys } from "../../model/queryKeys";
 import {
   catalogImportRowFilterStatuses,
   type CatalogImportRow,
   type CatalogImportRowFilterStatus,
   type CatalogImportRowIssue,
 } from "../../model/types";
-import { getCatalogImportRowFilterStatusLabel } from "../../model/catalogImportRowStatus";
-import { CatalogImportRowStatusBadge } from ".././CatalogImportRowStatusBadge";
-import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
-import { AppSelect } from "@/shared/ui/AppSelect";
+import { CatalogImportRowStatusBadge } from "../CatalogImportRowStatusBadge";
+import { CatalogImportBulkRowsEditor } from "./CatalogImportBulkRowsEditor";
 import { CatalogImportRowEditor } from "./CatalogImportRowEditor";
-import { catalogImportQueryKeys } from "../../model/queryKeys";
 
 interface CatalogImportRowsPreviewProps {
   batchId: string;
   productTypeId?: string | null;
+  expectedVersion: number;
   canEditRows: boolean;
 }
 
@@ -62,6 +64,7 @@ function getRawDataEntries(row: CatalogImportRow): Array<[string, string]> {
 export function CatalogImportRowsPreview({
   batchId,
   productTypeId,
+  expectedVersion,
   canEditRows,
 }: CatalogImportRowsPreviewProps) {
   const [status, setStatus] = useState<CatalogImportRowFilterStatus | null>(
@@ -73,6 +76,12 @@ export function CatalogImportRowsPreview({
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
 
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
+
+  const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+
+  const [isBulkEditorOpen, setIsBulkEditorOpen] = useState(false);
 
   const rowsQuery = useQuery({
     queryKey: catalogImportQueryKeys.rows(batchId, status, page, pageSize),
@@ -92,6 +101,57 @@ export function CatalogImportRowsPreview({
   const backendTotalPages = rowsQuery.data?.totalPages ?? 0;
   const totalPages = Math.max(1, backendTotalPages);
 
+  const canUseBulkEditing = canEditRows && Boolean(productTypeId);
+
+  const selectedRows = items.filter((row) => selectedRowIds.has(row.rowId));
+
+  const allPageRowsSelected =
+    items.length > 0 && selectedRows.length === items.length;
+
+  function clearSelectedRows(): void {
+    setSelectedRowIds(new Set());
+    setIsBulkEditorOpen(false);
+  }
+
+  function toggleSelectedRow(rowId: string): void {
+    setSelectedRowIds((currentRowIds) => {
+      const nextRowIds = new Set(currentRowIds);
+
+      if (nextRowIds.has(rowId)) {
+        nextRowIds.delete(rowId);
+      } else {
+        nextRowIds.add(rowId);
+      }
+
+      return nextRowIds;
+    });
+
+    setIsBulkEditorOpen(false);
+    setEditingRowId(null);
+  }
+
+  function toggleCurrentPageSelection(): void {
+    if (allPageRowsSelected) {
+      clearSelectedRows();
+
+      return;
+    }
+
+    setSelectedRowIds(new Set(items.map((row) => row.rowId)));
+    setIsBulkEditorOpen(false);
+    setEditingRowId(null);
+  }
+
+  function openBulkEditor(): void {
+    if (!canUseBulkEditing || selectedRows.length === 0) {
+      return;
+    }
+
+    setExpandedRowId(null);
+    setEditingRowId(null);
+    setIsBulkEditorOpen(true);
+  }
+
   function handleStatusChange(value: string): void {
     setStatus(
       value.length === 0 ? null : (value as CatalogImportRowFilterStatus),
@@ -99,6 +159,7 @@ export function CatalogImportRowsPreview({
 
     setExpandedRowId(null);
     setEditingRowId(null);
+    clearSelectedRows();
     setPage(1);
   }
 
@@ -110,6 +171,7 @@ export function CatalogImportRowsPreview({
 
   function editRow(rowId: string): void {
     setExpandedRowId(null);
+    clearSelectedRows();
 
     setEditingRowId((currentRowId) => (currentRowId === rowId ? null : rowId));
   }
@@ -165,6 +227,58 @@ export function CatalogImportRowsPreview({
             <span className="text-teal-300">Обновляем...</span>
           )}
         </div>
+
+        {canUseBulkEditing && selectedRows.length > 0 && (
+          <div className="mt-5 rounded-2xl border border-teal-500/30 bg-teal-500/10 p-5">
+            <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+              <div>
+                <h3 className="font-semibold text-teal-100">
+                  Выбрано строк: {selectedRows.length}
+                </h3>
+
+                <p className="mt-1 text-sm text-teal-100/70">
+                  Можно изменить каждую выбранную строку и сохранить всё одним
+                  запросом.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  disabled={isBulkEditorOpen}
+                  onClick={openBulkEditor}
+                  className="rounded-xl bg-teal-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-teal-400 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Редактировать выбранные
+                </button>
+
+                <button
+                  type="button"
+                  onClick={clearSelectedRows}
+                  className="rounded-xl border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-white/[0.1]"
+                >
+                  Снять выбор
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isBulkEditorOpen && productTypeId && selectedRows.length > 0 && (
+          <CatalogImportBulkRowsEditor
+            key={selectedRows.map((row) => row.rowId).join("-")}
+            batchId={batchId}
+            productTypeId={productTypeId}
+            expectedVersion={expectedVersion}
+            rows={selectedRows}
+            onCancel={() => {
+              setIsBulkEditorOpen(false);
+            }}
+            onSaved={() => {
+              clearSelectedRows();
+            }}
+          />
+        )}
       </div>
 
       {rowsQuery.isError && (
@@ -193,6 +307,21 @@ export function CatalogImportRowsPreview({
           <table className="w-full min-w-[1280px] border-collapse text-left text-sm">
             <thead className="bg-black/30 text-slate-400">
               <tr>
+                <th className="w-14 px-4 py-3 font-medium">
+                  <input
+                    type="checkbox"
+                    checked={allPageRowsSelected}
+                    disabled={
+                      !canUseBulkEditing ||
+                      items.length === 0 ||
+                      isBulkEditorOpen
+                    }
+                    onChange={toggleCurrentPageSelection}
+                    aria-label="Выбрать все строки текущей страницы"
+                    className="h-4 w-4 cursor-pointer accent-teal-500 disabled:cursor-not-allowed disabled:opacity-40"
+                  />
+                </th>
+
                 <th className="px-4 py-3 font-medium">Строка</th>
 
                 <th className="px-4 py-3 font-medium">Статус</th>
@@ -224,6 +353,17 @@ export function CatalogImportRowsPreview({
                 return (
                   <Fragment key={row.rowId}>
                     <tr className="bg-white/[0.01] align-top transition hover:bg-white/[0.04]">
+                      <td className="px-4 py-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedRowIds.has(row.rowId)}
+                          disabled={!rowCanBeEdited || isBulkEditorOpen}
+                          onChange={() => toggleSelectedRow(row.rowId)}
+                          aria-label={`Выбрать строку ${row.rowNumber}`}
+                          className="h-4 w-4 cursor-pointer accent-teal-500 disabled:cursor-not-allowed disabled:opacity-40"
+                        />
+                      </td>
+
                       <td className="px-4 py-4 font-medium text-white">
                         {row.rowNumber}
                       </td>
@@ -308,7 +448,7 @@ export function CatalogImportRowsPreview({
 
                     {(isExpanded || isEditing) && (
                       <tr className="bg-black/20">
-                        <td colSpan={9} className="px-5 py-5">
+                        <td colSpan={10} className="px-5 py-5">
                           {isEditing && productTypeId ? (
                             <CatalogImportRowEditor
                               key={`${row.rowId}-${row.status}`}
@@ -343,7 +483,7 @@ export function CatalogImportRowsPreview({
           onClick={() => {
             setExpandedRowId(null);
             setEditingRowId(null);
-
+            clearSelectedRows();
             setPage((currentPage) => Math.max(1, currentPage - 1));
           }}
           className="rounded-xl bg-white/[0.06] px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-40"
@@ -361,7 +501,7 @@ export function CatalogImportRowsPreview({
           onClick={() => {
             setExpandedRowId(null);
             setEditingRowId(null);
-
+            clearSelectedRows();
             setPage((currentPage) => Math.min(totalPages, currentPage + 1));
           }}
           className="rounded-xl bg-white/[0.06] px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-40"

@@ -10,9 +10,10 @@ public sealed class CatalogAssistantDictionarySuggestionsController : Controller
 {
     private readonly GetCatalogAssistantDictionarySuggestionsQueryHandler _handler;
 
-    public CatalogAssistantDictionarySuggestionsController(
-        GetCatalogAssistantDictionarySuggestionsQueryHandler handler)
+    public CatalogAssistantDictionarySuggestionsController(GetCatalogAssistantDictionarySuggestionsQueryHandler handler)
     {
+        ArgumentNullException.ThrowIfNull(handler);
+
         _handler = handler;
     }
 
@@ -30,31 +31,68 @@ public sealed class CatalogAssistantDictionarySuggestionsController : Controller
             page,
             pageSize);
 
-        var result = await _handler
-            .Handle(query, cancellationToken)
-            .ConfigureAwait(false);
+        var result = await _handler.Handle(query, cancellationToken).ConfigureAwait(false);
 
         if (result.IsFailure)
         {
             return BadRequest(result.Error.Message);
         }
 
+        var items = result.Value.Items.Select(suggestion => new CatalogAssistantDictionarySuggestionResponse(
+            suggestion.Id,
+            suggestion.OriginalMessage,
+            suggestion.UnknownPhrase,
+            suggestion.NormalizedUnknownPhrase,
+            suggestion.SuggestedKind,
+            suggestion.SuggestedTargetCode,
+            suggestion.SuggestedTargetValue,
+            suggestion.Confidence,
+            suggestion.Source,
+            suggestion.ProductTypeId,
+            suggestion.ProductTypeCode,
+            suggestion.ProductTypeName,
+            suggestion.CharacteristicDefinitionId,
+            suggestion.CharacteristicCode,
+            suggestion.CharacteristicName,
+            suggestion.OccurrenceCount,
+            suggestion.AcceptedEvidenceCount,
+            suggestion.CorrectedEvidenceCount,
+            suggestion.RejectedEvidenceCount,
+            suggestion.GeneratedAutomatically,
+            suggestion.EvidenceExamples.Select(evidence => new CatalogAssistantDictionarySuggestionEvidenceExampleResponse(
+                evidence.FeedbackId,
+                evidence.ProductName,
+                evidence.FeedbackType,
+                evidence.SuggestedRawValue,
+                evidence.SuggestedNormalizedValue,
+                evidence.FinalNormalizedValue,
+                evidence.SuggestedConfidence,
+                evidence.SuggestedSource,
+                evidence.SpanStart,
+                evidence.SpanLength,
+                evidence.LabelQuality,
+                evidence.FinalizedAtUtc)).ToList(),
+            suggestion.ApprovedPhrase,
+            suggestion.ApprovedKind,
+            suggestion.ApprovedTargetCode,
+            suggestion.ApprovedTargetValue,
+            suggestion.ApprovedProductTypeId,
+            suggestion.ApprovedProductTypeCode,
+            suggestion.ApprovedProductTypeName,
+            suggestion.ApprovedCharacteristicDefinitionId,
+            suggestion.ApprovedCharacteristicCode,
+            suggestion.ApprovedCharacteristicName,
+            suggestion.ApprovedPriority,
+            suggestion.CreatedDictionaryTermId,
+            suggestion.Status,
+            suggestion.CreatedByUserId,
+            suggestion.CreatedAtUtc,
+            suggestion.ReviewedByUserId,
+            suggestion.ReviewedAtUtc,
+            suggestion.ReviewComment)).ToList();
+
         return Ok(new CatalogAssistantDictionarySuggestionsResponse(
-            result.Value.Items.Select(suggestion => new CatalogAssistantDictionarySuggestionResponse(
-                suggestion.Id,
-                suggestion.OriginalMessage,
-                suggestion.UnknownPhrase,
-                suggestion.NormalizedUnknownPhrase,
-                suggestion.SuggestedKind,
-                suggestion.SuggestedTargetCode,
-                suggestion.SuggestedTargetValue,
-                suggestion.Confidence,
-                suggestion.Status,
-                suggestion.CreatedByUserId,
-                suggestion.CreatedAtUtc,
-                suggestion.ReviewedByUserId,
-                suggestion.ReviewedAtUtc,
-                suggestion.ReviewComment)).ToList(),
+            items,
             result.Value.Page,
             result.Value.PageSize,
             result.Value.TotalCount));

@@ -1,3 +1,6 @@
 [**/Migrations/*.cs]
 generated_code = true
 dotnet_diagnostic.CA1861.severity = none
+
+[*.cs]
+MA0015.consider_member_access_as_parameter = true

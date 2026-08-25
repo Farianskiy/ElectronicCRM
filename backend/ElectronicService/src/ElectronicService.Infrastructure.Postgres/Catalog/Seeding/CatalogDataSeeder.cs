@@ -8,9 +8,9 @@ using Microsoft.Extensions.Logging;
 namespace ElectronicService.Infrastructure.Postgres.Catalog.Seeding;
 
 // это сервис, который будет вызываться при старте приложения, sealed означает, что от этого класса нельзя наследоваться
-public sealed class CatalogDataSeeder
+public sealed partial class CatalogDataSeeder
 {
-    
+
     // Список начальных терминов словаря, которые нужно добавить в БД, для распознования запросов пользователей, например, "ИЭК" -> "IEK"
     private static readonly CatalogDictionaryTermSeed[] DictionaryTerms =
     [
@@ -67,6 +67,8 @@ public sealed class CatalogDataSeeder
 
         new("РУБИЛЬНИК", CatalogDictionaryTermKind.ProductType, null, "SWITCH_DISCONNECTOR", 100),
         new("ВЫКЛЮЧАТЕЛЬ НАГРУЗКИ", CatalogDictionaryTermKind.ProductType, null, "LOAD_SWITCH", 100),
+
+        new("NB1", CatalogDictionaryTermKind.Characteristic, "PRODUCT_SERIES", "NB1", 100),
 
         new("АРМАТ", CatalogDictionaryTermKind.Characteristic, "PRODUCT_SERIES", "ARMAT", 100),
         new("ARMAT", CatalogDictionaryTermKind.Characteristic, "PRODUCT_SERIES", "ARMAT", 100),
@@ -664,8 +666,17 @@ public sealed class CatalogDataSeeder
         _logger = logger;
     }
 
-    public async Task SeedAsync(CancellationToken cancellationToken = default)
+    public async Task SeedAsync(
+    CancellationToken cancellationToken = default)
     {
+        await SeedManufacturersAsync(cancellationToken).ConfigureAwait(false);
+
+        await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        await SeedManufacturerAliasesAsync(cancellationToken).ConfigureAwait(false);
+
+        await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
         await SeedCharacteristicsAsync(cancellationToken).ConfigureAwait(false);
 
         await SeedProductTypesAsync(cancellationToken).ConfigureAwait(false);
@@ -673,6 +684,10 @@ public sealed class CatalogDataSeeder
         await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
         await SeedProductTypeCharacteristicsAsync(cancellationToken).ConfigureAwait(false);
+
+        await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        await SeedRecognitionProfilesAsync(cancellationToken).ConfigureAwait(false);
 
         await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
@@ -848,7 +863,8 @@ public sealed class CatalogDataSeeder
                 seed.TargetValue,
                 seed.Priority,
                 CatalogDictionaryTermStatus.Approved,
-                CatalogDictionaryTermSource.Seed);
+                CatalogDictionaryTermSource.Seed,
+                productTypeId: null);
 
             if (termResult.IsFailure)
             {

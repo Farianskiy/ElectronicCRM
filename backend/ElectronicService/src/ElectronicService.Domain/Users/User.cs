@@ -90,6 +90,16 @@ public sealed class User : AggregateRoot
         return IsActive && IsTechnical;
     }
 
+    public bool CanManageCatalogRecognitionProfiles()
+    {
+        return IsActive && IsTechnical;
+    }
+
+    public bool CanManageManufacturers()
+    {
+        return IsActive && IsTechnical;
+    }
+
     public bool CanCreateCatalogImport()
     {
         return IsActive

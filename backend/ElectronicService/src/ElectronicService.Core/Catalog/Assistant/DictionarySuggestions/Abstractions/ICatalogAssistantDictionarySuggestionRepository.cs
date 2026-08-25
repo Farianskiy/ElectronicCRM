@@ -4,13 +4,11 @@ namespace ElectronicService.Core.Catalog.Assistant.DictionarySuggestions.Abstrac
 
 public interface ICatalogAssistantDictionarySuggestionRepository
 {
-    Task<CatalogAssistantDictionarySuggestion?> GetByIdAsync(
-        Guid suggestionId,
-        CancellationToken cancellationToken = default);
+    Task<CatalogAssistantDictionarySuggestion?> GetByIdAsync(Guid suggestionId, CancellationToken cancellationToken = default);
 
-    Task<bool> ExistsPendingAsync(
-        CatalogAssistantDictionarySuggestion suggestion,
-        CancellationToken cancellationToken = default);
+    Task<CatalogAssistantDictionarySuggestion?> GetEquivalentPendingAsync(CatalogAssistantDictionarySuggestion suggestion, CancellationToken cancellationToken = default);
+
+    Task<bool> ExistsPendingAsync(CatalogAssistantDictionarySuggestion suggestion, CancellationToken cancellationToken = default);
 
     void Add(CatalogAssistantDictionarySuggestion suggestion);
 

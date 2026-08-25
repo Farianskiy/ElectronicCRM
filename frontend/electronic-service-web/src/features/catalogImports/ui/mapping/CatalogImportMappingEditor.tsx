@@ -4,10 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState, type FormEvent } from "react";
 import { getCatalogProductTypeCharacteristics } from "@/features/catalogMetadata/api/getCatalogProductTypeCharacteristics";
 import { getCatalogProductTypes } from "@/features/catalogMetadata/api/getCatalogProductTypes";
-import type {
-  CatalogProductTypeCharacteristicMetadata,
-  CatalogProductTypeMetadata,
-} from "@/features/catalogMetadata/model/types";
+import type { CatalogProductTypeMetadata } from "@/features/catalogMetadata/model/types";
 import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
 import { AppSelect } from "@/shared/ui/AppSelect";
 import { analyzeCatalogImportBatch } from "../../api/analyzeCatalogImportBatch";
@@ -25,6 +22,9 @@ import {
 } from "../../model/types";
 import { validateCatalogImportMapping } from "../../model/mappingValidation";
 import { catalogImportQueryKeys } from "../../model/queryKeys";
+import { CatalogImportCharacteristicAssignment } from "./CatalogImportCharacteristicAssignment";
+import { CatalogImportRecognitionShadowPanel } from "../recognition/CatalogImportRecognitionShadowPanel";
+import { CatalogImportManufacturerResolutionPanel } from "../manufacturers/CatalogImportManufacturerResolutionPanel";
 
 interface CatalogImportMappingEditorProps {
   batchId: string;
@@ -51,37 +51,12 @@ function formatConfidence(confidence: number): string {
   return `${Math.round(confidence * 100)}%`;
 }
 
-function formatCharacteristicDataType(dataType: string): string {
-  switch (dataType) {
-    case "Text":
-      return "Текст";
-
-    case "Number":
-      return "Число";
-
-    case "Boolean":
-      return "Да / Нет";
-
-    default:
-      return dataType;
-  }
-}
-
-function getCharacteristicLabel(
-  characteristic: CatalogProductTypeCharacteristicMetadata,
-): string {
-  const unit = characteristic.unit ? `, ${characteristic.unit}` : "";
-
-  const required = characteristic.isRequired ? " · обязательная" : "";
-
-  return `${characteristic.name}${unit} · ${formatCharacteristicDataType(
-    characteristic.dataType,
-  )}${required}`;
-}
-
 export function CatalogImportMappingEditor({
   batchId,
 }: CatalogImportMappingEditorProps) {
+  const [analysis, setAnalysis] =
+    useState<AnalyzeCatalogImportBatchResponse | null>(null);
+
   const mappingQuery = useQuery({
     queryKey: catalogImportQueryKeys.mapping(batchId),
     queryFn: () => getCatalogImportMapping(batchId),
@@ -123,12 +98,27 @@ export function CatalogImportMappingEditor({
   }
 
   return (
-    <CatalogImportMappingForm
-      key={`${mapping.version}-${mapping.productTypeId ?? "none"}`}
-      batchId={batchId}
-      initialMapping={mapping}
-      productTypes={productTypes}
-    />
+    <>
+      <CatalogImportMappingForm
+        key={`${mapping.version}-${mapping.productTypeId ?? "none"}`}
+        batchId={batchId}
+        initialMapping={mapping}
+        productTypes={productTypes}
+        onAnalysisChange={setAnalysis}
+      />
+
+      <CatalogImportManufacturerResolutionPanel
+        batchId={batchId}
+        productTypeId={analysis?.productTypeId ?? mapping.productTypeId}
+        summary={analysis?.manufacturerResolutionSummary ?? null}
+        onAnalysisChange={setAnalysis}
+      />
+
+      <CatalogImportRecognitionShadowPanel
+        recognitionShadow={analysis?.recognitionShadow ?? null}
+        recognitionEnrichment={analysis?.recognitionEnrichment ?? null}
+      />
+    </>
   );
 }
 
@@ -136,10 +126,14 @@ function CatalogImportMappingForm({
   batchId,
   initialMapping,
   productTypes,
+  onAnalysisChange,
 }: {
   batchId: string;
   initialMapping: GetCatalogImportMappingResponse;
   productTypes: CatalogProductTypeMetadata[];
+  onAnalysisChange: (
+    analysis: AnalyzeCatalogImportBatchResponse | null,
+  ) => void;
 }) {
   const queryClient = useQueryClient();
 
@@ -155,6 +149,8 @@ function CatalogImportMappingForm({
 
   const [formErrors, setFormErrors] = useState<string[]>([]);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [busyCharacteristicColumnIds, setBusyCharacteristicColumnIds] =
+    useState<Set<string>>(() => new Set());
 
   const selectedProductType = productTypes.find(
     (productType) => productType.id === selectedProductTypeId,
@@ -210,7 +206,13 @@ function CatalogImportMappingForm({
       };
     },
 
+    onMutate: () => {
+      onAnalysisChange(null);
+    },
+
     onSuccess: async ({ analysis }) => {
+      onAnalysisChange(analysis);
+
       setFormErrors([]);
 
       setColumns((currentColumns) =>
@@ -254,6 +256,41 @@ function CatalogImportMappingForm({
     },
   });
 
+  const productTypeAnalysisMutation = useMutation({
+    mutationFn: async (productTypeId: string) => {
+      return analyzeCatalogImportBatch(batchId, productTypeId);
+    },
+
+    onMutate: () => {
+      onAnalysisChange(null);
+    },
+
+    onSuccess: async (analysis) => {
+      onAnalysisChange(analysis);
+      setFormErrors([]);
+      setSuccessMessage(null);
+
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: catalogImportQueryKeys.mapping(batchId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: catalogImportQueryKeys.details(batchId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: catalogImportQueryKeys.rowsRoot(batchId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: catalogImportQueryKeys.myRoot,
+        }),
+      ]);
+    },
+
+    onError: () => {
+      setSuccessMessage(null);
+    },
+  });
+
   function handleProductTypeChange(productTypeId: string): void {
     if (productTypeId === selectedProductTypeId) {
       return;
@@ -262,11 +299,16 @@ function CatalogImportMappingForm({
     setSelectedProductTypeId(productTypeId);
     setFormErrors([]);
     setSuccessMessage(null);
+    onAnalysisChange(null);
+
     saveMutation.reset();
+    productTypeAnalysisMutation.reset();
 
     /*
      * Назначения характеристик относятся к конкретному
-     * типу товара. При смене типа их безопаснее сбросить.
+     * типу товара. Пока backend повторно анализирует файл,
+     * старые назначения характеристик больше не считаются
+     * достоверными.
      */
     setColumns((currentColumns) =>
       currentColumns.map((column) =>
@@ -281,6 +323,28 @@ function CatalogImportMappingForm({
           : column,
       ),
     );
+
+    if (!productTypeId) {
+      return;
+    }
+
+    productTypeAnalysisMutation.mutate(productTypeId);
+  }
+
+  function handleRepeatAutomaticRecognition(): void {
+    setFormErrors([]);
+    setSuccessMessage(null);
+
+    saveMutation.reset();
+    productTypeAnalysisMutation.reset();
+
+    if (!selectedProductTypeId) {
+      setFormErrors(["Сначала выберите тип товара."]);
+
+      return;
+    }
+
+    productTypeAnalysisMutation.mutate(selectedProductTypeId);
   }
 
   function handleTargetChange(
@@ -335,6 +399,23 @@ function CatalogImportMappingForm({
     );
   }
 
+  function handleCharacteristicConfigurationBusyChange(
+    columnId: string,
+    isBusy: boolean,
+  ): void {
+    setBusyCharacteristicColumnIds((currentColumnIds) => {
+      const nextColumnIds = new Set(currentColumnIds);
+
+      if (isBusy) {
+        nextColumnIds.add(columnId);
+      } else {
+        nextColumnIds.delete(columnId);
+      }
+
+      return nextColumnIds;
+    });
+  }
+
   function handleSubmit(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
 
@@ -358,7 +439,11 @@ function CatalogImportMappingForm({
     saveMutation.mutate();
   }
 
-  const isBusy = saveMutation.isPending || characteristicsQuery.isFetching;
+  const isBusy =
+    saveMutation.isPending ||
+    productTypeAnalysisMutation.isPending ||
+    characteristicsQuery.isFetching ||
+    busyCharacteristicColumnIds.size > 0;
 
   return (
     <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
@@ -391,9 +476,7 @@ function CatalogImportMappingForm({
             ariaLabel="Тип товара для импорта"
             value={selectedProductTypeId}
             disabled={
-              !initialMapping.canEdit ||
-              saveMutation.isPending ||
-              productTypes.length === 0
+              !initialMapping.canEdit || isBusy || productTypes.length === 0
             }
             onChange={handleProductTypeChange}
             options={[
@@ -409,9 +492,39 @@ function CatalogImportMappingForm({
           />
 
           {selectedProductType && (
-            <p className="text-xs text-slate-500">
-              Код типа: {selectedProductType.code}
-            </p>
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs text-slate-500">
+                Код типа: {selectedProductType.code}
+              </p>
+
+              <button
+                type="button"
+                disabled={!initialMapping.canEdit || isBusy}
+                onClick={handleRepeatAutomaticRecognition}
+                className="rounded-xl border border-teal-500/30 bg-teal-500/10 px-4 py-2 text-sm font-medium text-teal-200 transition hover:bg-teal-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {productTypeAnalysisMutation.isPending
+                  ? "Анализируем заголовки..."
+                  : "Повторить автораспознавание"}
+              </button>
+            </div>
+          )}
+
+          {productTypeAnalysisMutation.isPending && (
+            <div className="rounded-2xl border border-teal-500/30 bg-teal-500/10 p-4 text-sm leading-6 text-teal-100">
+              Повторно анализируем заголовки Excel с учётом характеристик
+              выбранного типа товара. После завершения сопоставление и строки
+              пакета обновятся автоматически.
+            </div>
+          )}
+
+          {productTypeAnalysisMutation.isError && (
+            <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm leading-6 text-red-200">
+              {getApiErrorMessage(
+                productTypeAnalysisMutation.error,
+                "Не удалось повторно проанализировать заголовки Excel.",
+              )}
+            </div>
           )}
         </div>
 
@@ -512,7 +625,7 @@ function CatalogImportMappingForm({
         </div>
 
         <div className="overflow-x-auto rounded-2xl border border-white/10">
-          <table className="w-full min-w-[1150px] border-collapse text-left text-sm">
+          <table className="w-full min-w-[1300px] border-collapse text-left text-sm">
             <thead className="bg-black/30 text-slate-400">
               <tr>
                 <th className="px-4 py-3 font-medium">№</th>
@@ -621,9 +734,7 @@ function CatalogImportMappingForm({
                       <AppSelect
                         ariaLabel={`Назначение колонки ${column.sourceHeader}`}
                         value={column.targetKind}
-                        disabled={
-                          !initialMapping.canEdit || saveMutation.isPending
-                        }
+                        disabled={!initialMapping.canEdit || isBusy}
                         onChange={(value) =>
                           handleTargetChange(
                             column.columnId,
@@ -656,34 +767,31 @@ function CatalogImportMappingForm({
                       )}
                     </td>
 
-                    <td className="w-[420px] px-4 py-4">
+                    <td className="w-[520px] px-4 py-4">
                       {column.targetKind === "Characteristic" ? (
                         <div>
-                          <AppSelect
-                            ariaLabel={`Характеристика колонки ${column.sourceHeader}`}
+                          <CatalogImportCharacteristicAssignment
+                            columnId={column.columnId}
+                            sourceHeader={column.sourceHeader}
+                            productTypeCode={selectedProductType?.code ?? ""}
+                            productTypeName={selectedProductType?.name ?? ""}
                             value={column.characteristicDefinitionId ?? ""}
+                            characteristics={characteristics}
+                            usedCharacteristicIds={usedCharacteristicIds}
                             disabled={
                               !initialMapping.canEdit ||
-                              saveMutation.isPending ||
-                              characteristicsQuery.isFetching ||
+                              isBusy ||
                               !selectedProductTypeId
                             }
-                            onChange={(value) =>
-                              handleCharacteristicChange(column.columnId, value)
+                            onChange={(characteristicDefinitionId) =>
+                              handleCharacteristicChange(
+                                column.columnId,
+                                characteristicDefinitionId,
+                              )
                             }
-                            options={[
-                              {
-                                value: "",
-                                label: "Выберите характеристику",
-                              },
-                              ...characteristics.map((characteristic) => ({
-                                value: characteristic.id,
-                                label: getCharacteristicLabel(characteristic),
-                                disabled: usedCharacteristicIds.has(
-                                  characteristic.id,
-                                ),
-                              })),
-                            ]}
+                            onBusyChange={
+                              handleCharacteristicConfigurationBusyChange
+                            }
                           />
 
                           {currentColumnErrors.length > 0 && (

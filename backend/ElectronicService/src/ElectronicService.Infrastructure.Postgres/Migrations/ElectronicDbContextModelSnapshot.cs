@@ -129,10 +129,58 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<int>("AcceptedEvidenceCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("accepted_evidence_count");
+
+                    b.Property<Guid?>("ApprovedCharacteristicDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approved_characteristic_definition_id");
+
+                    b.Property<string>("ApprovedKind")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("approved_kind");
+
+                    b.Property<string>("ApprovedPhrase")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("approved_phrase");
+
+                    b.Property<int?>("ApprovedPriority")
+                        .HasColumnType("integer")
+                        .HasColumnName("approved_priority");
+
+                    b.Property<Guid?>("ApprovedProductTypeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approved_product_type_id");
+
+                    b.Property<string>("ApprovedTargetCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("approved_target_code");
+
+                    b.Property<string>("ApprovedTargetValue")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("approved_target_value");
+
+                    b.Property<Guid?>("CharacteristicDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("characteristic_definition_id");
+
                     b.Property<decimal>("Confidence")
                         .HasPrecision(5, 4)
                         .HasColumnType("numeric(5,4)")
                         .HasColumnName("confidence");
+
+                    b.Property<int>("CorrectedEvidenceCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("corrected_evidence_count");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
@@ -142,17 +190,43 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("created_by_user_id");
 
+                    b.Property<Guid?>("CreatedDictionaryTermId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_dictionary_term_id");
+
+                    b.Property<bool>("GeneratedAutomatically")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("generated_automatically");
+
                     b.Property<string>("NormalizedUnknownPhrase")
                         .IsRequired()
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)")
                         .HasColumnName("normalized_unknown_phrase");
 
+                    b.Property<int>("OccurrenceCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("occurrence_count");
+
                     b.Property<string>("OriginalMessage")
                         .IsRequired()
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("original_message");
+
+                    b.Property<Guid?>("ProductTypeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_type_id");
+
+                    b.Property<int>("RejectedEvidenceCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("rejected_evidence_count");
 
                     b.Property<string>("ReviewComment")
                         .HasMaxLength(1000)
@@ -166,6 +240,14 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                     b.Property<Guid?>("ReviewedByUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("reviewed_by_user_id");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("Assistant")
+                        .HasColumnName("source");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -198,11 +280,21 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ApprovedCharacteristicDefinitionId");
+
+                    b.HasIndex("CharacteristicDefinitionId")
+                        .HasDatabaseName("ix_dictionary_suggestions_characteristic");
+
                     b.HasIndex("CreatedAtUtc")
                         .HasDatabaseName("ix_catalog_assistant_dictionary_suggestions_created_at_utc");
 
                     b.HasIndex("CreatedByUserId")
                         .HasDatabaseName("ix_catalog_assistant_dictionary_suggestions_created_by_user_id");
+
+                    b.HasIndex("CreatedDictionaryTermId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_dictionary_suggestions_created_term")
+                        .HasFilter("\"created_dictionary_term_id\" IS NOT NULL");
 
                     b.HasIndex("NormalizedUnknownPhrase")
                         .HasDatabaseName("ix_catalog_assistant_dictionary_suggestions_normalized_unknown_phrase");
@@ -213,7 +305,35 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                     b.HasIndex("Status")
                         .HasDatabaseName("ix_catalog_assistant_dictionary_suggestions_status");
 
-                    b.ToTable("catalog_assistant_dictionary_suggestions", (string)null);
+                    b.HasIndex("ApprovedProductTypeId", "ApprovedCharacteristicDefinitionId")
+                        .HasDatabaseName("ix_dictionary_suggestions_approved_scope");
+
+                    b.HasIndex("ProductTypeId", "CharacteristicDefinitionId", "Status")
+                        .HasDatabaseName("ix_dictionary_suggestions_scope_status");
+
+                    b.HasIndex("Source", "Status", "CreatedAtUtc")
+                        .HasDatabaseName("ix_dictionary_suggestions_source_status_created");
+
+                    b.ToTable("catalog_assistant_dictionary_suggestions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_dictionary_suggestions_approved_characteristic_scope", "\"approved_characteristic_definition_id\" IS NULL OR (\"approved_product_type_id\" IS NOT NULL AND \"approved_kind\" = 'Characteristic')");
+
+                            t.HasCheckConstraint("ck_dictionary_suggestions_approved_decision", "(\"approved_phrase\" IS NULL AND \"approved_kind\" IS NULL AND \"approved_target_code\" IS NULL AND \"approved_target_value\" IS NULL AND \"approved_product_type_id\" IS NULL AND \"approved_characteristic_definition_id\" IS NULL AND \"approved_priority\" IS NULL AND \"created_dictionary_term_id\" IS NULL) OR (\"approved_phrase\" IS NOT NULL AND \"approved_kind\" IS NOT NULL AND \"approved_target_value\" IS NOT NULL AND \"approved_priority\" IS NOT NULL AND \"created_dictionary_term_id\" IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_dictionary_suggestions_approved_kind", "\"approved_kind\" IS NULL OR \"approved_kind\" IN ('Manufacturer', 'ProductType', 'Characteristic', 'SearchToken')");
+
+                            t.HasCheckConstraint("ck_dictionary_suggestions_approved_priority", "\"approved_priority\" IS NULL OR (\"approved_priority\" >= 1 AND \"approved_priority\" <= 10000)");
+
+                            t.HasCheckConstraint("ck_dictionary_suggestions_characteristic_scope", "\"characteristic_definition_id\" IS NULL OR (\"product_type_id\" IS NOT NULL AND \"suggested_kind\" = 'Characteristic')");
+
+                            t.HasCheckConstraint("ck_dictionary_suggestions_evidence_counts", "\"occurrence_count\" > 0 AND \"accepted_evidence_count\" >= 0 AND \"corrected_evidence_count\" >= 0 AND \"rejected_evidence_count\" >= 0 AND \"accepted_evidence_count\"::bigint + \"corrected_evidence_count\"::bigint + \"rejected_evidence_count\"::bigint <= \"occurrence_count\"::bigint");
+
+                            t.HasCheckConstraint("ck_dictionary_suggestions_generated_source", "NOT (\"source\" = 'Assistant' AND \"generated_automatically\" = TRUE)");
+
+                            t.HasCheckConstraint("ck_dictionary_suggestions_recognition_learning", "\"source\" <> 'RecognitionLearning' OR (\"generated_automatically\" = TRUE AND \"product_type_id\" IS NOT NULL AND \"characteristic_definition_id\" IS NOT NULL AND \"suggested_kind\" = 'Characteristic')");
+
+                            t.HasCheckConstraint("ck_dictionary_suggestions_source", "\"source\" IN ('Assistant', 'ImportRecognition', 'UserCorrection', 'RecognitionLearning', 'MlRecognition')");
+                        });
                 });
 
             modelBuilder.Entity("ElectronicService.Domain.Catalog.Dictionaries.CatalogDictionaryTerm", b =>
@@ -230,6 +350,19 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
+
+                    b.Property<string>("DisableReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("disable_reason");
+
+                    b.Property<DateTime?>("DisabledAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("disabled_at_utc");
+
+                    b.Property<Guid?>("DisabledByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("disabled_by_user_id");
 
                     b.Property<string>("Kind")
                         .IsRequired()
@@ -252,6 +385,18 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                     b.Property<int>("Priority")
                         .HasColumnType("integer")
                         .HasColumnName("priority");
+
+                    b.Property<Guid?>("ProductTypeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_type_id");
+
+                    b.Property<DateTime?>("ReactivatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reactivated_at_utc");
+
+                    b.Property<Guid?>("ReactivatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reactivated_by_user_id");
 
                     b.Property<string>("Source")
                         .IsRequired()
@@ -278,16 +423,44 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("DisabledByUserId")
+                        .HasDatabaseName("ix_catalog_dictionary_terms_disabled_by_user_id");
+
                     b.HasIndex("NormalizedPhrase")
                         .HasDatabaseName("ix_catalog_dictionary_terms_normalized_phrase");
+
+                    b.HasIndex("ReactivatedByUserId")
+                        .HasDatabaseName("ix_catalog_dictionary_terms_reactivated_by_user_id");
+
+                    b.HasIndex("Source")
+                        .HasDatabaseName("ix_catalog_dictionary_terms_source");
 
                     b.HasIndex("Status")
                         .HasDatabaseName("ix_catalog_dictionary_terms_status");
 
-                    b.HasIndex("NormalizedPhrase", "Kind", "TargetCode", "TargetValue")
-                        .HasDatabaseName("ix_catalog_dictionary_terms_mapping");
+                    b.HasIndex("ProductTypeId", "Status")
+                        .HasDatabaseName("ix_catalog_dictionary_terms_scope_status");
 
-                    b.ToTable("catalog_dictionary_terms", (string)null);
+                    b.HasIndex("ProductTypeId", "NormalizedPhrase", "Kind", "TargetCode", "TargetValue")
+                        .IsUnique()
+                        .HasDatabaseName("ux_catalog_dictionary_terms_scope_mapping");
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("ProductTypeId", "NormalizedPhrase", "Kind", "TargetCode", "TargetValue"), false);
+
+                    b.ToTable("catalog_dictionary_terms", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_catalog_dictionary_terms_approved_after_created", "\"approved_at_utc\" IS NULL OR \"approved_at_utc\" >= \"created_at_utc\"");
+
+                            t.HasCheckConstraint("ck_catalog_dictionary_terms_disable_reason_not_blank", "\"disable_reason\" IS NULL OR char_length(btrim(\"disable_reason\")) > 0");
+
+                            t.HasCheckConstraint("ck_catalog_dictionary_terms_disabled_after_approved", "\"disabled_at_utc\" IS NULL OR (\"approved_at_utc\" IS NOT NULL AND \"disabled_at_utc\" >= \"approved_at_utc\")");
+
+                            t.HasCheckConstraint("ck_catalog_dictionary_terms_reactivated_after_disabled", "\"reactivated_at_utc\" IS NULL OR (\"disabled_at_utc\" IS NOT NULL AND \"reactivated_at_utc\" >= \"disabled_at_utc\")");
+
+                            t.HasCheckConstraint("ck_catalog_dictionary_terms_status", "\"status\" IN ('Pending', 'Approved', 'Rejected', 'Disabled')");
+
+                            t.HasCheckConstraint("ck_catalog_dictionary_terms_status_lifecycle", "(\"status\" IN ('Pending', 'Rejected') AND \"approved_at_utc\" IS NULL AND \"disabled_at_utc\" IS NULL AND \"disabled_by_user_id\" IS NULL AND \"disable_reason\" IS NULL AND \"reactivated_at_utc\" IS NULL AND \"reactivated_by_user_id\" IS NULL) OR (\"status\" = 'Approved' AND \"approved_at_utc\" IS NOT NULL AND ((\"disabled_at_utc\" IS NULL AND \"disabled_by_user_id\" IS NULL AND \"disable_reason\" IS NULL AND \"reactivated_at_utc\" IS NULL AND \"reactivated_by_user_id\" IS NULL) OR (\"disabled_at_utc\" IS NOT NULL AND \"disabled_by_user_id\" IS NOT NULL AND \"disable_reason\" IS NOT NULL AND \"reactivated_at_utc\" IS NOT NULL AND \"reactivated_by_user_id\" IS NOT NULL))) OR (\"status\" = 'Disabled' AND \"approved_at_utc\" IS NOT NULL AND \"disabled_at_utc\" IS NOT NULL AND \"disabled_by_user_id\" IS NOT NULL AND \"disable_reason\" IS NOT NULL AND \"reactivated_at_utc\" IS NULL AND \"reactivated_by_user_id\" IS NULL)");
+                        });
                 });
 
             modelBuilder.Entity("ElectronicService.Domain.Catalog.ImportBatches.CatalogImportBatch", b =>
@@ -625,6 +798,163 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                     b.ToTable("manufacturers", (string)null);
                 });
 
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Manufacturers.ManufacturerAlias", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("ApprovedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("approved_at_utc");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("ManufacturerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("manufacturer_id");
+
+                    b.Property<string>("NormalizedPhrase")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("normalized_phrase");
+
+                    b.Property<string>("Phrase")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("phrase");
+
+                    b.Property<DateTime?>("RejectedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("rejected_at_utc");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("source");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NormalizedPhrase")
+                        .IsUnique()
+                        .HasDatabaseName("ux_manufacturer_aliases_active_normalized_phrase")
+                        .HasFilter("\"status\" IN ('Pending', 'Approved')");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("ix_manufacturer_aliases_status");
+
+                    b.HasIndex("ManufacturerId", "Status")
+                        .HasDatabaseName("ix_manufacturer_aliases_manufacturer_status");
+
+                    b.ToTable("manufacturer_aliases", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_manufacturer_aliases_approved_after_created", "\"approved_at_utc\" IS NULL OR \"approved_at_utc\" >= \"created_at_utc\"");
+
+                            t.HasCheckConstraint("ck_manufacturer_aliases_rejected_after_created", "\"rejected_at_utc\" IS NULL OR \"rejected_at_utc\" >= \"created_at_utc\"");
+
+                            t.HasCheckConstraint("ck_manufacturer_aliases_source", "\"source\" IN ('Seed', 'Import', 'TechnicalUser', 'UserCorrection', 'RecognitionLearning')");
+
+                            t.HasCheckConstraint("ck_manufacturer_aliases_status", "\"status\" IN ('Pending', 'Approved', 'Rejected')");
+
+                            t.HasCheckConstraint("ck_manufacturer_aliases_status_dates", "(\"status\" = 'Pending' AND \"approved_at_utc\" IS NULL AND \"rejected_at_utc\" IS NULL) OR (\"status\" = 'Approved' AND \"approved_at_utc\" IS NOT NULL AND \"rejected_at_utc\" IS NULL) OR (\"status\" = 'Rejected' AND \"approved_at_utc\" IS NULL AND \"rejected_at_utc\" IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_manufacturer_aliases_updated_after_created", "\"updated_at_utc\" >= \"created_at_utc\"");
+                        });
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Manufacturers.ManufacturerNoisePhrase", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTime?>("DeactivatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deactivated_at_utc");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("NormalizedPhrase")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("normalized_phrase");
+
+                    b.Property<string>("Phrase")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("phrase");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<Guid>("UpdatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId")
+                        .HasDatabaseName("ix_manufacturer_noise_phrases_created_by_user_id");
+
+                    b.HasIndex("IsActive")
+                        .HasDatabaseName("ix_manufacturer_noise_phrases_is_active");
+
+                    b.HasIndex("NormalizedPhrase")
+                        .IsUnique()
+                        .HasDatabaseName("ux_manufacturer_noise_phrases_normalized_phrase");
+
+                    b.HasIndex("UpdatedByUserId")
+                        .HasDatabaseName("ix_manufacturer_noise_phrases_updated_by_user_id");
+
+                    b.ToTable("manufacturer_noise_phrases", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_manufacturer_noise_phrases_activity_dates", "(\"is_active\" = TRUE AND \"deactivated_at_utc\" IS NULL) OR (\"is_active\" = FALSE AND \"deactivated_at_utc\" IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_manufacturer_noise_phrases_deactivated_after_created", "\"deactivated_at_utc\" IS NULL OR \"deactivated_at_utc\" >= \"created_at_utc\"");
+
+                            t.HasCheckConstraint("ck_manufacturer_noise_phrases_normalized_phrase_not_blank", "char_length(btrim(\"normalized_phrase\")) > 0");
+
+                            t.HasCheckConstraint("ck_manufacturer_noise_phrases_phrase_not_blank", "char_length(btrim(\"phrase\")) > 0");
+
+                            t.HasCheckConstraint("ck_manufacturer_noise_phrases_reason_not_blank", "\"reason\" IS NULL OR char_length(btrim(\"reason\")) > 0");
+
+                            t.HasCheckConstraint("ck_manufacturer_noise_phrases_updated_after_created", "\"updated_at_utc\" >= \"created_at_utc\"");
+                        });
+                });
+
             modelBuilder.Entity("ElectronicService.Domain.Catalog.ProductTypes.ProductType", b =>
                 {
                     b.Property<Guid>("Id")
@@ -809,6 +1139,456 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         });
                 });
 
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Recognition.CatalogCharacteristicRecognitionProfile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CharacteristicDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("characteristic_definition_id");
+
+                    b.Property<string>("ConfigurationJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("configuration_json");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<decimal>("MinimumConfidence")
+                        .HasPrecision(5, 4)
+                        .HasColumnType("numeric(5,4)")
+                        .HasColumnName("minimum_confidence");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("integer")
+                        .HasColumnName("priority");
+
+                    b.Property<Guid>("ProductTypeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_type_id");
+
+                    b.Property<string>("StrategyKind")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("strategy_kind");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CharacteristicDefinitionId")
+                        .HasDatabaseName("ix_recognition_profiles_characteristic");
+
+                    b.HasIndex("ProductTypeId", "IsActive")
+                        .HasDatabaseName("ix_recognition_profiles_product_type_active");
+
+                    b.HasIndex("ProductTypeId", "CharacteristicDefinitionId", "StrategyKind")
+                        .IsUnique()
+                        .HasDatabaseName("ux_recognition_profiles_scope_strategy");
+
+                    b.ToTable("catalog_characteristic_recognition_profiles", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_recognition_profiles_configuration_object", "jsonb_typeof(\"configuration_json\") = 'object'");
+
+                            t.HasCheckConstraint("ck_recognition_profiles_minimum_confidence", "\"minimum_confidence\" > 0 AND \"minimum_confidence\" <= 1");
+
+                            t.HasCheckConstraint("ck_recognition_profiles_priority", "\"priority\" >= 1 AND \"priority\" <= 10000");
+
+                            t.HasCheckConstraint("ck_recognition_profiles_strategy_kind", "\"strategy_kind\" IN ('NumericWithUnit', 'PoleCount', 'EnumToken', 'BooleanAlias', 'Dimensions', 'Dictionary')");
+                        });
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionCandidate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("AcceptedCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("accepted_count");
+
+                    b.Property<string>("CandidateKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("candidate_key");
+
+                    b.Property<string>("CharacteristicCodeSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("characteristic_code_snapshot");
+
+                    b.Property<Guid>("CharacteristicDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("characteristic_definition_id");
+
+                    b.Property<int>("CorrectedCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("corrected_count");
+
+                    b.Property<int>("DistinctProductCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("distinct_product_count");
+
+                    b.Property<DateTime>("FirstSeenAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_seen_at_utc");
+
+                    b.Property<DateTime>("LastSeenAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_seen_at_utc");
+
+                    b.Property<string>("NormalizedPhrase")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("normalized_phrase");
+
+                    b.Property<int>("OccurrenceCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("occurrence_count");
+
+                    b.Property<string>("Phrase")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("phrase");
+
+                    b.Property<string>("ProductTypeCodeSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("product_type_code_snapshot");
+
+                    b.Property<Guid>("ProductTypeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_type_id");
+
+                    b.Property<string>("ProposedValue")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("proposed_value");
+
+                    b.Property<int>("RejectedCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("rejected_count");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid?>("SuggestionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("suggestion_id");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CandidateKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_catalog_recognition_candidates_candidate_key");
+
+                    b.HasIndex("CharacteristicDefinitionId");
+
+                    b.HasIndex("SuggestionId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_recognition_candidates_suggestion")
+                        .HasFilter("\"suggestion_id\" IS NOT NULL");
+
+                    b.HasIndex("Status", "LastSeenAtUtc")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_recognition_candidates_status_last_seen");
+
+                    b.HasIndex("ProductTypeId", "CharacteristicDefinitionId", "Status")
+                        .HasDatabaseName("ix_recognition_candidates_scope_status");
+
+                    b.ToTable("catalog_recognition_candidates", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_catalog_recognition_candidates_candidate_key", "\"candidate_key\" = upper(\"candidate_key\") AND char_length(\"candidate_key\") = 64");
+
+                            t.HasCheckConstraint("ck_catalog_recognition_candidates_characteristic_code", "char_length(btrim(\"characteristic_code_snapshot\")) > 0");
+
+                            t.HasCheckConstraint("ck_catalog_recognition_candidates_counts", "\"occurrence_count\" >= 1 AND \"accepted_count\" >= 0 AND \"corrected_count\" >= 0 AND \"rejected_count\" >= 0 AND \"occurrence_count\" = \"accepted_count\" + \"corrected_count\" + \"rejected_count\"");
+
+                            t.HasCheckConstraint("ck_catalog_recognition_candidates_dates", "\"last_seen_at_utc\" >= \"first_seen_at_utc\"");
+
+                            t.HasCheckConstraint("ck_catalog_recognition_candidates_distinct_products", "\"distinct_product_count\" >= 1 AND \"distinct_product_count\" <= \"occurrence_count\"");
+
+                            t.HasCheckConstraint("ck_catalog_recognition_candidates_normalized_phrase", "char_length(btrim(\"normalized_phrase\")) > 0");
+
+                            t.HasCheckConstraint("ck_catalog_recognition_candidates_phrase", "char_length(btrim(\"phrase\")) > 0");
+
+                            t.HasCheckConstraint("ck_catalog_recognition_candidates_product_type_code", "char_length(btrim(\"product_type_code_snapshot\")) > 0");
+
+                            t.HasCheckConstraint("ck_catalog_recognition_candidates_proposed_value", "char_length(btrim(\"proposed_value\")) > 0");
+
+                            t.HasCheckConstraint("ck_catalog_recognition_candidates_status", "\"status\" IN ('Accumulating', 'SuggestionCreated', 'Approved', 'Rejected')");
+
+                            t.HasCheckConstraint("ck_catalog_recognition_candidates_suggestion_lifecycle", "(\"status\" = 'Accumulating' AND \"suggestion_id\" IS NULL) OR (\"status\" IN ('SuggestionCreated', 'Approved', 'Rejected') AND \"suggestion_id\" IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionCandidateEvidence", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CandidateId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("candidate_id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("FeedbackId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("feedback_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FeedbackId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_recognition_candidate_evidence_feedback");
+
+                    b.HasIndex("CandidateId", "CreatedAtUtc")
+                        .HasDatabaseName("ix_recognition_candidate_evidence_candidate_date");
+
+                    b.ToTable("catalog_recognition_candidate_evidence", (string)null);
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionFeedback", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("CharacteristicCodeSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("characteristic_code_snapshot");
+
+                    b.Property<Guid>("CharacteristicDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("characteristic_definition_id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid?>("DictionaryTermId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dictionary_term_id");
+
+                    b.Property<string>("FeedbackType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("feedback_type");
+
+                    b.Property<string>("FinalNormalizedValue")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("final_normalized_value");
+
+                    b.Property<DateTime?>("FinalizedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finalized_at_utc");
+
+                    b.Property<Guid?>("ImportBatchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("import_batch_id");
+
+                    b.Property<Guid?>("ImportRowId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("import_row_id");
+
+                    b.Property<bool>("IsTrainingEligible")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_training_eligible");
+
+                    b.Property<string>("LabelQuality")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("label_quality");
+
+                    b.Property<string>("ModelVersion")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("model_version");
+
+                    b.Property<string>("NormalizedProductName")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("normalized_product_name");
+
+                    b.Property<string>("ProductName")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("product_name");
+
+                    b.Property<string>("ProductTypeCodeSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("product_type_code_snapshot");
+
+                    b.Property<Guid>("ProductTypeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_type_id");
+
+                    b.Property<Guid?>("RecognitionProfileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("recognition_profile_id");
+
+                    b.Property<Guid?>("ReviewedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reviewed_by_user_id");
+
+                    b.Property<string>("ReviewerRole")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("reviewer_role");
+
+                    b.Property<int?>("SpanLength")
+                        .HasColumnType("integer")
+                        .HasColumnName("span_length");
+
+                    b.Property<int?>("SpanStart")
+                        .HasColumnType("integer")
+                        .HasColumnName("span_start");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("status");
+
+                    b.Property<decimal?>("SuggestedConfidence")
+                        .HasPrecision(5, 4)
+                        .HasColumnType("numeric(5,4)")
+                        .HasColumnName("suggested_confidence");
+
+                    b.Property<string>("SuggestedNormalizedValue")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("suggested_normalized_value");
+
+                    b.Property<string>("SuggestedRawValue")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("suggested_raw_value");
+
+                    b.Property<string>("SuggestedSource")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("suggested_source");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CharacteristicDefinitionId");
+
+                    b.HasIndex("DictionaryTermId")
+                        .HasDatabaseName("ix_catalog_recognition_feedback_dictionary_term");
+
+                    b.HasIndex("FinalizedAtUtc")
+                        .HasDatabaseName("ix_catalog_recognition_feedback_training_export")
+                        .HasFilter("\"status\" = 'Finalized' AND \"is_training_eligible\" = TRUE");
+
+                    b.HasIndex("RecognitionProfileId")
+                        .HasDatabaseName("ix_catalog_recognition_feedback_recognition_profile");
+
+                    b.HasIndex("ReviewedByUserId")
+                        .HasDatabaseName("ix_catalog_recognition_feedback_reviewer");
+
+                    b.HasIndex("FeedbackType", "FinalizedAtUtc")
+                        .HasDatabaseName("ix_catalog_recognition_feedback_type_date")
+                        .HasFilter("\"status\" = 'Finalized'");
+
+                    b.HasIndex("ImportBatchId", "ImportRowId")
+                        .HasDatabaseName("ix_catalog_recognition_feedback_import_source");
+
+                    b.HasIndex("ImportRowId", "CharacteristicDefinitionId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_catalog_recognition_feedback_import_row_characteristic")
+                        .HasFilter("\"import_row_id\" IS NOT NULL");
+
+                    b.HasIndex("ProductTypeId", "CharacteristicDefinitionId", "FinalizedAtUtc")
+                        .HasDatabaseName("ix_catalog_recognition_feedback_candidate_scope")
+                        .HasFilter("\"status\" = 'Finalized'");
+
+                    b.ToTable("catalog_recognition_feedback", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_catalog_recognition_feedback_accepted_value", "\"feedback_type\" <> 'Accepted' OR (\"suggested_normalized_value\" IS NOT NULL AND \"final_normalized_value\" = \"suggested_normalized_value\")");
+
+                            t.HasCheckConstraint("ck_catalog_recognition_feedback_added_manually", "\"feedback_type\" <> 'AddedManually' OR \"suggested_normalized_value\" IS NULL");
+
+                            t.HasCheckConstraint("ck_catalog_recognition_feedback_characteristic_code", "char_length(btrim(\"characteristic_code_snapshot\")) > 0");
+
+                            t.HasCheckConstraint("ck_catalog_recognition_feedback_confidence", "\"suggested_confidence\" IS NULL OR (\"suggested_confidence\" >= 0 AND \"suggested_confidence\" <= 1)");
+
+                            t.HasCheckConstraint("ck_catalog_recognition_feedback_confidence_evidence", "\"suggested_confidence\" IS NULL OR \"suggested_normalized_value\" IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_catalog_recognition_feedback_corrected_value", "\"feedback_type\" <> 'Corrected' OR (\"suggested_normalized_value\" IS NOT NULL AND \"final_normalized_value\" <> \"suggested_normalized_value\")");
+
+                            t.HasCheckConstraint("ck_catalog_recognition_feedback_final_value", "(\"feedback_type\" IN ('None', 'Rejected') AND \"final_normalized_value\" IS NULL) OR (\"feedback_type\" IN ('Accepted', 'Corrected', 'AddedManually', 'ConflictResolved') AND \"final_normalized_value\" IS NOT NULL AND char_length(btrim(\"final_normalized_value\")) > 0)");
+
+                            t.HasCheckConstraint("ck_catalog_recognition_feedback_finalized_date", "\"finalized_at_utc\" IS NULL OR \"finalized_at_utc\" >= \"created_at_utc\"");
+
+                            t.HasCheckConstraint("ck_catalog_recognition_feedback_import_links", "\"import_row_id\" IS NULL OR \"import_batch_id\" IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_catalog_recognition_feedback_label_quality", "\"label_quality\" IN ('None', 'Weak', 'Medium', 'Strong')");
+
+                            t.HasCheckConstraint("ck_catalog_recognition_feedback_lifecycle", "(\"status\" = 'Pending' AND \"feedback_type\" <> 'None' AND \"label_quality\" = 'None' AND \"reviewed_by_user_id\" IS NULL AND \"reviewer_role\" IS NULL AND \"finalized_at_utc\" IS NULL AND \"is_training_eligible\" = FALSE) OR (\"status\" = 'Finalized' AND \"feedback_type\" <> 'None' AND \"label_quality\" <> 'None' AND \"reviewed_by_user_id\" IS NOT NULL AND \"reviewer_role\" IS NOT NULL AND \"finalized_at_utc\" IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_catalog_recognition_feedback_model_version", "\"model_version\" IS NULL OR char_length(btrim(\"model_version\")) > 0");
+
+                            t.HasCheckConstraint("ck_catalog_recognition_feedback_normalized_product_name", "char_length(btrim(\"normalized_product_name\")) > 0");
+
+                            t.HasCheckConstraint("ck_catalog_recognition_feedback_product_name", "char_length(btrim(\"product_name\")) > 0");
+
+                            t.HasCheckConstraint("ck_catalog_recognition_feedback_product_type_code", "char_length(btrim(\"product_type_code_snapshot\")) > 0");
+
+                            t.HasCheckConstraint("ck_catalog_recognition_feedback_reviewer_role", "\"reviewer_role\" IS NULL OR char_length(btrim(\"reviewer_role\")) > 0");
+
+                            t.HasCheckConstraint("ck_catalog_recognition_feedback_span", "(\"span_start\" IS NULL AND \"span_length\" IS NULL) OR (\"span_start\" IS NOT NULL AND \"span_start\" >= 0 AND \"span_length\" IS NOT NULL AND \"span_length\" > 0 AND \"suggested_raw_value\" IS NOT NULL AND \"span_start\" + \"span_length\" <= char_length(\"product_name\"))");
+
+                            t.HasCheckConstraint("ck_catalog_recognition_feedback_status", "\"status\" IN ('Pending', 'Finalized')");
+
+                            t.HasCheckConstraint("ck_catalog_recognition_feedback_suggested_evidence", "(\"suggested_raw_value\" IS NULL AND \"suggested_normalized_value\" IS NULL AND \"suggested_source\" IS NULL) OR (\"suggested_raw_value\" IS NOT NULL AND char_length(btrim(\"suggested_raw_value\")) > 0 AND \"suggested_normalized_value\" IS NOT NULL AND char_length(btrim(\"suggested_normalized_value\")) > 0 AND \"suggested_source\" IS NOT NULL AND char_length(btrim(\"suggested_source\")) > 0)");
+
+                            t.HasCheckConstraint("ck_catalog_recognition_feedback_training_quality", "\"is_training_eligible\" = FALSE OR (\"status\" = 'Finalized' AND \"label_quality\" IN ('Medium', 'Strong'))");
+
+                            t.HasCheckConstraint("ck_catalog_recognition_feedback_type", "\"feedback_type\" IN ('None', 'Accepted', 'Corrected', 'Rejected', 'AddedManually', 'ConflictResolved')");
+                        });
+                });
+
             modelBuilder.Entity("ElectronicService.Domain.Users.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -866,15 +1646,63 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
 
             modelBuilder.Entity("ElectronicService.Domain.Catalog.Dictionaries.CatalogAssistantDictionarySuggestion", b =>
                 {
+                    b.HasOne("ElectronicService.Domain.Catalog.Characteristics.CharacteristicDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("ApprovedCharacteristicDefinitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_dictionary_suggestions_approved_characteristic");
+
+                    b.HasOne("ElectronicService.Domain.Catalog.ProductTypes.ProductType", null)
+                        .WithMany()
+                        .HasForeignKey("ApprovedProductTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_dictionary_suggestions_approved_product_type");
+
+                    b.HasOne("ElectronicService.Domain.Catalog.Characteristics.CharacteristicDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("CharacteristicDefinitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_dictionary_suggestions_characteristic");
+
                     b.HasOne("ElectronicService.Domain.Users.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedByUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("ElectronicService.Domain.Catalog.Dictionaries.CatalogDictionaryTerm", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedDictionaryTermId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_dictionary_suggestions_created_term");
+
+                    b.HasOne("ElectronicService.Domain.Catalog.ProductTypes.ProductType", null)
+                        .WithMany()
+                        .HasForeignKey("ProductTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_dictionary_suggestions_product_type");
+
                     b.HasOne("ElectronicService.Domain.Users.User", null)
                         .WithMany()
                         .HasForeignKey("ReviewedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Dictionaries.CatalogDictionaryTerm", b =>
+                {
+                    b.HasOne("ElectronicService.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("DisabledByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ElectronicService.Domain.Catalog.ProductTypes.ProductType", null)
+                        .WithMany()
+                        .HasForeignKey("ProductTypeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ElectronicService.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("ReactivatedByUserId")
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
@@ -941,6 +1769,30 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         .WithMany()
                         .HasForeignKey("BatchId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Manufacturers.ManufacturerAlias", b =>
+                {
+                    b.HasOne("ElectronicService.Domain.Catalog.Manufacturers.Manufacturer", null)
+                        .WithMany()
+                        .HasForeignKey("ManufacturerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Manufacturers.ManufacturerNoisePhrase", b =>
+                {
+                    b.HasOne("ElectronicService.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ElectronicService.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 
@@ -1130,6 +1982,101 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
 
                     b.Navigation("Value")
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Recognition.CatalogCharacteristicRecognitionProfile", b =>
+                {
+                    b.HasOne("ElectronicService.Domain.Catalog.Characteristics.CharacteristicDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("CharacteristicDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ElectronicService.Domain.Catalog.ProductTypes.ProductType", null)
+                        .WithMany()
+                        .HasForeignKey("ProductTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionCandidate", b =>
+                {
+                    b.HasOne("ElectronicService.Domain.Catalog.Characteristics.CharacteristicDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("CharacteristicDefinitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_recognition_candidates_characteristic");
+
+                    b.HasOne("ElectronicService.Domain.Catalog.ProductTypes.ProductType", null)
+                        .WithMany()
+                        .HasForeignKey("ProductTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_recognition_candidates_product_type");
+
+                    b.HasOne("ElectronicService.Domain.Catalog.Dictionaries.CatalogAssistantDictionarySuggestion", null)
+                        .WithMany()
+                        .HasForeignKey("SuggestionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_recognition_candidates_suggestion");
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionCandidateEvidence", b =>
+                {
+                    b.HasOne("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionCandidate", null)
+                        .WithMany()
+                        .HasForeignKey("CandidateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_recognition_candidate_evidence_candidate");
+
+                    b.HasOne("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionFeedback", null)
+                        .WithMany()
+                        .HasForeignKey("FeedbackId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_recognition_candidate_evidence_feedback");
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionFeedback", b =>
+                {
+                    b.HasOne("ElectronicService.Domain.Catalog.Characteristics.CharacteristicDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("CharacteristicDefinitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ElectronicService.Domain.Catalog.Dictionaries.CatalogDictionaryTerm", null)
+                        .WithMany()
+                        .HasForeignKey("DictionaryTermId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("ElectronicService.Domain.Catalog.ImportBatches.CatalogImportBatch", null)
+                        .WithMany()
+                        .HasForeignKey("ImportBatchId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("ElectronicService.Domain.Catalog.ImportBatches.CatalogImportRow", null)
+                        .WithMany()
+                        .HasForeignKey("ImportRowId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("ElectronicService.Domain.Catalog.ProductTypes.ProductType", null)
+                        .WithMany()
+                        .HasForeignKey("ProductTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ElectronicService.Domain.Catalog.Recognition.CatalogCharacteristicRecognitionProfile", null)
+                        .WithMany()
+                        .HasForeignKey("RecognitionProfileId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("ElectronicService.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("ElectronicService.Domain.Catalog.ImportBatches.CatalogImportBatch", b =>

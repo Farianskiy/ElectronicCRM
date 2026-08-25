@@ -2,12 +2,23 @@ using ElectronicService.Core.Abstractions;
 using ElectronicService.Core.Abstractions.Data;
 using ElectronicService.Core.Catalog.Assistant.Abstractions;
 using ElectronicService.Core.Catalog.Assistant.DictionarySuggestions.Abstractions;
+using ElectronicService.Core.Catalog.CharacteristicDefinitions.Abstractions;
 using ElectronicService.Core.Catalog.Dictionaries.Abstractions;
-using ElectronicService.Core.Catalog.Import.ImportProductsFromExcel;
+using ElectronicService.Core.Catalog.ImportBatches.Abstractions;
+using ElectronicService.Core.Catalog.ImportBatches.Analysis;
+using ElectronicService.Core.Catalog.ImportBatches.ApplyCatalogImportBatch;
+using ElectronicService.Core.Catalog.ImportBatches.ExportCatalogImportErrorReport;
+using ElectronicService.Core.Catalog.ImportBatches.GetCatalogImportAppliedProducts;
 using ElectronicService.Core.Catalog.Metadata.Abstractions;
 using ElectronicService.Core.Catalog.Products.Abstractions;
+using ElectronicService.Core.Catalog.Products.Audit;
+using ElectronicService.Core.Catalog.Products.GetAuditHistory;
+using ElectronicService.Core.Catalog.ProductTypes.Abstractions;
+using ElectronicService.Core.Catalog.Recognition.Abstractions;
 using ElectronicService.Core.Users;
-using ElectronicService.Infrastructure.Postgres.Catalog.Import;
+using ElectronicService.Infrastructure.Postgres.Catalog.ImportBatches;
+using ElectronicService.Infrastructure.Postgres.Catalog.ImportBatches.Cleanup;
+using ElectronicService.Infrastructure.Postgres.Catalog.ImportBatches.Reports;
 using ElectronicService.Infrastructure.Postgres.Catalog.Queries;
 using ElectronicService.Infrastructure.Postgres.Catalog.Repositories;
 using ElectronicService.Infrastructure.Postgres.Catalog.Seeding;
@@ -18,18 +29,10 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using ElectronicService.Core.Catalog.ProductTypes.Abstractions;
-using ElectronicService.Core.Catalog.CharacteristicDefinitions.Abstractions;
-using ElectronicService.Core.Catalog.Products.Audit;
-using ElectronicService.Core.Catalog.Products.GetAuditHistory;
-using ElectronicService.Core.Catalog.ImportBatches.Abstractions;
-using ElectronicService.Core.Catalog.ImportBatches.Analysis;
-using ElectronicService.Infrastructure.Postgres.Catalog.ImportBatches;
-using ElectronicService.Core.Catalog.ImportBatches.ApplyCatalogImportBatch;
-using ElectronicService.Infrastructure.Postgres.Catalog.ImportBatches.Cleanup;
-using ElectronicService.Core.Catalog.ImportBatches.GetCatalogImportAppliedProducts;
-using ElectronicService.Core.Catalog.ImportBatches.ExportCatalogImportErrorReport;
-using ElectronicService.Infrastructure.Postgres.Catalog.ImportBatches.Reports;
+using ElectronicService.Core.Catalog.Manufacturers.Resolution;
+using ElectronicService.Infrastructure.Postgres.Catalog.Manufacturers;
+using ElectronicService.Core.Catalog.Manufacturers.Abstractions;
+using ElectronicService.Core.Catalog.Manufacturers.CreateFromUnresolvedPhrase;
 
 namespace ElectronicService.Infrastructure.Postgres;
 
@@ -85,12 +88,11 @@ public static class DependencyInjectionExtensions
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<CatalogDataSeeder>();
-        services.AddScoped<ImportProductsFromExcelCommandHandler>();
-        services.AddScoped<IProductsExcelImporter, ProductExcelImportService>();
         services.AddScoped<ICatalogProductsReader, CatalogProductsReader>();
         services.AddScoped<ICatalogProductReplacementsReader, CatalogProductReplacementsReader>();
         services.AddScoped<IProductRepository, ProductRepository>();
         services.AddScoped<ICatalogProductMetadataRepository, CatalogProductMetadataRepository>();
+        services.AddScoped<IManufacturerResolver, PostgresManufacturerResolver>();
         services.AddScoped<ICatalogMetadataReader, CatalogMetadataReader>();
         services.AddScoped<ICatalogDictionaryReader, CatalogDictionaryReader>();
         services.AddScoped<ICatalogDictionaryRepository, CatalogDictionaryRepository>();
@@ -109,6 +111,15 @@ public static class DependencyInjectionExtensions
         services.AddScoped<ICatalogImportBatchApplier, CatalogImportBatchApplier>();
         services.AddScoped<ICatalogImportAppliedProductsReader, CatalogImportAppliedProductsReader>();
         services.AddScoped<ICatalogImportErrorReportGenerator, CatalogImportErrorReportGenerator>();
+        services.AddScoped<ICatalogCharacteristicRecognitionProfileReader, CatalogCharacteristicRecognitionProfileReader>();
+        services.AddScoped<ICatalogCharacteristicRecognitionProfileRepository, CatalogCharacteristicRecognitionProfileRepository>();
+        services.AddScoped<ICatalogRecognitionFeedbackRepository, CatalogRecognitionFeedbackRepository>();
+        services.AddScoped<ICatalogRecognitionDatasetReader, CatalogRecognitionDatasetReader>();
+        services.AddScoped<ICatalogRecognitionCandidateRepository, CatalogRecognitionCandidateRepository>();
+        services.AddScoped<IManufacturerRepository, ManufacturerRepository>();
+        services.AddScoped<IManufacturerAliasRepository, ManufacturerAliasRepository>();
+        services.AddScoped<IManufacturerNoisePhraseRepository, ManufacturerNoisePhraseRepository>();
+
 
         return services;
     }
