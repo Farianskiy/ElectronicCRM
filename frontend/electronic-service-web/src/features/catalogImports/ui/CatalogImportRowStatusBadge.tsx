@@ -6,10 +6,16 @@ interface CatalogImportRowStatusBadgeProps {
 }
 
 const statusClassNames: Record<CatalogImportRowStatus, string> = {
-  None: "border-slate-500/30 bg-slate-500/10 text-slate-300",
-  PendingMapping: "border-amber-500/30 bg-amber-500/10 text-amber-200",
-  Valid: "border-green-500/30 bg-green-500/10 text-green-200",
-  Error: "border-red-500/30 bg-red-500/10 text-red-200",
+  None: "border-[var(--app-border)] bg-[var(--app-surface)] text-[var(--app-muted)]",
+
+  PendingMapping:
+    "border-[var(--app-warning-border)] bg-[var(--app-warning-soft)] text-[var(--app-warning)]",
+
+  Valid:
+    "border-[var(--app-success-border)] bg-[var(--app-success-soft)] text-[var(--app-success)]",
+
+  Error:
+    "border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] text-[var(--app-danger)]",
 };
 
 export function CatalogImportRowStatusBadge({

@@ -1,0 +1,3 @@
+namespace ElectronicService.Contracts.Catalog.Recognition.Management;
+
+public sealed record CreateCatalogCharacteristicRecognitionProfileResponse(Guid ProfileId);

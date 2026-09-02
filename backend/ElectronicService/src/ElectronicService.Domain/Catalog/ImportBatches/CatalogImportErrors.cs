@@ -248,6 +248,24 @@ public static class CatalogImportErrors
             $"не разрешена для типа товара '{productTypeId}'.");
     }
 
+    public static DomainError RowsSearchIsTooLong(
+        int maximumLength)
+    {
+        return new DomainError(
+            "catalog.import.rows.search_too_long",
+            $"Поисковый запрос не должен превышать " +
+            $"'{maximumLength}' символов.");
+    }
+
+    public static DomainError InvalidRowIssueCode()
+    {
+        return new DomainError(
+            "catalog.import.rows.invalid_issue_code",
+            "Код проблемы может содержать только " +
+            "латинские буквы, цифры, точку, дефис " +
+            "и символ подчёркивания.");
+    }
+
     public static DomainError InvalidPagination()
     {
         return new DomainError(
@@ -269,6 +287,27 @@ public static class CatalogImportErrors
         return new DomainError(
             "catalog.import.row.not_found",
             $"Строка импорта '{rowId}' не найдена.");
+    }
+
+    public static DomainError BulkUpdateRowsAreRequired()
+    {
+        return new DomainError(
+            "catalog.import.rows.bulk_empty",
+            "Для массового обновления необходимо передать хотя бы одну строку.");
+    }
+
+    public static DomainError BulkUpdateRowsLimitExceeded(int maximumRows)
+    {
+        return new DomainError(
+            "catalog.import.rows.bulk_limit_exceeded",
+            $"За один запрос можно обновить не более '{maximumRows}' строк импорта.");
+    }
+
+    public static DomainError DuplicateBulkUpdateRow(Guid rowId)
+    {
+        return new DomainError(
+            "catalog.import.rows.bulk_duplicate_row",
+            $"Строка импорта '{rowId}' передана в массовом запросе несколько раз.");
     }
 
     public static DomainError UserCannotEditCatalogImport()

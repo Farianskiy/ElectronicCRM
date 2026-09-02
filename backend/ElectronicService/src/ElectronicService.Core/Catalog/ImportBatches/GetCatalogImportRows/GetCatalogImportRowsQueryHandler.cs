@@ -1,21 +1,24 @@
 using System.Text.Json;
 using CSharpFunctionalExtensions;
-using ElectronicService.Core.Catalog
-    .ImportBatches.Abstractions;
-using ElectronicService.Core.Catalog
-    .ImportBatches.Analysis;
+using ElectronicService.Core.Catalog.ImportBatches.Abstractions;
+using ElectronicService.Core.Catalog.ImportBatches.Analysis;
 using ElectronicService.Core.Users;
-using ElectronicService.Domain.Catalog
-    .ImportBatches;
+using ElectronicService.Domain.Catalog.ImportBatches;
 using ElectronicService.Domain.Common;
+using ElectronicService.Domain.Catalog.Manufacturers;
 
-namespace ElectronicService.Core.Catalog
-    .ImportBatches.GetCatalogImportRows;
+namespace ElectronicService.Core.Catalog.ImportBatches.GetCatalogImportRows;
 
 public sealed class
     GetCatalogImportRowsQueryHandler
 {
     private const int MaximumPageSize = 200;
+
+    private const int MaximumSearchLength = 100;
+
+    private const int MaximumIssueCodeLength = 100;
+
+    private const int MaximumManufacturerGroupKeyLength = 200;
 
     private static readonly JsonSerializerOptions
         JsonOptions =
@@ -79,6 +82,49 @@ public sealed class
                 DomainError>(
                     CatalogImportErrors
                         .InvalidPagination());
+        }
+
+        var search =
+        string.IsNullOrWhiteSpace(query.Search)
+            ? null
+            : query.Search.Trim();
+
+        if (search?.Length > MaximumSearchLength)
+        {
+            return Result.Failure<
+                GetCatalogImportRowsResult,
+                DomainError>(
+                    CatalogImportErrors
+                        .RowsSearchIsTooLong(
+                            MaximumSearchLength));
+        }
+
+        var issueCode =
+            string.IsNullOrWhiteSpace(query.IssueCode)
+                ? null
+                : query.IssueCode.Trim();
+
+        if (issueCode is not null
+            && (issueCode.Length > MaximumIssueCodeLength
+                || issueCode.Any(character =>
+                    !IsIssueCodeCharacter(character))))
+        {
+            return Result.Failure<
+                GetCatalogImportRowsResult,
+                DomainError>(
+                    CatalogImportErrors
+                        .InvalidRowIssueCode());
+        }
+
+        var manufacturerGroupKey =
+            string.IsNullOrWhiteSpace(query.ManufacturerGroupKey)
+                ? null
+                : ManufacturerNameNormalizer.Normalize(query.ManufacturerGroupKey);
+
+        if (manufacturerGroupKey?.Length > MaximumManufacturerGroupKeyLength)
+        {
+            return Result.Failure<GetCatalogImportRowsResult, DomainError>(
+                GeneralErrors.ValueIsInvalid(nameof(query.ManufacturerGroupKey)));
         }
 
         var skipLong =
@@ -147,23 +193,29 @@ public sealed class
 
         var skip = (int)skipLong;
 
-        var rows =
-            await _importBatchRepository
-                .GetRowsAsync(
-                    query.BatchId,
-                    query.Status,
-                    skip,
-                    query.PageSize,
-                    cancellationToken)
-                .ConfigureAwait(false);
+        var rows = await _importBatchRepository
+            .GetRowsAsync(
+                query.BatchId,
+                query.Status,
+                search,
+                issueCode,
+                query.ProblemKind,
+                manufacturerGroupKey,
+                skip,
+                query.PageSize,
+                cancellationToken)
+            .ConfigureAwait(false);
 
-        var totalCount =
-            await _importBatchRepository
-                .CountRowsAsync(
-                    query.BatchId,
-                    query.Status,
-                    cancellationToken)
-                .ConfigureAwait(false);
+        var totalCount = await _importBatchRepository
+            .CountRowsAsync(
+                query.BatchId,
+                query.Status,
+                search,
+                issueCode,
+                query.ProblemKind,
+                manufacturerGroupKey,
+                cancellationToken)
+            .ConfigureAwait(false);
 
         var items =
             new List<GetCatalogImportRowResult>(
@@ -253,5 +305,15 @@ public sealed class
         return Result.Success<
             GetCatalogImportRowsResult,
             DomainError>(result);
+    }
+
+    private static bool IsIssueCodeCharacter(
+    char character)
+    {
+        return character is >= 'a' and <= 'z'
+            or >= '0' and <= '9'
+            or '.'
+            or '-'
+            or '_';
     }
 }

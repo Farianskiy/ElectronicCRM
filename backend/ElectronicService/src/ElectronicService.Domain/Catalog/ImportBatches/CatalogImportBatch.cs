@@ -438,6 +438,40 @@ public sealed class CatalogImportBatch : AggregateRoot
         return UnitResult.Success<DomainError>();
     }
 
+    public UnitResult<DomainError> ClearProductType()
+    {
+        if (!IsEditable)
+        {
+            return UnitResult.Failure(
+                CatalogImportErrors
+                    .InvalidStatusTransition(
+                        Status,
+                        CatalogImportBatchStatus.Uploaded));
+        }
+
+        if (ProductTypeId is null)
+        {
+            return UnitResult.Success<DomainError>();
+        }
+
+        ProductTypeId = null;
+
+        /*
+         * После снятия общего типа предыдущий
+         * анализ больше нельзя считать актуальным.
+         */
+        Status =
+            CatalogImportBatchStatus.Uploaded;
+
+        RowsCount = 0;
+        ValidRowsCount = 0;
+        ErrorRowsCount = 0;
+
+        Touch();
+
+        return UnitResult.Success<DomainError>();
+    }
+
     public UnitResult<DomainError>
         RegisterAnalysisResult(
             int rowsCount,
@@ -472,8 +506,7 @@ public sealed class CatalogImportBatch : AggregateRoot
         ValidRowsCount = validRowsCount;
         ErrorRowsCount = errorRowsCount;
 
-        if (mappingRequired
-            || ProductTypeId is null)
+        if (mappingRequired)
         {
             Status =
                 CatalogImportBatchStatus

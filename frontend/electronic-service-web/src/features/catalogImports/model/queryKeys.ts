@@ -1,6 +1,7 @@
 import type {
   CatalogImportBatchStatus,
   CatalogImportReviewQueueStatus,
+  CatalogImportRowProblemKind,
   CatalogImportRowFilterStatus,
 } from "./types";
 
@@ -37,12 +38,25 @@ export const catalogImportQueryKeys = {
       batchId,
     ] as const,
 
-  mapping: (batchId: string) =>
+    mapping: (batchId: string) =>
     [
       ...root,
       "mapping",
       batchId,
     ] as const,
+
+  analysis: (batchId: string) =>
+    [
+      ...root,
+      "analysis",
+      batchId,
+    ] as const,
+
+    saveRows: (batchId: string) =>
+    [...root, "save-rows", batchId] as const,
+
+  nameExplanations: (batchId: string) =>
+    [...root, "name-explanations", batchId] as const,
 
   rowsRoot: (batchId: string) =>
     [
@@ -51,20 +65,57 @@ export const catalogImportQueryKeys = {
       batchId,
     ] as const,
 
-  rows: (
+      rowProblemCodesRoot: (batchId: string) =>
+    [...root, "row-problem-codes", batchId] as const,
+
+  rowProblemCodes: (
     batchId: string,
     status: CatalogImportRowFilterStatus | null,
-    page: number,
-    pageSize: number,
+    search: string,
+    expectedVersion: number,
   ) =>
     [
       ...root,
-      "rows",
+      "row-problem-codes",
       batchId,
       status,
-      page,
-      pageSize,
+      search,
+      expectedVersion,
     ] as const,
+
+    manufacturerGroups: (
+  batchId: string,
+  expectedVersion: number,
+) =>
+  [
+    ...root,
+    "manufacturer-groups",
+    batchId,
+    expectedVersion,
+  ] as const,
+
+    rows: (
+  batchId: string,
+  status: CatalogImportRowFilterStatus | null,
+  search: string,
+  issueCode: string | null,
+  problemKind: CatalogImportRowProblemKind | null,
+  manufacturerGroupKey: string | null,
+  page: number,
+  pageSize: number,
+) =>
+  [
+  ...root,
+  "rows",
+  batchId,
+  status,
+  search,
+  issueCode,
+  problemKind,
+  manufacturerGroupKey,
+  page,
+  pageSize,
+] as const,
 
   reviewQueueRoot,
 

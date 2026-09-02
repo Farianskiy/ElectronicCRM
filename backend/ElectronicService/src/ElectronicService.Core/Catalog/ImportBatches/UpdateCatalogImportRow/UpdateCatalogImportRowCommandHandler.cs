@@ -17,17 +17,26 @@ public sealed class UpdateCatalogImportRowCommandHandler
     private readonly ICatalogProductMetadataRepository _metadataRepository;
     private readonly IUserRepository _userRepository;
     private readonly ICatalogImportRowValidator _rowValidator;
+    private readonly ICatalogImportRecognitionFeedbackCollector _recognitionFeedbackCollector;
 
     public UpdateCatalogImportRowCommandHandler(
         ICatalogImportBatchRepository importBatchRepository,
         ICatalogProductMetadataRepository metadataRepository,
         IUserRepository userRepository,
-        ICatalogImportRowValidator rowValidator)
+        ICatalogImportRowValidator rowValidator,
+        ICatalogImportRecognitionFeedbackCollector recognitionFeedbackCollector)
     {
+        ArgumentNullException.ThrowIfNull(importBatchRepository);
+        ArgumentNullException.ThrowIfNull(metadataRepository);
+        ArgumentNullException.ThrowIfNull(userRepository);
+        ArgumentNullException.ThrowIfNull(rowValidator);
+        ArgumentNullException.ThrowIfNull(recognitionFeedbackCollector);
+
         _importBatchRepository = importBatchRepository;
         _metadataRepository = metadataRepository;
         _userRepository = userRepository;
         _rowValidator = rowValidator;
+        _recognitionFeedbackCollector = recognitionFeedbackCollector;
     }
 
     public async Task<Result<UpdateCatalogImportRowResult, DomainError>> Handle(
@@ -108,8 +117,16 @@ public sealed class UpdateCatalogImportRowCommandHandler
                 CatalogImportErrors.RowNotFound(command.RowId));
         }
 
+        var previousData = DeserializeNormalizedData(row.NormalizedDataJson);
+
+        if (previousData is null)
+        {
+            return Result.Failure<UpdateCatalogImportRowResult, DomainError>(
+                CatalogImportErrors.InvalidImportJson(nameof(CatalogImportRow.NormalizedDataJson)));
+        }
+
         var productType = await _metadataRepository
-            .GetProductTypeByIdAsync(productTypeId, cancellationToken)
+                    .GetProductTypeByIdAsync(productTypeId, cancellationToken)
             .ConfigureAwait(false);
 
         if (productType is null)
@@ -159,8 +176,28 @@ public sealed class UpdateCatalogImportRowCommandHandler
             productType,
             characteristicDefinitions);
 
+        var feedbackCollectionRequest = new CatalogImportRecognitionFeedbackCollectionRequest(
+            batch.Id,
+            row.Id,
+            productType,
+            characteristicDefinitions,
+            previousData,
+            validationResult.Data);
+
+        var feedbackCollectionResult = await _recognitionFeedbackCollector
+            .CollectAsync(feedbackCollectionRequest, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (feedbackCollectionResult.IsFailure)
+        {
+            return Result.Failure<UpdateCatalogImportRowResult, DomainError>(
+                feedbackCollectionResult.Error);
+        }
+
+        var effectiveData = feedbackCollectionResult.Value.Data;
+
         var normalizedDataJson = JsonSerializer.Serialize(
-            validationResult.Data,
+            effectiveData,
             JsonOptions);
 
         var issuesJson = JsonSerializer.Serialize(
@@ -225,7 +262,7 @@ public sealed class UpdateCatalogImportRowCommandHandler
             row.Id,
             row.RowNumber,
             row.Status,
-            validationResult.Data,
+            effectiveData,
             validationResult.Issues,
             validationResult.Warnings,
             batch.Status,
@@ -235,5 +272,23 @@ public sealed class UpdateCatalogImportRowCommandHandler
             batch.Version);
 
         return Result.Success<UpdateCatalogImportRowResult, DomainError>(result);
+    }
+
+    private static CatalogImportNormalizedRowData? DeserializeNormalizedData(string normalizedDataJson)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<CatalogImportNormalizedRowData>(
+                normalizedDataJson,
+                JsonOptions);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
     }
 }

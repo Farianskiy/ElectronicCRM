@@ -6,4 +6,5 @@ public sealed record CatalogAssistantClarificationResponse(
     string? SuggestedTargetCode,
     string SuggestedTargetValue,
     decimal Confidence,
-    string Question);
+    string Question,
+    bool CanCreateSuggestion);

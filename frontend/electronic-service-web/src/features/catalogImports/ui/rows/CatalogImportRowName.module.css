@@ -1,0 +1,15 @@
+.palette {
+  --import-name-characteristic-text: #7dd3fc;
+  --import-name-characteristic-bg: rgba(14, 165, 233, 0.14);
+
+  --import-name-mixed-text: #f0abfc;
+  --import-name-mixed-bg: rgba(217, 70, 239, 0.14);
+}
+
+:global(html[data-theme="light"]) .palette {
+  --import-name-characteristic-text: #075985;
+  --import-name-characteristic-bg: #e0f2fe;
+
+  --import-name-mixed-text: #86198f;
+  --import-name-mixed-bg: #fae8ff;
+}

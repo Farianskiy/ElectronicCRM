@@ -1,12 +1,13 @@
-using ElectronicService.Domain.Users;
-using Microsoft.EntityFrameworkCore;
+using ElectronicService.Domain.Catalog.Audit;
 using ElectronicService.Domain.Catalog.Characteristics;
+using ElectronicService.Domain.Catalog.Dictionaries;
+using ElectronicService.Domain.Catalog.ImportBatches;
 using ElectronicService.Domain.Catalog.Manufacturers;
 using ElectronicService.Domain.Catalog.Products;
 using ElectronicService.Domain.Catalog.ProductTypes;
-using ElectronicService.Domain.Catalog.Dictionaries;
-using ElectronicService.Domain.Catalog.Audit;
-using ElectronicService.Domain.Catalog.ImportBatches;
+using ElectronicService.Domain.Catalog.Recognition;
+using ElectronicService.Domain.Users;
+using Microsoft.EntityFrameworkCore;
 
 namespace ElectronicService.Infrastructure.Postgres.Data;
 
@@ -33,6 +34,8 @@ public sealed class ElectronicDbContext : DbContext
 
     public DbSet<Manufacturer> Manufacturers => Set<Manufacturer>();
 
+    public DbSet<ManufacturerAlias> ManufacturerAliases => Set<ManufacturerAlias>();
+
     public DbSet<CatalogDictionaryTerm> CatalogDictionaryTerms => Set<CatalogDictionaryTerm>();
 
     public DbSet<CatalogAssistantDictionarySuggestion> CatalogAssistantDictionarySuggestions => Set<CatalogAssistantDictionarySuggestion>();
@@ -47,10 +50,19 @@ public sealed class ElectronicDbContext : DbContext
 
     public DbSet<CatalogImportRow> CatalogImportRows => Set<CatalogImportRow>();
 
+    public DbSet<CatalogCharacteristicRecognitionProfile> CatalogCharacteristicRecognitionProfiles => Set<CatalogCharacteristicRecognitionProfile>();
+
+    public DbSet<CatalogRecognitionFeedback> CatalogRecognitionFeedbackEntries => Set<CatalogRecognitionFeedback>();
+
+    public DbSet<CatalogRecognitionCandidate> CatalogRecognitionCandidates => Set<CatalogRecognitionCandidate>();
+
+    public DbSet<CatalogRecognitionCandidateEvidence> CatalogRecognitionCandidateEvidenceEntries => Set<CatalogRecognitionCandidateEvidence>();
+
+    public DbSet<ManufacturerNoisePhrase> ManufacturerNoisePhrases => Set<ManufacturerNoisePhrase>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.ApplyConfigurationsFromAssembly(
-            typeof(ElectronicDbContext).Assembly);
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(ElectronicDbContext).Assembly);
 
         base.OnModelCreating(modelBuilder);
     }

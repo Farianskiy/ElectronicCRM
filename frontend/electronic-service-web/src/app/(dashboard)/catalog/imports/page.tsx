@@ -18,7 +18,8 @@ import {
 import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
 import { formatDate, formatFileSize } from "@/shared/lib/formatters";
 import { AppSelect } from "@/shared/ui/AppSelect";
-import { PageHeader } from "@/shared/ui/PageHeader";
+import { AppButton } from "@/shared/ui/AppButton";
+import { PageWorkspace } from "@/shared/ui/PageWorkspace";
 
 const pageSize = 20;
 
@@ -32,10 +33,12 @@ function CatalogImportRow({
   onDelete: (item: MyCatalogImportBatchItem) => void;
 }) {
   return (
-    <tr className="bg-white/[0.02] transition hover:bg-white/[0.05]">
+    <tr className="bg-[var(--app-panel)] align-top transition-colors hover:bg-[var(--app-panel-hover)] motion-reduce:transition-none">
       <td className="px-4 py-4">
-        <p className="font-medium text-white">{item.originalFileName}</p>
-        <p className="mt-1 text-xs text-slate-500">
+        <p className="font-medium text-[var(--app-text)] [overflow-wrap:anywhere]">
+          {item.originalFileName}
+        </p>
+        <p className="mt-1 text-xs text-[var(--app-muted)]">
           {formatFileSize(item.fileSizeBytes)}
         </p>
       </td>
@@ -44,31 +47,37 @@ function CatalogImportRow({
         <CatalogImportStatusBadge status={item.status} />
       </td>
 
-      <td className="px-4 py-4 text-slate-300">
+      <td className="px-4 py-4 tabular-nums text-[var(--app-text)]">
         <p>Всего: {item.rowsCount}</p>
-        <p className="mt-1 text-xs text-green-300">
+        <p className="mt-1 text-xs text-[var(--app-success)]">
           Корректных: {item.validRowsCount}
         </p>
-        <p className="mt-1 text-xs text-red-300">
+        <p className="mt-1 text-xs text-[var(--app-danger)]">
           С ошибками: {item.errorRowsCount}
         </p>
       </td>
 
-      <td className="px-4 py-4 text-slate-300">
+      <td className="px-4 py-4 text-[var(--app-muted)]">
         {formatDate(item.lastActivityAtUtc)}
       </td>
 
-      <td className="max-w-80 px-4 py-4 text-slate-300">
+      <td className="px-4 py-4 [overflow-wrap:anywhere]">
         {item.changesRequestComment ? (
-          <p className="line-clamp-3 text-sm text-orange-200">
+          <p
+            title={item.changesRequestComment}
+            className="line-clamp-3 text-sm text-[var(--app-warning)]"
+          >
             {item.changesRequestComment}
           </p>
         ) : item.rejectionReason ? (
-          <p className="line-clamp-3 text-sm text-rose-200">
+          <p
+            title={item.rejectionReason}
+            className="line-clamp-3 text-sm text-[var(--app-danger)]"
+          >
             {item.rejectionReason}
           </p>
         ) : (
-          <span className="text-slate-600">—</span>
+          <span className="text-[var(--app-muted)]">—</span>
         )}
       </td>
 
@@ -76,20 +85,24 @@ function CatalogImportRow({
         <div className="flex flex-wrap gap-2">
           <Link
             href={`/catalog/imports/${item.batchId}`}
-            className="rounded-xl bg-white/[0.06] px-3 py-2 text-xs font-medium text-slate-200 transition hover:bg-teal-500 hover:text-white"
+            aria-label={`Открыть пакет ${item.originalFileName}`}
+            className="inline-flex min-h-10 items-center justify-center rounded-xl border border-[var(--app-button-primary-border)] bg-[var(--app-button-primary-bg)] px-3 py-2 text-xs font-semibold text-[var(--app-button-primary-text)] transition-colors hover:border-[var(--app-button-primary-hover-border)] hover:bg-[var(--app-button-primary-hover-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] motion-reduce:transition-none"
           >
             Открыть
           </Link>
 
           {item.canDelete && (
-            <button
+            <AppButton
               type="button"
+              variant="danger"
+              size="sm"
               disabled={isDeleting}
+              loading={isDeleting}
+              aria-label={`Удалить пакет ${item.originalFileName}`}
               onClick={() => onDelete(item)}
-              className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-200 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isDeleting ? "Удаляем..." : "Удалить"}
-            </button>
+            </AppButton>
           )}
         </div>
       </td>
@@ -153,25 +166,28 @@ export default function CatalogImportsPage() {
   }
 
   return (
-    <div className="grid gap-6">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <PageHeader
-          title="Импорт каталога"
-          description="История загруженных Excel-файлов и состояние обработки каждого пакета."
-        />
-
+    <PageWorkspace
+      eyebrow="Работа с каталогом"
+      title="Импорт каталога"
+      description="История загруженных Excel-файлов и состояние обработки каждого пакета."
+      contentClassName="grid min-w-0 gap-6"
+      actions={
         <Link
           href="/catalog/imports/new"
-          className="inline-flex shrink-0 items-center justify-center rounded-2xl bg-teal-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-teal-400"
+          className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-button-primary-border)] bg-[var(--app-button-primary-bg)] px-4 py-2.5 text-sm font-semibold text-[var(--app-button-primary-text)] transition-colors hover:border-[var(--app-button-primary-hover-border)] hover:bg-[var(--app-button-primary-hover-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] motion-reduce:transition-none sm:w-auto"
         >
+          <span aria-hidden="true">+</span>
           Загрузить Excel
         </Link>
-      </div>
-
-      <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
-        <div className="grid gap-4 md:grid-cols-[minmax(0,320px)_1fr] md:items-end">
-          <label className="grid gap-2">
-            <span className="text-sm font-medium text-slate-300">
+      }
+    >
+      <section
+        aria-label="Фильтры импорта"
+        className="min-w-0 rounded-3xl border border-[var(--app-border)] bg-[var(--app-panel)] p-5 shadow-sm shadow-[var(--app-shadow)] sm:p-6"
+      >
+        <div className="grid min-w-0 gap-4 md:grid-cols-[minmax(0,320px)_1fr] md:items-end">
+          <div className="grid min-w-0 gap-2">
+            <span className="text-sm font-medium text-[var(--app-text)]">
               Статус пакета
             </span>
 
@@ -190,28 +206,47 @@ export default function CatalogImportsPage() {
                 })),
               ]}
             />
-          </label>
+          </div>
 
-          <div className="flex items-center justify-start md:justify-end">
-            <p className="text-sm text-slate-400">
+          <div className="flex min-w-0 items-center justify-start md:justify-end">
+            <p className="text-sm text-[var(--app-muted)]">
               Найдено пакетов:{" "}
-              <span className="font-semibold text-white">{totalCount}</span>
+              <span className="font-semibold tabular-nums text-[var(--app-text)]">
+                {totalCount}
+              </span>
             </p>
           </div>
         </div>
       </section>
 
       {importsQuery.isError && (
-        <section className="rounded-3xl border border-red-500/30 bg-red-500/10 p-5 text-red-200">
-          {getApiErrorMessage(
-            importsQuery.error,
-            "Не удалось загрузить список импортов.",
+        <section
+          role="alert"
+          className="min-w-0 rounded-3xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-5 text-[var(--app-danger)]"
+        >
+          <h2 className="font-semibold">
+            Не удалось загрузить список импортов
+          </h2>
+          <p className="mt-2 whitespace-pre-wrap text-sm [overflow-wrap:anywhere]">
+            {getApiErrorMessage(
+              importsQuery.error,
+              "Не удалось загрузить список импортов.",
+            )}
+          </p>
+          {items.length > 0 && (
+            <p className="mt-2 text-sm text-[var(--app-muted)]">
+              Ниже показаны ранее загруженные данные. Они могут быть
+              неактуальны.
+            </p>
           )}
         </section>
       )}
 
       {deleteMutation.isError && (
-        <section className="rounded-3xl border border-red-500/30 bg-red-500/10 p-5 text-red-200">
+        <section
+          role="alert"
+          className="min-w-0 rounded-3xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-5 text-sm text-[var(--app-danger)] [overflow-wrap:anywhere]"
+        >
           {getApiErrorMessage(
             deleteMutation.error,
             "Не удалось удалить пакет импорта.",
@@ -219,52 +254,83 @@ export default function CatalogImportsPage() {
         </section>
       )}
 
-      <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
+      <section
+        aria-labelledby="my-imports-title"
+        className="min-w-0 rounded-3xl border border-[var(--app-border)] bg-[var(--app-panel)] p-5 shadow-sm shadow-[var(--app-shadow)] sm:p-6"
+      >
         <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
-          <div>
-            <h2 className="text-xl font-semibold text-white">Мои загрузки</h2>
+          <div className="min-w-0">
+            <h2
+              id="my-imports-title"
+              className="text-xl font-semibold text-[var(--app-text)]"
+            >
+              Мои загрузки
+            </h2>
 
-            <p className="mt-1 text-sm text-slate-400">
+            <p className="mt-1 text-sm text-[var(--app-muted)]">
               Страница {page} из {totalPages}
             </p>
           </div>
 
           {importsQuery.isFetching && !importsQuery.isLoading && (
-            <p className="text-sm text-teal-300">Обновляем список...</p>
+            <p role="status" className="text-sm text-[var(--app-accent)]">
+              Обновляем список...
+            </p>
           )}
         </div>
 
         {importsQuery.isLoading ? (
-          <div className="mt-6 rounded-2xl border border-white/10 bg-black/20 p-5 text-slate-300">
+          <div
+            role="status"
+            className="mt-6 flex min-h-32 items-center justify-center gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-5 text-sm text-[var(--app-muted)]"
+          >
+            <span
+              aria-hidden="true"
+              className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-[var(--app-accent-border)] border-t-[var(--app-accent)] motion-reduce:animate-none"
+            />
             Загружаем пакеты импорта...
           </div>
-        ) : items.length === 0 ? (
-          <div className="mt-6 rounded-2xl border border-white/10 bg-black/20 p-6">
-            <h3 className="text-lg font-semibold text-white">
-              Пакеты не найдены
-            </h3>
-
-            <p className="mt-2 text-sm text-slate-400">
-              Для выбранного статуса у пользователя пока нет импортов.
-            </p>
-          </div>
-        ) : (
-          <div className="mt-6 overflow-x-auto rounded-2xl border border-white/10">
-            <table className="w-full min-w-[1120px] border-collapse text-left text-sm">
-              <thead className="bg-black/30 text-slate-400">
+        ) : items.length > 0 ? (
+          <div
+            role="region"
+            aria-label="Таблица пакетов импорта"
+            tabIndex={0}
+            className="mt-6 min-w-0 max-w-full overflow-x-auto rounded-2xl border border-[var(--app-border)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]"
+          >
+            <table className="w-full min-w-[1120px] table-fixed border-collapse text-left text-sm">
+              <caption className="sr-only">Загруженные пакеты импорта</caption>
+              <colgroup>
+                <col className="w-[28%]" />
+                <col className="w-[18%]" />
+                <col className="w-[12%]" />
+                <col className="w-[16%]" />
+                <col className="w-[14%]" />
+                <col className="w-[12%]" />
+              </colgroup>
+              <thead className="bg-[var(--app-surface)] text-[var(--app-muted)]">
                 <tr>
-                  <th className="px-4 py-3 font-medium">Файл</th>
-                  <th className="px-4 py-3 font-medium">Статус</th>
-                  <th className="px-4 py-3 font-medium">Строки</th>
-                  <th className="px-4 py-3 font-medium">
+                  <th scope="col" className="px-4 py-3 font-medium">
+                    Файл
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-medium">
+                    Статус
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-medium">
+                    Строки
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-medium">
                     Последняя активность
                   </th>
-                  <th className="px-4 py-3 font-medium">Комментарий</th>
-                  <th className="px-4 py-3 font-medium">Действия</th>
+                  <th scope="col" className="px-4 py-3 font-medium">
+                    Комментарий
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-medium">
+                    Действия
+                  </th>
                 </tr>
               </thead>
 
-              <tbody className="divide-y divide-white/10">
+              <tbody className="divide-y divide-[var(--app-border)]">
                 {items.map((item) => (
                   <CatalogImportRow
                     key={item.batchId}
@@ -279,22 +345,40 @@ export default function CatalogImportsPage() {
               </tbody>
             </table>
           </div>
-        )}
+        ) : !importsQuery.isError ? (
+          <div
+            role="status"
+            className="mt-6 rounded-2xl border border-dashed border-[var(--app-border-strong)] bg-[var(--app-surface)] p-6"
+          >
+            <h3 className="text-lg font-semibold text-[var(--app-text)]">
+              {status ? "Пакеты не найдены" : "Загрузок пока нет"}
+            </h3>
+            <p className="mt-2 text-sm text-[var(--app-muted)]">
+              {status
+                ? "Нет пакетов с выбранным статусом. Попробуйте выбрать другой статус или «Все статусы»."
+                : "Чтобы начать работу, нажмите «Загрузить Excel» вверху страницы."}
+            </p>
+          </div>
+        ) : null}
 
-        <div className="mt-5 flex items-center justify-between">
-          <button
+        <nav
+          aria-label="Страницы импортов"
+          className="mt-5 grid grid-cols-2 gap-3 sm:flex sm:items-center sm:justify-between"
+        >
+          <AppButton
             type="button"
+            variant="secondary"
             disabled={page <= 1 || importsQuery.isFetching}
             onClick={() =>
               setPage((currentPage) => Math.max(1, currentPage - 1))
             }
-            className="rounded-xl bg-white/[0.06] px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-40"
           >
             Назад
-          </button>
+          </AppButton>
 
-          <button
+          <AppButton
             type="button"
+            variant="secondary"
             disabled={
               page >= totalPages ||
               backendTotalPages === 0 ||
@@ -303,12 +387,11 @@ export default function CatalogImportsPage() {
             onClick={() =>
               setPage((currentPage) => Math.min(totalPages, currentPage + 1))
             }
-            className="rounded-xl bg-white/[0.06] px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-40"
           >
             Вперёд
-          </button>
-        </div>
+          </AppButton>
+        </nav>
       </section>
-    </div>
+    </PageWorkspace>
   );
 }

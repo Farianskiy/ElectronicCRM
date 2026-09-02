@@ -1,0 +1,3 @@
+namespace ElectronicService.Core.Catalog.CharacteristicDefinitions.DeleteDefinition;
+
+public sealed record DeleteCharacteristicDefinitionCommand(Guid CharacteristicDefinitionId);

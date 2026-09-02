@@ -6,6 +6,8 @@ import type { FormEvent } from "react";
 import { useState } from "react";
 import { getCatalogManufacturers } from "@/features/catalogMetadata/api/getCatalogManufacturers";
 import { AppSelect } from "@/shared/ui/AppSelect";
+import { AppButton } from "@/shared/ui/AppButton";
+import { AppInput } from "@/shared/ui/AppInput";
 import { updateCatalogProductGeneralInformation } from "../api/updateCatalogProductGeneralInformation";
 import type { CatalogProductDetails } from "../model/types";
 import { catalogProductAuditHistoryQueryKey } from "@/features/catalogProductAuditHistory/model/queryKeys";
@@ -157,46 +159,62 @@ export function TechnicalProductGeneralInformationEditor({
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-2xl border border-white/10 bg-black/20 p-5"
+      className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-panel-strong)] p-5"
     >
       <div>
-        <h3 className="font-semibold text-white">Основная информация</h3>
+        <h3 className="text-base font-semibold text-[var(--app-text)]">
+          Основная информация
+        </h3>
 
-        <p className="mt-2 text-sm text-slate-400">
+        <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">
           Здесь изменяются название, артикул и производитель. Тип товара
           изменяется отдельной безопасной операцией.
         </p>
       </div>
 
       {manufacturersQuery.isError && (
-        <div className="mt-5 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+        <div
+          role="alert"
+          className="mt-5 whitespace-pre-wrap rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-4 text-sm leading-6 text-[var(--app-danger)] [overflow-wrap:anywhere]"
+        >
           {getErrorMessage(manufacturersQuery.error)}
         </div>
       )}
 
       {validationError && (
-        <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
+        <div
+          role="alert"
+          className="mt-5 rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-4 text-sm leading-6 text-[var(--app-danger)] [overflow-wrap:anywhere]"
+        >
           {validationError}
         </div>
       )}
 
       {mutation.isError && (
-        <div className="mt-5 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+        <div
+          role="alert"
+          className="mt-5 whitespace-pre-wrap rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-4 text-sm leading-6 text-[var(--app-danger)] [overflow-wrap:anywhere]"
+        >
           {getErrorMessage(mutation.error)}
         </div>
       )}
 
       {successMessage && (
-        <div className="mt-5 rounded-2xl border border-green-500/30 bg-green-500/10 p-4 text-sm text-green-200">
+        <div
+          role="status"
+          className="mt-5 rounded-2xl border border-[var(--app-success-border)] bg-[var(--app-success-soft)] p-4 text-sm leading-6 text-[var(--app-success)] [overflow-wrap:anywhere]"
+        >
           {successMessage}
         </div>
       )}
 
-      <div className="mt-5 grid gap-4 lg:grid-cols-2">
-        <label className="grid gap-2 lg:col-span-2">
-          <span className="text-sm text-slate-300">Название товара</span>
+      <div className="mt-5 grid min-w-0 gap-4 lg:grid-cols-2">
+        <label className="grid min-w-0 content-start gap-2 lg:col-span-2">
+          <span className="text-sm font-medium text-[var(--app-text)]">
+            Название товара
+          </span>
 
-          <input
+          <AppInput
             value={name}
             maxLength={500}
             required
@@ -205,14 +223,15 @@ export function TechnicalProductGeneralInformationEditor({
               setValidationError(null);
               setSuccessMessage(null);
             }}
-            className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-slate-100 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20"
           />
         </label>
 
-        <label className="grid gap-2">
-          <span className="text-sm text-slate-300">Артикул</span>
+        <label className="grid min-w-0 content-start gap-2">
+          <span className="text-sm font-medium text-[var(--app-text)]">
+            Артикул
+          </span>
 
-          <input
+          <AppInput
             value={article}
             maxLength={100}
             required
@@ -221,12 +240,13 @@ export function TechnicalProductGeneralInformationEditor({
               setValidationError(null);
               setSuccessMessage(null);
             }}
-            className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-slate-100 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20"
           />
         </label>
 
-        <div className="grid gap-2">
-          <span className="text-sm text-slate-300">Производитель</span>
+        <div className="grid min-w-0 content-start gap-2">
+          <span className="text-sm font-medium text-[var(--app-text)]">
+            Производитель
+          </span>
 
           <AppSelect
             ariaLabel="Производитель товара"
@@ -244,20 +264,23 @@ export function TechnicalProductGeneralInformationEditor({
         </div>
       </div>
 
-      <div className="mt-5 flex flex-wrap gap-3">
-        <button
+      <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+        <AppButton
           type="submit"
-          disabled={mutation.isPending || manufacturersQuery.isError}
-          className="rounded-2xl bg-teal-500 px-5 py-3 text-sm font-medium text-white transition hover:bg-teal-400 disabled:cursor-not-allowed disabled:opacity-50"
+          variant="primary"
+          loading={mutation.isPending}
+          disabled={manufacturersQuery.isError}
+          className="w-full sm:w-auto"
         >
           {mutation.isPending ? "Сохраняем..." : "Сохранить информацию"}
-        </button>
+        </AppButton>
 
         {(nameDraft !== null ||
           articleDraft !== null ||
           manufacturerIdDraft !== null) && (
-          <button
+          <AppButton
             type="button"
+            variant="secondary"
             disabled={mutation.isPending}
             onClick={() => {
               setNameDraft(null);
@@ -267,10 +290,10 @@ export function TechnicalProductGeneralInformationEditor({
               setSuccessMessage(null);
               mutation.reset();
             }}
-            className="rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-medium text-slate-300 transition hover:bg-white/[0.08]"
+            className="w-full sm:w-auto"
           >
             Отменить изменения
-          </button>
+          </AppButton>
         )}
       </div>
     </form>

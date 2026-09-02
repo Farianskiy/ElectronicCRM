@@ -105,6 +105,10 @@ public sealed class ExportCatalogImportErrorReportQueryHandler
             .CountRowsAsync(
                 batch.Id,
                 CatalogImportRowStatus.Error,
+                search: null,
+                issueCode: null,
+                problemKind: null,
+                manufacturerGroupKey: null,
                 cancellationToken)
             .ConfigureAwait(false);
 
@@ -126,6 +130,10 @@ public sealed class ExportCatalogImportErrorReportQueryHandler
             .GetRowsAsync(
                 batch.Id,
                 CatalogImportRowStatus.Error,
+                search: null,
+                issueCode: null,
+                problemKind: null,
+                manufacturerGroupKey: null,
                 skip: 0,
                 take: errorRowsCount,
                 cancellationToken: cancellationToken)

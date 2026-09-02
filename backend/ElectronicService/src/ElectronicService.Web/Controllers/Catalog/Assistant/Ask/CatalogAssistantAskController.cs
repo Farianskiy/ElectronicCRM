@@ -2,6 +2,7 @@ using ElectronicService.Contracts.Catalog.Assistant;
 using ElectronicService.Contracts.Catalog.Products;
 using ElectronicService.Contracts.Catalog.Products.Replacements;
 using ElectronicService.Core.Catalog.Assistant.AskCatalogAssistant;
+using ElectronicService.Core.Catalog.Manufacturers.Resolution;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ElectronicService.Web.Controllers.Catalog.Assistant.Ask;
@@ -32,7 +33,8 @@ public sealed class CatalogAssistantAskController : ControllerBase
             request.OnlyInStock,
             request.MinimumScore,
             request.Page,
-            request.PageSize);
+            request.PageSize,
+            request.SelectedManufacturer);
 
         var result = await _handler
             .Handle(command, cancellationToken)
@@ -53,7 +55,11 @@ public sealed class CatalogAssistantAskController : ControllerBase
                 clarification.SuggestedTargetCode,
                 clarification.SuggestedTargetValue,
                 clarification.Confidence,
-                clarification.Question);
+                clarification.Question,
+                clarification.CanCreateSuggestion);
+
+        var manufacturerRecognitionResponse = MapManufacturerRecognition(
+            result.Value.ParsedRequest.ManufacturerRecognition);
 
         return Ok(new CatalogAssistantResponse(
             result.Value.Intent.ToString(),
@@ -69,7 +75,8 @@ public sealed class CatalogAssistantAskController : ControllerBase
                         characteristic.Code,
                         characteristic.Value))
                     .ToList(),
-                clarificationResponse),
+                clarificationResponse,
+                manufacturerRecognitionResponse),
             result.Value.Products.Select(product => new ProductListItemResponse(
                 product.Id,
                 product.Article,
@@ -103,5 +110,37 @@ public sealed class CatalogAssistantAskController : ControllerBase
                 replacement.PriceCurrency,
                 replacement.StockQuantity,
                 replacement.ReplacementScore)).ToList()));
+    }
+
+    private static CatalogAssistantManufacturerRecognitionResponse MapManufacturerRecognition(
+        ManufacturerNameRecognitionResult recognition)
+    {
+        var selectedCandidate = recognition.SelectedCandidate is null
+            ? null
+            : MapManufacturerCandidate(recognition.SelectedCandidate);
+
+        return new CatalogAssistantManufacturerRecognitionResponse(
+            recognition.ProductName,
+            recognition.Status.ToString(),
+            recognition.IsResolved,
+            recognition.IsConflict,
+            selectedCandidate,
+            recognition.Candidates
+                .Select(MapManufacturerCandidate)
+                .ToArray());
+    }
+
+    private static CatalogAssistantManufacturerRecognitionCandidateResponse MapManufacturerCandidate(
+        ManufacturerNameRecognitionCandidate candidate)
+    {
+        return new CatalogAssistantManufacturerRecognitionCandidateResponse(
+            candidate.ManufacturerName,
+            candidate.RawValue,
+            candidate.NormalizedValue,
+            candidate.Confidence,
+            candidate.Source.ToString(),
+            candidate.StartIndex,
+            candidate.Length,
+            candidate.EndIndex);
     }
 }

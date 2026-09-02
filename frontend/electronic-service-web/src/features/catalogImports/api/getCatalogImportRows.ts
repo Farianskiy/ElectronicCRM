@@ -13,6 +13,10 @@ export async function getCatalogImportRows(
       {
         params: {
           status: params.status ?? undefined,
+          search: params.search?.trim() || undefined,
+          issueCode: params.issueCode ?? undefined,
+          problemKind: params.problemKind ?? undefined,
+          manufacturerGroupKey: params.manufacturerGroupKey ?? undefined,
           page: params.page,
           pageSize: params.pageSize,
         },

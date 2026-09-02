@@ -1,0 +1,3 @@
+namespace ElectronicService.Contracts.Catalog.Recognition.Management;
+
+public sealed record SetCatalogCharacteristicRecognitionProfileActiveRequest(bool IsActive);

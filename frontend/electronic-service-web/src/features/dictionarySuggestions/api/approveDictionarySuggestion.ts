@@ -1,9 +1,9 @@
 import { httpClient } from "@/shared/api/httpClient";
-import type { ReviewDictionarySuggestionRequest } from "../model/types";
+import type { ApproveDictionarySuggestionRequest } from "../model/types";
 
 export interface ApproveDictionarySuggestionParams {
   suggestionId: string;
-  request: ReviewDictionarySuggestionRequest;
+  request: ApproveDictionarySuggestionRequest;
 }
 
 export async function approveDictionarySuggestion(

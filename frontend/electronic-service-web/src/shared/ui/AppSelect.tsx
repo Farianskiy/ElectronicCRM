@@ -205,12 +205,13 @@ export function AppSelect({
         className={[
           "flex w-full items-center justify-between",
           "rounded-2xl border px-4 py-3",
-          "border-white/10 bg-black/30",
-          "text-left text-sm text-slate-100",
-          "outline-none transition",
-          "hover:border-white/20 hover:bg-white/[0.04]",
-          "focus:border-teal-400",
-          "focus:ring-2 focus:ring-teal-400/20",
+          "border-[var(--app-border)] bg-[var(--app-surface)]",
+          "text-left text-sm text-[var(--app-text)]",
+          "outline-none transition-colors motion-reduce:transition-none",
+          "enabled:hover:border-[var(--app-border-strong)]",
+          "enabled:hover:bg-[var(--app-surface-hover)]",
+          "focus:border-[var(--app-accent)]",
+          "focus:ring-2 focus:ring-[var(--app-accent)]",
           "disabled:cursor-not-allowed",
           "disabled:opacity-60",
         ].join(" ")}
@@ -225,7 +226,8 @@ export function AppSelect({
           fill="none"
           className={[
             "ml-3 size-4 shrink-0",
-            "text-slate-400 transition-transform",
+            "text-[var(--app-muted)]",
+            "transition-transform motion-reduce:transition-none",
             isOpen ? "rotate-180" : "",
           ].join(" ")}
         >
@@ -247,10 +249,9 @@ export function AppSelect({
           className={[
             "absolute left-0 right-0 top-full z-50",
             "mt-2 max-h-72 overflow-y-auto",
-            "rounded-2xl border border-white/10",
-            "bg-slate-950/95 p-1.5",
-            "shadow-2xl shadow-black/60",
-            "backdrop-blur-xl",
+            "rounded-2xl border border-[var(--app-border-strong)]",
+            "bg-[var(--app-panel)] p-1.5",
+            "shadow-2xl shadow-[var(--app-shadow)]",
           ].join(" ")}
         >
           {options.map((option, index) => {
@@ -277,12 +278,16 @@ export function AppSelect({
                   "flex cursor-pointer items-center",
                   "justify-between gap-3",
                   "rounded-xl px-3 py-2.5",
-                  "text-sm transition",
-                  isActive ? "bg-teal-500/15 text-teal-100" : "text-slate-300",
+                  "text-sm transition-colors motion-reduce:transition-none",
+                  isActive
+                    ? "bg-[var(--app-accent-soft)] text-[var(--app-accent)]"
+                    : "text-[var(--app-text)]",
                   isSelected ? "font-medium" : "",
                   option.disabled
                     ? "pointer-events-none opacity-40"
-                    : "hover:bg-white/[0.06] hover:text-white",
+                    : isActive
+                      ? ""
+                      : "hover:bg-[var(--app-surface-hover)]",
                 ].join(" ")}
               >
                 <span className="truncate">{option.label}</span>
@@ -292,7 +297,7 @@ export function AppSelect({
                     aria-hidden="true"
                     viewBox="0 0 20 20"
                     fill="none"
-                    className="size-4 shrink-0 text-teal-400"
+                    className="size-4 shrink-0 text-[var(--app-accent)]"
                   >
                     <path
                       d="m5 10 3 3 7-7"

@@ -1,38 +1,15 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import axios from "axios";
 import type { FormEvent } from "react";
 import { useState } from "react";
+import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
+import { deleteCharacteristicDefinition } from "../api/deleteCharacteristicDefinition";
 import { updateCharacteristicDefinition } from "../api/updateCharacteristicDefinition";
 import type { CatalogCharacteristicDefinition } from "../model/types";
 
 interface CharacteristicDefinitionEditorCardProps {
   definition: CatalogCharacteristicDefinition;
-}
-
-function getErrorMessage(error: unknown): string {
-  if (axios.isAxiosError(error)) {
-    const responseData = error.response?.data;
-
-    if (typeof responseData === "string") {
-      return responseData;
-    }
-
-    if (typeof responseData?.detail === "string") {
-      return responseData.detail;
-    }
-
-    if (typeof responseData?.message === "string") {
-      return responseData.message;
-    }
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "Не удалось обновить характеристику.";
 }
 
 function formatDataType(dataType: string): string {
@@ -57,26 +34,25 @@ export function CharacteristicDefinitionEditorCard({
   const queryClient = useQueryClient();
 
   const [isEditing, setIsEditing] = useState(false);
-
+  const [isDeleteConfirmationOpen, setIsDeleteConfirmationOpen] =
+    useState(false);
   const [nameDraft, setNameDraft] = useState<string | null>(null);
-
   const [unitDraft, setUnitDraft] = useState<string | null>(null);
-
   const [validationError, setValidationError] = useState<string | null>(null);
-
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const name = nameDraft ?? definition.name;
-
   const unit = unitDraft ?? definition.unit ?? "";
-
-  const normalizedUnit = unit.trim().length ? unit.trim() : null;
+  const normalizedUnit = unit.trim().length > 0 ? unit.trim() : null;
 
   const hasChanges =
     name.trim() !== definition.name ||
     normalizedUnit !== (definition.unit ?? null);
 
-  const mutation = useMutation({
+  const hasKnownDependencies =
+    definition.productTypesCount > 0 || definition.productsWithValueCount > 0;
+
+  const updateMutation = useMutation({
     mutationFn: async () => {
       await updateCharacteristicDefinition(definition.id, {
         name: name.trim(),
@@ -89,19 +65,15 @@ export function CharacteristicDefinitionEditorCard({
         queryClient.invalidateQueries({
           queryKey: ["catalog-characteristic-definitions"],
         }),
-
         queryClient.invalidateQueries({
           queryKey: ["catalog-product-type-characteristic-schema"],
         }),
-
         queryClient.invalidateQueries({
           queryKey: ["catalog-product-type-available-definitions"],
         }),
-
         queryClient.invalidateQueries({
           queryKey: ["catalog-product-type-characteristics"],
         }),
-
         queryClient.invalidateQueries({
           queryKey: ["catalog-product-details"],
         }),
@@ -111,15 +83,41 @@ export function CharacteristicDefinitionEditorCard({
       setUnitDraft(null);
       setValidationError(null);
       setIsEditing(false);
-
       setSuccessMessage("Определение характеристики обновлено.");
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      await deleteCharacteristicDefinition(definition.id);
+    },
+
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["catalog-characteristic-definitions"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["catalog-product-type-characteristic-schema"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["catalog-product-type-available-definitions"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["catalog-product-type-characteristics"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["catalog-product-details"],
+        }),
+      ]);
     },
   });
 
   function handleSubmit(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
 
-    mutation.reset();
+    updateMutation.reset();
+    deleteMutation.reset();
     setValidationError(null);
     setSuccessMessage(null);
 
@@ -129,16 +127,48 @@ export function CharacteristicDefinitionEditorCard({
       return;
     }
 
-    mutation.mutate();
+    updateMutation.mutate();
+  }
+
+  function startEditing(): void {
+    updateMutation.reset();
+    deleteMutation.reset();
+    setIsDeleteConfirmationOpen(false);
+    setValidationError(null);
+    setSuccessMessage(null);
+    setIsEditing(true);
   }
 
   function cancelEditing(): void {
-    mutation.reset();
+    updateMutation.reset();
     setNameDraft(null);
     setUnitDraft(null);
     setValidationError(null);
     setSuccessMessage(null);
     setIsEditing(false);
+  }
+
+  function openDeleteConfirmation(): void {
+    if (hasKnownDependencies) {
+      return;
+    }
+
+    updateMutation.reset();
+    deleteMutation.reset();
+    setValidationError(null);
+    setSuccessMessage(null);
+    setIsEditing(false);
+    setIsDeleteConfirmationOpen(true);
+  }
+
+  function cancelDeleting(): void {
+    deleteMutation.reset();
+    setIsDeleteConfirmationOpen(false);
+  }
+
+  function confirmDeleting(): void {
+    deleteMutation.reset();
+    deleteMutation.mutate();
   }
 
   return (
@@ -161,18 +191,25 @@ export function CharacteristicDefinitionEditorCard({
           </p>
         </div>
 
-        {!isEditing && (
-          <button
-            type="button"
-            onClick={() => {
-              setIsEditing(true);
-              setSuccessMessage(null);
-              mutation.reset();
-            }}
-            className="rounded-xl border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/[0.1]"
-          >
-            Редактировать
-          </button>
+        {!isEditing && !isDeleteConfirmationOpen && (
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={startEditing}
+              className="rounded-xl border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/[0.1]"
+            >
+              Редактировать
+            </button>
+
+            <button
+              type="button"
+              disabled={hasKnownDependencies}
+              onClick={openDeleteConfirmation}
+              className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-200 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.03] disabled:text-slate-600"
+            >
+              Удалить
+            </button>
+          </div>
         )}
       </div>
 
@@ -194,21 +231,85 @@ export function CharacteristicDefinitionEditorCard({
         </div>
       </div>
 
+      {hasKnownDependencies && !isEditing && (
+        <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
+          Удаление недоступно, потому что характеристика используется типами
+          товаров или заполнена у существующих товаров. Сначала необходимо
+          удалить связанные настройки и значения.
+        </div>
+      )}
+
       {validationError && (
         <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
           {validationError}
         </div>
       )}
 
-      {mutation.isError && (
+      {updateMutation.isError && (
         <div className="mt-5 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
-          {getErrorMessage(mutation.error)}
+          {getApiErrorMessage(
+            updateMutation.error,
+            "Не удалось обновить характеристику.",
+          )}
+        </div>
+      )}
+
+      {deleteMutation.isError && (
+        <div className="mt-5 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+          {getApiErrorMessage(
+            deleteMutation.error,
+            "Не удалось удалить характеристику.",
+          )}
         </div>
       )}
 
       {successMessage && (
         <div className="mt-5 rounded-2xl border border-green-500/30 bg-green-500/10 p-4 text-sm text-green-200">
           {successMessage}
+        </div>
+      )}
+
+      {isDeleteConfirmationOpen && (
+        <div className="mt-5 rounded-2xl border border-red-500/30 bg-red-500/[0.08] p-5">
+          <h4 className="text-lg font-semibold text-red-100">
+            Удалить характеристику?
+          </h4>
+
+          <p className="mt-2 text-sm leading-6 text-red-100/80">
+            Характеристика{" "}
+            <span className="font-semibold text-red-100">
+              {definition.name}
+            </span>{" "}
+            с кодом{" "}
+            <span className="font-mono text-red-100">{definition.code}</span>{" "}
+            будет удалена без возможности восстановления.
+          </p>
+
+          <p className="mt-3 text-sm leading-6 text-slate-400">
+            Backend дополнительно проверит связи с типами товаров, товарами и
+            сопоставлениями импорта. Если характеристика используется, удаление
+            будет отклонено.
+          </p>
+
+          <div className="mt-5 flex flex-wrap gap-3">
+            <button
+              type="button"
+              disabled={deleteMutation.isPending}
+              onClick={confirmDeleting}
+              className="rounded-xl bg-red-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {deleteMutation.isPending ? "Удаляем..." : "Удалить навсегда"}
+            </button>
+
+            <button
+              type="button"
+              disabled={deleteMutation.isPending}
+              onClick={cancelDeleting}
+              className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Отмена
+            </button>
+          </div>
         </div>
       )}
 
@@ -263,17 +364,17 @@ export function CharacteristicDefinitionEditorCard({
           <div className="mt-5 flex flex-wrap gap-3">
             <button
               type="submit"
-              disabled={mutation.isPending || !hasChanges}
+              disabled={updateMutation.isPending || !hasChanges}
               className="rounded-xl bg-teal-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-teal-400 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {mutation.isPending ? "Сохраняем..." : "Сохранить"}
+              {updateMutation.isPending ? "Сохраняем..." : "Сохранить"}
             </button>
 
             <button
               type="button"
-              disabled={mutation.isPending}
+              disabled={updateMutation.isPending}
               onClick={cancelEditing}
-              className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-white/[0.08]"
+              className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-50"
             >
               Отмена
             </button>

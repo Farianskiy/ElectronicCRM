@@ -1,3 +1,4 @@
+using ElectronicService.Core.Catalog.Manufacturers.Resolution;
 using ElectronicService.Core.Catalog.Products.SearchProducts;
 
 namespace ElectronicService.Core.Catalog.Assistant.AskCatalogAssistant;
@@ -8,4 +9,5 @@ public sealed record CatalogAssistantParsedRequest(
     string? ProductTypeCode,
     string? Manufacturer,
     IReadOnlyCollection<SearchProductCharacteristicFilter> Characteristics,
-    CatalogAssistantClarificationResult? Clarification);
+    CatalogAssistantClarificationResult? Clarification,
+    ManufacturerNameRecognitionResult ManufacturerRecognition);

@@ -8,6 +8,8 @@ import { addCatalogProductAlias } from "../api/addCatalogProductAlias";
 import { removeCatalogProductAlias } from "../api/removeCatalogProductAlias";
 import type { CatalogProductDetails } from "../model/types";
 import { catalogProductAuditHistoryQueryKey } from "@/features/catalogProductAuditHistory/model/queryKeys";
+import { AppButton } from "@/shared/ui/AppButton";
+import { AppInput } from "@/shared/ui/AppInput";
 
 interface TechnicalProductAliasesEditorProps {
   product: CatalogProductDetails;
@@ -123,22 +125,24 @@ export function TechnicalProductAliasesEditor({
   const mutationError = addMutation.error ?? removeMutation.error;
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
+    <div className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-panel-strong)] p-5">
       <div>
-        <h3 className="font-semibold text-white">Альтернативные названия</h3>
+        <h3 className="text-base font-semibold text-[var(--app-text)]">
+          Альтернативные названия
+        </h3>
 
-        <p className="mt-2 text-sm text-slate-400">
-          Alias участвует в поиске товара. Удаление начинает действовать сразу
-          после подтверждения.
+        <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">
+          Альтернативные названия участвуют в поиске товара. Удаление начинает
+          действовать сразу после подтверждения.
         </p>
       </div>
 
       {product.aliases.length === 0 ? (
-        <p className="mt-4 text-sm text-slate-500">
+        <p className="mt-4 rounded-2xl border border-dashed border-[var(--app-border-strong)] bg-[var(--app-surface)] p-4 text-sm leading-6 text-[var(--app-muted)]">
           Альтернативные названия пока не добавлены.
         </p>
       ) : (
-        <div className="mt-4 grid gap-2">
+        <ul className="mt-4 grid min-w-0 gap-3">
           {product.aliases.map((productAlias) => {
             const isAwaitingConfirmation =
               aliasIdPendingRemoval === productAlias.id;
@@ -148,42 +152,48 @@ export function TechnicalProductAliasesEditor({
               removeMutation.variables?.aliasId === productAlias.id;
 
             return (
-              <div
+              <li
                 key={productAlias.id}
-                className="flex flex-col justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3 sm:flex-row sm:items-center"
+                className="grid min-w-0 gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center"
               >
-                <span className="min-w-0 break-words text-sm font-medium text-teal-300">
+                <span className="min-w-0 text-sm font-medium leading-6 text-[var(--app-text)] [overflow-wrap:anywhere]">
                   {productAlias.value}
                 </span>
 
                 {isAwaitingConfirmation ? (
-                  <div className="flex flex-wrap gap-2">
-                    <button
+                  <div className="flex min-w-0 flex-wrap gap-2 lg:justify-end">
+                    <AppButton
                       type="button"
+                      variant="danger"
+                      size="sm"
                       disabled={isRemoving}
+                      loading={isRemoving}
                       onClick={() =>
                         removeMutation.mutate({
                           aliasId: productAlias.id,
                           aliasValue: productAlias.value,
                         })
                       }
-                      className="rounded-xl bg-red-500 px-3 py-2 text-xs font-medium text-white transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="max-w-full"
                     >
                       {isRemoving ? "Удаляем..." : "Подтвердить удаление"}
-                    </button>
+                    </AppButton>
 
-                    <button
+                    <AppButton
                       type="button"
+                      variant="secondary"
+                      size="sm"
                       disabled={isRemoving}
                       onClick={() => setAliasIdPendingRemoval(null)}
-                      className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-medium text-slate-300 transition hover:bg-white/[0.08]"
                     >
                       Отмена
-                    </button>
+                    </AppButton>
                   </div>
                 ) : (
-                  <button
+                  <AppButton
                     type="button"
+                    variant="danger"
+                    size="sm"
                     disabled={addMutation.isPending || removeMutation.isPending}
                     onClick={() => {
                       addMutation.reset();
@@ -192,58 +202,75 @@ export function TechnicalProductAliasesEditor({
                       setSuccessMessage(null);
                       setAliasIdPendingRemoval(productAlias.id);
                     }}
-                    className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="justify-self-start lg:justify-self-end"
                   >
                     Удалить
-                  </button>
+                  </AppButton>
                 )}
-              </div>
+              </li>
             );
           })}
-        </div>
+        </ul>
       )}
 
       {validationError && (
-        <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
+        <div
+          role="alert"
+          className="mt-5 rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-4 text-sm leading-6 text-[var(--app-danger)] [overflow-wrap:anywhere]"
+        >
           {validationError}
         </div>
       )}
 
       {mutationError && (
-        <div className="mt-5 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+        <div
+          role="alert"
+          className="mt-5 whitespace-pre-wrap rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-4 text-sm leading-6 text-[var(--app-danger)] [overflow-wrap:anywhere]"
+        >
           {getErrorMessage(mutationError)}
         </div>
       )}
 
       {successMessage && (
-        <div className="mt-5 rounded-2xl border border-green-500/30 bg-green-500/10 p-4 text-sm text-green-200">
+        <div
+          role="status"
+          className="mt-5 rounded-2xl border border-[var(--app-success-border)] bg-[var(--app-success-soft)] p-4 text-sm leading-6 text-[var(--app-success)] [overflow-wrap:anywhere]"
+        >
           {successMessage}
         </div>
       )}
 
       <form
         onSubmit={handleSubmit}
-        className="mt-5 flex flex-col gap-3 sm:flex-row"
+        className="mt-5 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end"
       >
-        <input
-          value={alias}
-          onChange={(event) => {
-            setAlias(event.target.value);
-            setValidationError(null);
-            setSuccessMessage(null);
-            setAliasIdPendingRemoval(null);
-          }}
-          placeholder="Например: NSX400F 4P 400A"
-          className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-slate-100 outline-none placeholder:text-slate-600 focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20"
-        />
+        <label className="grid min-w-0 flex-1 gap-2">
+          <span className="text-sm font-medium text-[var(--app-text)]">
+            Новое альтернативное название
+          </span>
 
-        <button
+          <AppInput
+            value={alias}
+            aria-invalid={Boolean(validationError)}
+            onChange={(event) => {
+              setAlias(event.target.value);
+              setValidationError(null);
+              setSuccessMessage(null);
+              setAliasIdPendingRemoval(null);
+            }}
+            placeholder="Например: NSX400F 4P 400A"
+          />
+        </label>
+
+        <AppButton
           type="submit"
+          variant="primary"
           disabled={addMutation.isPending || removeMutation.isPending}
-          className="rounded-2xl bg-teal-500 px-5 py-3 text-sm font-medium text-white transition hover:bg-teal-400 disabled:cursor-not-allowed disabled:opacity-50"
+          loading={addMutation.isPending}
+          className="w-full sm:w-auto"
         >
-          {addMutation.isPending ? "Добавляем..." : "Добавить alias"}
-        </button>
+          {addMutation.isPending ? "Добавляем..." : "Добавить название"}
+        </AppButton>
       </form>
     </div>
   );

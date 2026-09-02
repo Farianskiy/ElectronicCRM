@@ -1,0 +1,3 @@
+namespace ElectronicService.Core.Catalog.Recognition.Management.CreateProfile;
+
+public sealed record CreateCatalogCharacteristicRecognitionProfileResult(Guid ProfileId);

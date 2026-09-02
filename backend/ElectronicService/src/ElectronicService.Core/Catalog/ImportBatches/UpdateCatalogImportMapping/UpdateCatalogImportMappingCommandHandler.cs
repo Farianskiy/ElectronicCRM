@@ -4,6 +4,7 @@ using ElectronicService.Core.Catalog.Products.Abstractions;
 using ElectronicService.Core.Users;
 using ElectronicService.Domain.Catalog.ImportBatches;
 using ElectronicService.Domain.Common;
+using ElectronicService.Domain.Catalog.ProductTypes;
 
 namespace ElectronicService.Core.Catalog.ImportBatches.UpdateCatalogImportMapping;
 
@@ -41,10 +42,11 @@ public sealed class UpdateCatalogImportMappingCommandHandler
                 CatalogImportErrors.BatchNotFound(command.BatchId));
         }
 
-        if (command.ProductTypeId == Guid.Empty)
+        if (command.ProductTypeId.HasValue && command.ProductTypeId.Value == Guid.Empty)
         {
             return Result.Failure<UpdateCatalogImportMappingResult, DomainError>(
-                CatalogImportErrors.ProductTypeIsRequired());
+                CatalogImportErrors.ProductTypeNotFound(
+                    command.ProductTypeId.Value));
         }
 
         if (command.Columns.Count == 0)
@@ -91,14 +93,24 @@ public sealed class UpdateCatalogImportMappingCommandHandler
                 CatalogImportErrors.BatchMappingCannotBeEdited(batch.Status));
         }
 
-        var productType = await _metadataRepository
-            .GetProductTypeByIdAsync(command.ProductTypeId, cancellationToken)
-            .ConfigureAwait(false);
+        ProductType? productType = null;
 
-        if (productType is null)
+        if (command.ProductTypeId.HasValue)
         {
-            return Result.Failure<UpdateCatalogImportMappingResult, DomainError>(
-                CatalogImportErrors.ProductTypeNotFound(command.ProductTypeId));
+            productType = await _metadataRepository
+                .GetProductTypeByIdAsync(
+                    command.ProductTypeId.Value,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            if (productType is null)
+            {
+                return Result.Failure<
+                    UpdateCatalogImportMappingResult,
+                    DomainError>(
+                        CatalogImportErrors.ProductTypeNotFound(
+                            command.ProductTypeId.Value));
+            }
         }
 
         var storedColumns = await _importBatchRepository
@@ -182,23 +194,42 @@ public sealed class UpdateCatalogImportMappingCommandHandler
         var disallowedCharacteristic = command.Columns.FirstOrDefault(mapping =>
             mapping.TargetKind == CatalogImportColumnTargetKind.Characteristic
             && mapping.CharacteristicDefinitionId.HasValue
-            && !productType.AllowsCharacteristic(
-                mapping.CharacteristicDefinitionId.Value));
+            && (
+                productType is null
+                || !productType.AllowsCharacteristic(
+                    mapping.CharacteristicDefinitionId.Value)
+    ));
 
         if (disallowedCharacteristic is not null)
         {
-            return Result.Failure<UpdateCatalogImportMappingResult, DomainError>(
-                CatalogImportErrors.CharacteristicNotAllowed(
-                    disallowedCharacteristic.CharacteristicDefinitionId!.Value,
-                    productType.Id));
+            if (productType is null)
+            {
+                return Result.Failure<
+                    UpdateCatalogImportMappingResult,
+                    DomainError>(
+                        CatalogImportErrors.InvalidColumnMapping());
+            }
+
+            return Result.Failure<
+                UpdateCatalogImportMappingResult,
+                DomainError>(
+                    CatalogImportErrors.CharacteristicNotAllowed(
+                        disallowedCharacteristic
+                            .CharacteristicDefinitionId!.Value,
+                        productType.Id));
         }
 
-        var assignProductTypeResult = batch.AssignProductType(productType.Id);
+        var changeProductTypeResult =
+            productType is null
+                ? batch.ClearProductType()
+                : batch.AssignProductType(productType.Id);
 
-        if (assignProductTypeResult.IsFailure)
+        if (changeProductTypeResult.IsFailure)
         {
-            return Result.Failure<UpdateCatalogImportMappingResult, DomainError>(
-                assignProductTypeResult.Error);
+            return Result.Failure<
+                UpdateCatalogImportMappingResult,
+                DomainError>(
+                    changeProductTypeResult.Error);
         }
 
         var mappingsByColumnId = command.Columns.ToDictionary(
@@ -244,7 +275,7 @@ public sealed class UpdateCatalogImportMappingCommandHandler
         var result = new UpdateCatalogImportMappingResult(
             batch.Id,
             batch.Status,
-            productType.Id,
+            batch.ProductTypeId,
             storedColumns.Count,
             storedColumns.Count(column =>
                 column.TargetKind == CatalogImportColumnTargetKind.Unmapped),

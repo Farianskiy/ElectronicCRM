@@ -1,7 +1,7 @@
 namespace ElectronicService.Contracts.Catalog.ImportBatches;
 
 public sealed record UpdateCatalogImportMappingRequest(
-    Guid ProductTypeId,
+    Guid? ProductTypeId,
     IReadOnlyCollection<UpdateCatalogImportColumnMappingRequest>? Columns);
 
 public sealed record UpdateCatalogImportColumnMappingRequest(

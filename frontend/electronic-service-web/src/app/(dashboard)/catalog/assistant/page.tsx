@@ -96,13 +96,19 @@ function InfoCard({ label, value }: { label: string; value: string }) {
 
 function ClarificationBlock({
   clarification,
+  manufacturerChoices,
+  onSelectManufacturer,
   onCreateSuggestion,
+  isAssistantPending,
   isPending,
   isSuccess,
   error,
 }: {
   clarification: CatalogAssistantClarification;
+  manufacturerChoices: string[];
+  onSelectManufacturer: (manufacturerName: string) => void;
   onCreateSuggestion: () => void;
+  isAssistantPending: boolean;
   isPending: boolean;
   isSuccess: boolean;
   error: unknown | null;
@@ -123,7 +129,10 @@ function ClarificationBlock({
           </p>
 
           <div className="mt-5 grid gap-3 md:grid-cols-4">
-            <InfoCard label="Неизвестное слово" value={clarification.unknownPhrase} />
+            <InfoCard
+              label="Неизвестное слово"
+              value={clarification.unknownPhrase}
+            />
             <InfoCard label="Тип" value={clarification.suggestedKind} />
             <InfoCard
               label="Значение"
@@ -134,20 +143,46 @@ function ClarificationBlock({
               value={formatPercent(clarification.confidence)}
             />
           </div>
+
+          {manufacturerChoices.length > 0 && (
+            <div className="mt-5">
+              <p className="text-sm font-medium text-amber-100">
+                Выберите производителя для продолжения поиска
+              </p>
+
+              <div className="mt-3 flex flex-wrap gap-3">
+                {manufacturerChoices.map((manufacturerName) => (
+                  <button
+                    key={manufacturerName}
+                    type="button"
+                    onClick={() => onSelectManufacturer(manufacturerName)}
+                    disabled={isAssistantPending}
+                    className="rounded-2xl border border-amber-400/40 bg-amber-400/15 px-5 py-3 text-sm font-medium text-amber-100 transition hover:bg-amber-400 hover:text-slate-950 disabled:opacity-60"
+                  >
+                    {isAssistantPending
+                      ? "Выполняем поиск..."
+                      : `Использовать ${manufacturerName}`}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
-        <button
-          type="button"
-          onClick={onCreateSuggestion}
-          disabled={isPending || isSuccess}
-          className="w-fit rounded-2xl bg-amber-500 px-5 py-3 text-sm font-medium text-slate-950 disabled:opacity-60"
-        >
-          {isPending
-            ? "Отправляем..."
-            : isSuccess
-              ? "Отправлено"
-              : "Отправить предложение"}
-        </button>
+        {clarification.canCreateSuggestion && (
+          <button
+            type="button"
+            onClick={onCreateSuggestion}
+            disabled={isPending || isSuccess}
+            className="w-fit rounded-2xl bg-amber-500 px-5 py-3 text-sm font-medium text-slate-950 disabled:opacity-60"
+          >
+            {isPending
+              ? "Отправляем..."
+              : isSuccess
+                ? "Отправлено"
+                : "Отправить предложение"}
+          </button>
+        )}
       </div>
 
       {isSuccess && (
@@ -178,10 +213,7 @@ function TechnicalParsedRequestBlock({
 
       <div className="mt-5 grid gap-3 md:grid-cols-4">
         <InfoCard label="Intent" value={response.parsedRequest.intent} />
-        <InfoCard
-          label="Search"
-          value={response.parsedRequest.search ?? "—"}
-        />
+        <InfoCard label="Search" value={response.parsedRequest.search ?? "—"} />
         <InfoCard
           label="Product type"
           value={response.parsedRequest.productTypeCode ?? "—"}
@@ -244,22 +276,52 @@ export default function CatalogAssistantPage() {
   const response = assistantMutation.data;
   const clarification = response?.parsedRequest.clarification ?? null;
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  const manufacturerChoices =
+    clarification?.suggestedKind === "ManufacturerConflict"
+      ? Array.from(
+          new Set(
+            (
+              response?.parsedRequest.manufacturerRecognition.candidates ?? []
+            ).map((candidate) => candidate.manufacturerName),
+          ),
+        )
+      : [];
 
+  function submitAssistant(
+    requestMessage: string,
+    selectedManufacturer: string | null,
+  ) {
     suggestionMutation.reset();
 
     assistantMutation.mutate({
-      message,
+      message: requestMessage,
       onlyInStock,
       minimumScore,
       page: 1,
       pageSize,
+      selectedManufacturer,
     });
   }
 
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    submitAssistant(message, null);
+  }
+
+  function handleSelectManufacturer(manufacturerName: string) {
+    if (!response) {
+      return;
+    }
+
+    submitAssistant(
+      response.parsedRequest.manufacturerRecognition.productName,
+      manufacturerName,
+    );
+  }
+
   function handleCreateSuggestion() {
-    if (!clarification) {
+    if (!clarification || !clarification.canCreateSuggestion) {
       return;
     }
 
@@ -313,7 +375,9 @@ export default function CatalogAssistantPage() {
                 min={0}
                 max={100}
                 value={minimumScore}
-                onChange={(event) => setMinimumScore(Number(event.target.value))}
+                onChange={(event) =>
+                  setMinimumScore(Number(event.target.value))
+                }
                 className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-slate-100 outline-none focus:border-teal-400"
               />
             </label>
@@ -352,7 +416,10 @@ export default function CatalogAssistantPage() {
       {response && clarification && (
         <ClarificationBlock
           clarification={clarification}
+          manufacturerChoices={manufacturerChoices}
+          onSelectManufacturer={handleSelectManufacturer}
           onCreateSuggestion={handleCreateSuggestion}
+          isAssistantPending={assistantMutation.isPending}
           isPending={suggestionMutation.isPending}
           isSuccess={suggestionMutation.isSuccess}
           error={suggestionMutation.error ?? null}
@@ -376,13 +443,15 @@ export default function CatalogAssistantPage() {
         <section className="grid gap-4">
           <h2 className="text-xl font-semibold text-white">Замены</h2>
 
-          {response.replacements.map((replacement: CatalogAssistantReplacement) => (
-            <ProductCard
-              key={replacement.id}
-              product={replacement}
-              score={replacement.replacementScore}
-            />
-          ))}
+          {response.replacements.map(
+            (replacement: CatalogAssistantReplacement) => (
+              <ProductCard
+                key={replacement.id}
+                product={replacement}
+                score={replacement.replacementScore}
+              />
+            ),
+          )}
         </section>
       )}
 
@@ -410,7 +479,9 @@ export default function CatalogAssistantPage() {
           </section>
         )}
 
-      {response && technical && <TechnicalParsedRequestBlock response={response} />}
+      {response && technical && (
+        <TechnicalParsedRequestBlock response={response} />
+      )}
     </div>
   );
 }

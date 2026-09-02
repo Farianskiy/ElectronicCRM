@@ -2,34 +2,49 @@ using System.Text.RegularExpressions;
 using ElectronicService.Core.Catalog.Assistant.Abstractions;
 using ElectronicService.Core.Catalog.Assistant.AskCatalogAssistant;
 using ElectronicService.Core.Catalog.Dictionaries.Abstractions;
-using ElectronicService.Core.Catalog.Products.SearchProducts;
-using ElectronicService.Domain.Catalog.Dictionaries;
 using ElectronicService.Core.Catalog.Dictionaries.GetTerms;
+using ElectronicService.Core.Catalog.Manufacturers.Resolution;
+using ElectronicService.Core.Catalog.Products.SearchProducts;
+using ElectronicService.Core.Catalog.Recognition.Abstractions;
+using ElectronicService.Core.Catalog.Recognition.Models;
+using ElectronicService.Domain.Catalog.Dictionaries;
 
 namespace ElectronicService.Core.Catalog.Assistant.Parsing;
 
-public sealed partial class RuleBasedCatalogAssistantMessageParser
-    : ICatalogAssistantMessageParser
+public sealed partial class RuleBasedCatalogAssistantMessageParser : ICatalogAssistantMessageParser
 {
+    private const int RegexTimeoutMilliseconds = 100;
+
     private readonly ICatalogDictionaryReader _dictionaryReader;
     private readonly ICatalogAssistantUnknownTermResolver _unknownTermResolver;
+    private readonly ICatalogProductNameRecognitionService _productNameRecognitionService;
+    private readonly IManufacturerResolver _manufacturerResolver;
 
     public RuleBasedCatalogAssistantMessageParser(
-    ICatalogDictionaryReader dictionaryReader,
-    ICatalogAssistantUnknownTermResolver unknownTermResolver)
+        ICatalogDictionaryReader dictionaryReader,
+        ICatalogAssistantUnknownTermResolver unknownTermResolver,
+        ICatalogProductNameRecognitionService productNameRecognitionService,
+        IManufacturerResolver manufacturerResolver)
     {
+        ArgumentNullException.ThrowIfNull(dictionaryReader);
+        ArgumentNullException.ThrowIfNull(unknownTermResolver);
+        ArgumentNullException.ThrowIfNull(productNameRecognitionService);
+        ArgumentNullException.ThrowIfNull(manufacturerResolver);
+
         _dictionaryReader = dictionaryReader;
         _unknownTermResolver = unknownTermResolver;
+        _productNameRecognitionService = productNameRecognitionService;
+        _manufacturerResolver = manufacturerResolver;
     }
 
     public async Task<CatalogAssistantParsedRequest> ParseAsync(
         string message,
+        string? selectedManufacturer,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
 
         var normalizedMessage = NormalizeText(message);
-
         var intent = ResolveIntent(normalizedMessage);
 
         var terms = await _dictionaryReader
@@ -44,17 +59,12 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser
 
         foreach (var term in terms)
         {
-            if (!normalizedMessage.Contains(
-                    term.NormalizedPhrase,
-                    StringComparison.Ordinal))
+            if (!Enum.TryParse<CatalogDictionaryTermKind>(term.Kind, ignoreCase: true, out var kind))
             {
                 continue;
             }
 
-            if (!Enum.TryParse<CatalogDictionaryTermKind>(
-                    term.Kind,
-                    ignoreCase: true,
-                    out var kind))
+            if (!IsDictionaryTermMatch(normalizedMessage, term.NormalizedPhrase, kind))
             {
                 continue;
             }
@@ -86,21 +96,57 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser
             }
         }
 
-        ExtractRegexCharacteristics(
-            normalizedMessage,
-            characteristics);
+        var recognitionResult = await _productNameRecognitionService
+            .RecognizeAsync(
+                new CatalogProductNameRecognitionRequest(message),
+                cancellationToken)
+            .ConfigureAwait(false);
 
-        search ??= ExtractSearchToken(normalizedMessage);
+        foreach (var recognizedCharacteristic in recognitionResult.Characteristics)
+        {
+            AddOrReplaceCharacteristic(
+                characteristics,
+                recognizedCharacteristic.CharacteristicCode,
+                recognizedCharacteristic.NormalizedValue);
+        }
 
-        var unknownPhrase = FindFirstUnknownPhrase(
-            normalizedMessage,
-            terms);
+        var manufacturerResolutionIndex = await _manufacturerResolver
+            .LoadIndexAsync(cancellationToken)
+            .ConfigureAwait(false);
 
-        var clarification = unknownPhrase is null
-            ? null
-            : await _unknownTermResolver
-                .ResolveAsync(unknownPhrase, cancellationToken)
-                .ConfigureAwait(false);
+        var manufacturerRecognition = manufacturerResolutionIndex
+            .RecognizeInText(message);
+
+        var manufacturerSelection = ResolveManufacturerSelection(
+            manufacturer,
+            selectedManufacturer,
+            manufacturerRecognition);
+
+        manufacturer = manufacturerSelection.Manufacturer;
+
+        search ??= ExtractSearchToken(
+            message,
+            recognitionResult);
+
+        CatalogAssistantClarificationResult? clarification;
+
+        if (manufacturerSelection.Clarification is not null)
+        {
+            clarification = manufacturerSelection.Clarification;
+        }
+        else
+        {
+            var unknownPhrase = FindFirstUnknownPhrase(
+                normalizedMessage,
+                terms,
+                manufacturerRecognition);
+
+            clarification = unknownPhrase is null
+                ? null
+                : await _unknownTermResolver
+                    .ResolveAsync(unknownPhrase, cancellationToken)
+                    .ConfigureAwait(false);
+        }
 
         return new CatalogAssistantParsedRequest(
             intent,
@@ -108,7 +154,8 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser
             productTypeCode,
             manufacturer,
             characteristics,
-            clarification);
+            clarification,
+            manufacturerRecognition);
     }
 
     private static CatalogAssistantIntent ResolveIntent(string normalizedMessage)
@@ -131,104 +178,78 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser
         return CatalogAssistantIntent.SearchProducts;
     }
 
-    private static void ExtractRegexCharacteristics(
-        string normalizedMessage,
-        List<SearchProductCharacteristicFilter> characteristics)
+    private static string? ExtractSearchToken(
+    string message,
+    CatalogProductNameRecognitionResult recognitionResult)
     {
-        var polesMatch = PolesRegex().Match(normalizedMessage);
-
-        if (polesMatch.Success)
+        foreach (Match seriesMatch in SeriesTokenRegex().Matches(message))
         {
-            AddOrReplaceCharacteristic(
-                characteristics,
-                "POLES",
-                polesMatch.Groups["value"].Value);
+            var valueMatch = seriesMatch.Groups["value"];
+
+            if (!valueMatch.Success)
+            {
+                continue;
+            }
+
+            var normalizedValue = NormalizeText(valueMatch.Value);
+
+            if (normalizedValue.StartsWith("IP", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (OverlapsRecognizedCharacteristic(
+                    valueMatch.Index,
+                    valueMatch.Length,
+                    recognitionResult))
+            {
+                continue;
+            }
+
+            return normalizedValue;
         }
 
-        var breakingCapacityMatch = BreakingCapacityRegex().Match(normalizedMessage);
-
-        if (breakingCapacityMatch.Success)
-        {
-            AddOrReplaceCharacteristic(
-                characteristics,
-                "BREAKING_CAPACITY",
-                breakingCapacityMatch.Groups["value"].Value);
-        }
-
-        var leakageCurrentMatch = LeakageCurrentRegex().Match(normalizedMessage);
-
-        if (leakageCurrentMatch.Success)
-        {
-            AddOrReplaceCharacteristic(
-                characteristics,
-                "LEAKAGE_CURRENT",
-                leakageCurrentMatch.Groups["value"].Value);
-        }
-
-        var ratedCurrentMatch = RatedCurrentRegex().Match(normalizedMessage);
-
-        if (ratedCurrentMatch.Success)
-        {
-            AddOrReplaceCharacteristic(
-                characteristics,
-                "RATED_CURRENT",
-                ratedCurrentMatch.Groups["value"].Value);
-        }
-
-        var curveMatch = CurveRegex().Match(normalizedMessage);
-
-        if (curveMatch.Success)
-        {
-            AddOrReplaceCharacteristic(
-                characteristics,
-                "CURVE",
-                NormalizeCurve(curveMatch.Groups["value"].Value));
-        }
-
-        var curveBeforeCurrentMatch = CurveBeforeCurrentRegex().Match(normalizedMessage);
-
-        if (curveBeforeCurrentMatch.Success)
-        {
-            AddOrReplaceCharacteristic(
-                characteristics,
-                "CURVE",
-                NormalizeCurve(curveBeforeCurrentMatch.Groups["value"].Value));
-        }
-
-        var ipRatingMatch = IpRatingRegex().Match(normalizedMessage);
-
-        if (ipRatingMatch.Success)
-        {
-            AddOrReplaceCharacteristic(
-                characteristics,
-                "IP_RATING",
-                $"IP{ipRatingMatch.Groups["value"].Value}");
-        }
+        return null;
     }
 
-    private static string? ExtractSearchToken(string normalizedMessage)
+    private static bool OverlapsRecognizedCharacteristic(
+        int startIndex,
+        int length,
+        CatalogProductNameRecognitionResult recognitionResult)
     {
-        var seriesMatch = SeriesTokenRegex().Match(normalizedMessage);
-
-        if (!seriesMatch.Success)
+        if (recognitionResult.Characteristics.Any(characteristic =>
+                SpansOverlap(
+                    startIndex,
+                    length,
+                    characteristic.StartIndex,
+                    characteristic.Length)))
         {
-            return null;
+            return true;
         }
 
-        var value = seriesMatch.Groups["value"].Value;
-
-        if (value.StartsWith("IP", StringComparison.Ordinal))
-        {
-            return null;
-        }
-
-        return value;
+        return recognitionResult.Conflicts.Any(conflict =>
+            conflict.Candidates.Any(candidate =>
+                SpansOverlap(
+                    startIndex,
+                    length,
+                    candidate.StartIndex,
+                    candidate.Length)));
     }
 
-    private static void AddOrReplaceCharacteristic(
-        List<SearchProductCharacteristicFilter> characteristics,
-        string code,
-        string value)
+    private static bool SpansOverlap(
+        int leftStartIndex,
+        int leftLength,
+        int rightStartIndex,
+        int rightLength)
+    {
+        var leftEndIndex = leftStartIndex + leftLength;
+        var rightEndIndex = rightStartIndex + rightLength;
+
+        return leftStartIndex < rightEndIndex
+            && rightStartIndex < leftEndIndex;
+    }
+
+    private static void AddOrReplaceCharacteristic(List<SearchProductCharacteristicFilter> characteristics, string code, string value)
     {
         var normalizedCode = NormalizeText(code);
         var normalizedValue = NormalizeCharacteristicValue(value);
@@ -246,6 +267,7 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser
         if (existingIndex < 0)
         {
             characteristics.Add(characteristic);
+
             return;
         }
 
@@ -269,86 +291,41 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser
             .Replace("Ё", "Е", StringComparison.Ordinal);
     }
 
-    private static string NormalizeCurve(string value)
-    {
-        var normalizedValue = NormalizeText(value);
-
-        return normalizedValue switch
-        {
-            "С" => "C",
-            "В" => "B",
-            _ => normalizedValue
-        };
-    }
-
-    private const int RegexTimeoutMilliseconds = 100;
-
-    [GeneratedRegex(
-        @"(?<value>\d+)\s*(?:П|P)\b",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
-        RegexTimeoutMilliseconds)]
-    private static partial Regex PolesRegex();
-
-    [GeneratedRegex(
-        @"(?<value>\d+(?:[,.]\d+)?)\s*(?:К|K)\s*(?:А|A)\b",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
-        RegexTimeoutMilliseconds)]
-    private static partial Regex BreakingCapacityRegex();
-
-    [GeneratedRegex(
-        @"(?<value>\d+(?:[,.]\d+)?)\s*(?:М|M)\s*(?:А|A)\b",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
-        RegexTimeoutMilliseconds)]
-    private static partial Regex LeakageCurrentRegex();
-
-    [GeneratedRegex(
-        @"(?<value>\d+(?:[,.]\d+)?)\s*(?:А|A)\b",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
-        RegexTimeoutMilliseconds)]
-    private static partial Regex RatedCurrentRegex();
-
-    [GeneratedRegex(
-        @"\b(?<value>[BCDСВ])\b",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
-        RegexTimeoutMilliseconds)]
-    private static partial Regex CurveRegex();
-
-    [GeneratedRegex(
-        @"\b(?<value>[BCDСВ])\s*\d+",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
-        RegexTimeoutMilliseconds)]
-    private static partial Regex CurveBeforeCurrentRegex();
-
-    [GeneratedRegex(
-        @"\bIP\s*(?<value>\d{2})\b",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
-        RegexTimeoutMilliseconds)]
-    private static partial Regex IpRatingRegex();
-
-    [GeneratedRegex(
-        @"\b(?<value>[А-ЯA-Z]{1,8}\d+[А-ЯA-Z0-9\-]*)\b",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
-        RegexTimeoutMilliseconds)]
-    private static partial Regex SeriesTokenRegex();
-
     private static string? FindFirstUnknownPhrase(
     string normalizedMessage,
-    IReadOnlyCollection<CatalogDictionaryTermResult> terms)
+    IReadOnlyCollection<CatalogDictionaryTermResult> terms,
+    ManufacturerNameRecognitionResult manufacturerRecognition)
     {
         var recognizedWords = terms
-            .Where(term => normalizedMessage.Contains(
-                term.NormalizedPhrase,
-                StringComparison.Ordinal))
+            .Where(term =>
+                Enum.TryParse<CatalogDictionaryTermKind>(
+                    term.Kind,
+                    ignoreCase: true,
+                    out var kind)
+                && IsDictionaryTermMatch(
+                    normalizedMessage,
+                    term.NormalizedPhrase,
+                    kind))
             .SelectMany<CatalogDictionaryTermResult, string>(term =>
                 term.NormalizedPhrase.Split(
                     ' ',
                     StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             .ToHashSet(StringComparer.Ordinal);
 
+        foreach (var candidate in manufacturerRecognition.Candidates)
+        {
+            foreach (var recognizedWord in candidate.NormalizedValue.Split(
+                         ' ',
+                         StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                recognizedWords.Add(recognizedWord);
+            }
+        }
+
         foreach (var word in WordRegex()
-                    .Matches(normalizedMessage)
-                    .Cast<Match>()
-                    .Select(match => match.Value))
+                     .Matches(normalizedMessage)
+                     .Cast<Match>()
+                     .Select(match => match.Value))
         {
             if (word.Length < 3)
             {
@@ -374,6 +351,168 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser
         }
 
         return null;
+    }
+
+    private static (
+    string? Manufacturer,
+    CatalogAssistantClarificationResult? Clarification)
+    ResolveManufacturerSelection(
+        string? dictionaryManufacturer,
+        string? selectedManufacturer,
+        ManufacturerNameRecognitionResult manufacturerRecognition)
+    {
+        if (!string.IsNullOrWhiteSpace(selectedManufacturer))
+        {
+            var normalizedSelection = selectedManufacturer.Trim();
+
+            var selectedCandidate = manufacturerRecognition.Candidates
+                .FirstOrDefault(candidate =>
+                    string.Equals(
+                        candidate.ManufacturerName,
+                        normalizedSelection,
+                        StringComparison.OrdinalIgnoreCase));
+
+            if (selectedCandidate is null)
+            {
+                return (
+                    null,
+                    CreateInvalidManufacturerSelectionClarification(
+                        normalizedSelection,
+                        manufacturerRecognition));
+            }
+
+            return (
+                selectedCandidate.ManufacturerName,
+                null);
+        }
+
+        if (manufacturerRecognition.IsConflict)
+        {
+            return (
+                null,
+                CreateManufacturerConflictClarification(
+                    manufacturerRecognition));
+        }
+
+        if (!manufacturerRecognition.IsResolved)
+        {
+            return (
+                dictionaryManufacturer,
+                null);
+        }
+
+        var resolvedManufacturer = manufacturerRecognition
+            .SelectedCandidate?
+            .ManufacturerName
+            ?? throw new InvalidOperationException(
+                "Resolved manufacturer recognition does not contain a selected candidate.");
+
+        return (
+            resolvedManufacturer,
+            null);
+    }
+
+    private static CatalogAssistantClarificationResult CreateManufacturerConflictClarification(
+        ManufacturerNameRecognitionResult manufacturerRecognition)
+    {
+        var manufacturerNames = manufacturerRecognition.Candidates
+            .Select(candidate => candidate.ManufacturerName)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(manufacturerName => manufacturerName, StringComparer.Ordinal)
+            .ToArray();
+
+        var rawValues = manufacturerRecognition.Candidates
+            .OrderBy(candidate => candidate.StartIndex)
+            .Select(candidate => candidate.RawValue)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var manufacturerNamesText = string.Join(", ", manufacturerNames);
+
+        return new CatalogAssistantClarificationResult(
+            string.Join(" / ", rawValues),
+            "ManufacturerConflict",
+            null,
+            manufacturerNamesText,
+            1.0000m,
+            $"В запросе найдены разные производители: {manufacturerNamesText}. Уточните, какого производителя использовать.",
+            false);
+    }
+
+    private static CatalogAssistantClarificationResult CreateInvalidManufacturerSelectionClarification(
+    string selectedManufacturer,
+    ManufacturerNameRecognitionResult manufacturerRecognition)
+    {
+        var availableManufacturers = manufacturerRecognition.Candidates
+            .Select(candidate => candidate.ManufacturerName)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(manufacturerName => manufacturerName, StringComparer.Ordinal)
+            .ToArray();
+
+        var availableManufacturersText = availableManufacturers.Length == 0
+            ? "нет доступных вариантов"
+            : string.Join(", ", availableManufacturers);
+
+        return new CatalogAssistantClarificationResult(
+            selectedManufacturer,
+            "ManufacturerSelectionInvalid",
+            null,
+            availableManufacturersText,
+            0.0000m,
+            $"Производитель {selectedManufacturer} не относится к найденным вариантам. Доступные варианты: {availableManufacturersText}.",
+            false);
+    }
+
+    private static bool IsDictionaryTermMatch(
+        string normalizedMessage,
+        string normalizedPhrase,
+        CatalogDictionaryTermKind kind)
+    {
+        return kind == CatalogDictionaryTermKind.Manufacturer
+            ? ContainsWholeTerm(normalizedMessage, normalizedPhrase)
+            : normalizedMessage.Contains(normalizedPhrase, StringComparison.Ordinal);
+    }
+
+    private static bool ContainsWholeTerm(string text, string term)
+    {
+        if (string.IsNullOrWhiteSpace(term) || term.Length > text.Length)
+        {
+            return false;
+        }
+
+        var searchStartIndex = 0;
+
+        while (searchStartIndex <= text.Length - term.Length)
+        {
+            var matchIndex = text.IndexOf(
+                term,
+                searchStartIndex,
+                StringComparison.Ordinal);
+
+            if (matchIndex < 0)
+            {
+                return false;
+            }
+
+            var hasStartBoundary =
+                matchIndex == 0 ||
+                !char.IsLetterOrDigit(text[matchIndex - 1]);
+
+            var endIndex = matchIndex + term.Length;
+
+            var hasEndBoundary =
+                endIndex == text.Length ||
+                !char.IsLetterOrDigit(text[endIndex]);
+
+            if (hasStartBoundary && hasEndBoundary)
+            {
+                return true;
+            }
+
+            searchStartIndex = matchIndex + 1;
+        }
+
+        return false;
     }
 
     private static readonly HashSet<string> IgnoredWords = new(StringComparer.Ordinal)
@@ -403,6 +542,12 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser
         "СЕРИЯ",
         "ТИПА"
     };
+
+    [GeneratedRegex(
+        @"\b(?<value>[А-ЯA-Z]{1,8}-?\d+[А-ЯA-Z0-9\-]*)\b",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+        RegexTimeoutMilliseconds)]
+    private static partial Regex SeriesTokenRegex();
 
     [GeneratedRegex(
         @"[А-ЯA-Z0-9\-]+",

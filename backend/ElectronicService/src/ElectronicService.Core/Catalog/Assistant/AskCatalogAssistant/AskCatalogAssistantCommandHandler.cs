@@ -38,7 +38,10 @@ public sealed class AskCatalogAssistantCommandHandler
         }
 
         var parsedRequest = await _messageParser
-            .ParseAsync(command.Message, cancellationToken)
+            .ParseAsync(
+                command.Message,
+                command.SelectedManufacturer,
+                cancellationToken)
             .ConfigureAwait(false);
 
         if (parsedRequest.Clarification is not null)

@@ -93,7 +93,19 @@ builder.Services.AddCors(options =>
         policy
             .WithOrigins(frontendOrigins)
             .AllowAnyHeader()
-            .AllowAnyMethod();
+            .AllowAnyMethod()
+            .WithExposedHeaders(
+                "Content-Disposition",
+                "X-Dataset-Format-Version",
+                "X-Dataset-Finalized-Until-Utc",
+                "X-Dataset-Exported-At-Utc",
+                "X-Dataset-Example-Count",
+                "X-Dataset-Example-Counts",
+                "X-Dataset-SHA256",
+                "X-Dataset-Bundle-Format-Version",
+                "X-Dataset-Split-Algorithm-Version",
+                "X-Dataset-Product-Group-Count",
+                "X-Dataset-Bundle-Manifest");
     });
 });
 

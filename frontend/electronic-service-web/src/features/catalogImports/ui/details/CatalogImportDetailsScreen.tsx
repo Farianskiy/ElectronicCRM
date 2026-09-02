@@ -5,7 +5,7 @@ import Link from "next/link";
 import { getCatalogImportBatch } from "../../api/getCatalogImportBatch";
 import { catalogImportQueryKeys } from "../../model/queryKeys";
 import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
-import { PageHeader } from "@/shared/ui/PageHeader";
+import { PageWorkspace } from "@/shared/ui/PageWorkspace";
 import { CatalogImportDetailsContent } from "./CatalogImportDetailsContent";
 
 interface CatalogImportDetailsScreenProps {
@@ -26,29 +26,34 @@ export function CatalogImportDetailsScreen({
   });
 
   return (
-    <div className="grid gap-6">
-      <PageHeader
-        title="Пакет импорта"
-        description="Состояние обработки, результаты проверки и доступные действия."
-      />
-
-      <div>
+    <PageWorkspace
+      eyebrow="Импорт каталога"
+      title="Пакет импорта"
+      description="Основная работа — со строками и техническим разбором. Настройка файла, сводка и действия, история доступны из меню шапки пакета."
+      contentClassName="grid min-w-0 gap-6"
+      actions={
         <Link
           href={backHref}
-          className="inline-flex rounded-xl bg-white/[0.06] px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/[0.1]"
+          className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[var(--app-button-secondary-border)] bg-[var(--app-button-secondary-bg)] px-4 py-2 text-sm font-medium text-[var(--app-text)] transition-colors hover:bg-[var(--app-surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] motion-reduce:transition-none"
         >
           ← {backLabel}
         </Link>
-      </div>
-
+      }
+    >
       {batchQuery.isLoading && (
-        <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 text-slate-300">
+        <section
+          role="status"
+          className="rounded-3xl border border-[var(--app-border)] bg-[var(--app-panel)] p-6 text-[var(--app-muted)]"
+        >
           Загружаем пакет импорта...
         </section>
       )}
 
       {batchQuery.isError && (
-        <section className="rounded-3xl border border-red-500/30 bg-red-500/10 p-6 text-red-200">
+        <section
+          role="alert"
+          className="rounded-3xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-6 text-[var(--app-danger)]"
+        >
           {getApiErrorMessage(
             batchQuery.error,
             "Не удалось загрузить пакет импорта.",
@@ -57,8 +62,11 @@ export function CatalogImportDetailsScreen({
       )}
 
       {batchQuery.data && (
-        <CatalogImportDetailsContent batch={batchQuery.data} />
+        <CatalogImportDetailsContent
+          key={batchQuery.data.batchId}
+          batch={batchQuery.data}
+        />
       )}
-    </div>
+    </PageWorkspace>
   );
 }

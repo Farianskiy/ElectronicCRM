@@ -6,4 +6,5 @@ public sealed record CatalogAssistantParsedRequestResponse(
     string? ProductTypeCode,
     string? Manufacturer,
     IReadOnlyCollection<CatalogAssistantCharacteristicResponse> Characteristics,
-    CatalogAssistantClarificationResponse? Clarification);
+    CatalogAssistantClarificationResponse? Clarification,
+    CatalogAssistantManufacturerRecognitionResponse ManufacturerRecognition);

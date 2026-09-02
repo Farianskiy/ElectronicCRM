@@ -27,7 +27,10 @@ public sealed record CatalogImportNormalizedRowResponse(
     Guid? ManufacturerId,
     decimal? Price,
     int? StockQuantity,
-    IReadOnlyDictionary<string, string> Characteristics);
+    IReadOnlyDictionary<string, string> Characteristics,
+    Guid? ProductTypeId,
+    string? ProductTypeResolutionSource,
+    decimal? ProductTypeResolutionConfidence);
 
 public sealed record CatalogImportRowIssueResponse(
     string Code,
