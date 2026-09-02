@@ -105,7 +105,8 @@ public sealed class CatalogAssistantUnknownTermResolver
             bestCandidate.Candidate.TargetCode,
             bestCandidate.Candidate.TargetValue,
             bestCandidate.Confidence,
-            question);
+            question,
+            true);
     }
 
     private static string CreateQuestion(

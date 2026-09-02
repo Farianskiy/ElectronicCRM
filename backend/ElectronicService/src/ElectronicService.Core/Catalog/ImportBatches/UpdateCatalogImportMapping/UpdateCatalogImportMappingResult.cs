@@ -5,7 +5,7 @@ namespace ElectronicService.Core.Catalog.ImportBatches.UpdateCatalogImportMappin
 public sealed record UpdateCatalogImportMappingResult(
     Guid BatchId,
     CatalogImportBatchStatus Status,
-    Guid ProductTypeId,
+    Guid? ProductTypeId,
     int ColumnsCount,
     int UnmappedColumnsCount,
     int UnconfirmedColumnsCount,

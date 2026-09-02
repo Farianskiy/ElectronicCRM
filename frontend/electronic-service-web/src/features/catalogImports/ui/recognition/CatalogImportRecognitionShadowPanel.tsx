@@ -1,3 +1,6 @@
+"use client";
+
+import { CatalogImportDiagnosticList } from "../CatalogImportDiagnosticList";
 import type {
   CatalogImportRecognitionAppliedValue,
   CatalogImportRecognitionEnrichment,
@@ -738,8 +741,10 @@ export function CatalogImportRecognitionShadowPanel({
             </p>
           </div>
         ) : (
-          <div className="mt-4 grid gap-4">
-            {recognitionShadow.samples.map((sample, index) => {
+          <CatalogImportDiagnosticList
+            items={recognitionShadow.samples}
+            ariaLabel="Примеры распознавания характеристик"
+            renderItem={(sample, index) => {
               const appliedValue =
                 appliedValuesByKey.get(
                   getAppliedValueKey(
@@ -764,8 +769,8 @@ export function CatalogImportRecognitionShadowPanel({
                   }
                 />
               );
-            })}
-          </div>
+            }}
+          />
         )}
       </div>
     </section>

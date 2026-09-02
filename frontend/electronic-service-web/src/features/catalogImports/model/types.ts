@@ -209,6 +209,211 @@ export interface CatalogImportManufacturerResolutionSummary {
   groups: CatalogImportManufacturerResolutionGroup[];
 }
 
+export const catalogImportManufacturerRecognitionShadowSampleKinds = [
+  "None",
+  "Conflict",
+  "NameConflict",
+  "ComparisonUnavailable",
+  "Suggestion",
+  "Match",
+] as const;
+
+export type CatalogImportManufacturerRecognitionShadowSampleKind =
+  (typeof catalogImportManufacturerRecognitionShadowSampleKinds)[number];
+
+export interface CatalogImportManufacturerRecognitionShadowCandidate {
+  manufacturerId: string;
+  manufacturerName: string;
+  rawValue: string;
+  normalizedValue: string;
+  confidence: number;
+  source: CatalogImportManufacturerResolutionSource;
+  manufacturerAliasId?: string | null;
+  spanStart: number;
+  spanLength: number;
+}
+
+export interface CatalogImportManufacturerRecognitionShadowSample {
+  rowNumber: number;
+  kind: CatalogImportManufacturerRecognitionShadowSampleKind;
+  productName: string;
+  excelManufacturerId?: string | null;
+  excelManufacturerName?: string | null;
+  excelManufacturerResolutionSource?: string | null;
+  recognizedManufacturerId?: string | null;
+  recognizedManufacturerName?: string | null;
+  rawRecognizedValue?: string | null;
+  confidence?: number | null;
+  recognitionSource?: CatalogImportManufacturerResolutionSource | null;
+  spanStart?: number | null;
+  spanLength?: number | null;
+  candidates: CatalogImportManufacturerRecognitionShadowCandidate[];
+  details: string;
+}
+
+export interface CatalogImportManufacturerRecognitionShadow {
+  rowsAnalyzedCount: number;
+  rowsWithExcelManufacturerValueCount: number;
+  rowsWithResolvedExcelManufacturerCount: number;
+  rowsWithRecognizedManufacturerCount: number;
+  matchesCount: number;
+  conflictsCount: number;
+  suggestionsCount: number;
+  nameConflictsCount: number;
+  nameUnresolvedCount: number;
+  comparisonUnavailableCount: number;
+  samplesTruncated: boolean;
+  samples: CatalogImportManufacturerRecognitionShadowSample[];
+}
+
+export const catalogImportProductTypeSuggestionShadowSampleKinds = [
+  "None",
+  "Conflict",
+  "NameConflict",
+  "Suggestion",
+  "Match",
+  "Unresolved",
+] as const;
+
+export type CatalogImportProductTypeSuggestionShadowSampleKind =
+  (typeof catalogImportProductTypeSuggestionShadowSampleKinds)[number];
+
+export interface CatalogImportProductTypeSuggestionShadowEvidence {
+  dictionaryTermId: string;
+  phrase: string;
+  rawValue: string;
+  normalizedValue: string;
+  priority: number;
+  source: string;
+  startIndex: number;
+  length: number;
+  endIndex: number;
+}
+
+export interface CatalogImportProductTypeSuggestionShadowCandidate {
+  productTypeId: string;
+  productTypeCode: string;
+  productTypeName: string;
+  highestPriority: number;
+  confidence: number;
+  evidence: CatalogImportProductTypeSuggestionShadowEvidence[];
+}
+
+export interface CatalogImportProductTypeSuggestionShadowSample {
+  rowNumber: number;
+  kind: CatalogImportProductTypeSuggestionShadowSampleKind;
+  productName: string;
+  selectedProductTypeId?: string | null;
+  selectedProductTypeCode?: string | null;
+  selectedProductTypeName?: string | null;
+  suggestedProductTypeId?: string | null;
+  suggestedProductTypeCode?: string | null;
+  suggestedProductTypeName?: string | null;
+  confidence?: number | null;
+  highestPriority?: number | null;
+  candidates: CatalogImportProductTypeSuggestionShadowCandidate[];
+  details: string;
+}
+
+export interface CatalogImportProductTypeSuggestionShadowGroup {
+  productTypeId: string;
+  productTypeCode: string;
+  productTypeName: string;
+  rowsCount: number;
+  matchesCount: number;
+  conflictsCount: number;
+  suggestionsCount: number;
+  highestConfidence: number;
+  exampleRowNumbers: number[];
+}
+
+export interface CatalogImportProductTypeSuggestionShadow {
+  rowsAnalyzedCount: number;
+  hasSelectedProductType: boolean;
+  selectedProductTypeId?: string | null;
+  selectedProductTypeCode?: string | null;
+  selectedProductTypeName?: string | null;
+  suggestedRowsCount: number;
+  matchesCount: number;
+  conflictsCount: number;
+  suggestionsCount: number;
+  nameConflictsCount: number;
+  unresolvedCount: number;
+  distinctSuggestedProductTypesCount: number;
+  hasMixedSuggestedProductTypes: boolean;
+  samplesTruncated: boolean;
+  typeGroups: CatalogImportProductTypeSuggestionShadowGroup[];
+  samples: CatalogImportProductTypeSuggestionShadowSample[];
+}
+
+export const catalogImportProductNameExplanationSampleKinds = [
+  "None",
+  "Unexplained",
+  "PartiallyExplained",
+  "FullyExplained",
+] as const;
+
+export type CatalogImportProductNameExplanationSampleKind =
+  (typeof catalogImportProductNameExplanationSampleKinds)[number];
+
+export const catalogImportProductNameEvidenceKinds = [
+  "None",
+  "Manufacturer",
+  "ProductType",
+  "Characteristic",
+] as const;
+
+export type CatalogImportProductNameEvidenceKind =
+  (typeof catalogImportProductNameEvidenceKinds)[number];
+
+export interface CatalogImportProductNameEvidenceSpan {
+  kind: CatalogImportProductNameEvidenceKind;
+  targetCode: string;
+  targetValue: string;
+  rawValue: string;
+  source: string;
+  confidence: number;
+  priority: number;
+  startIndex: number;
+  length: number;
+  endIndex: number;
+}
+
+export interface CatalogImportProductNameUnexplainedSpan {
+  rawValue: string;
+  startIndex: number;
+  length: number;
+  endIndex: number;
+}
+
+export interface CatalogImportProductNameExplanationSample {
+  rowNumber: number;
+  kind: CatalogImportProductNameExplanationSampleKind;
+  productName: string;
+  meaningfulCharactersCount: number;
+  coveredMeaningfulCharactersCount: number;
+  coverage: number;
+  isFullyExplained: boolean;
+  hasUnexplainedSpans: boolean;
+  manufacturerEvidenceCount: number;
+  productTypeEvidenceCount: number;
+  characteristicEvidenceCount: number;
+  evidence: CatalogImportProductNameEvidenceSpan[];
+  unexplainedSpans: CatalogImportProductNameUnexplainedSpan[];
+}
+
+export interface CatalogImportProductNameExplanation {
+  rowsAnalyzedCount: number;
+  rowsWithEvidenceCount: number;
+  fullyExplainedRowsCount: number;
+  partiallyExplainedRowsCount: number;
+  unexplainedRowsCount: number;
+  averageCoverage: number;
+  samplesTruncated: boolean;
+  samples: CatalogImportProductNameExplanationSample[];
+}
+
+
 export interface CatalogImportRecognitionAppliedValue {
   rowNumber: number;
   characteristicDefinitionId: string;
@@ -249,7 +454,10 @@ export interface AnalyzeCatalogImportBatchResponse {
   validRowsCount: number;
   errorRowsCount: number;
   manufacturerResolutionSummary: CatalogImportManufacturerResolutionSummary;
+  manufacturerRecognitionShadow: CatalogImportManufacturerRecognitionShadow;
+  productTypeSuggestionShadow: CatalogImportProductTypeSuggestionShadow;
   recognitionShadow?: CatalogImportRecognitionShadow | null;
+  productNameExplanation: CatalogImportProductNameExplanation;
   recognitionEnrichment: CatalogImportRecognitionEnrichment;
 }
 
@@ -272,6 +480,8 @@ export type CatalogImportRowStatus =
 export type CatalogImportRowFilterStatus =
   (typeof catalogImportRowFilterStatuses)[number];
 
+export type CatalogImportRowProblemKind = "Error" | "Warning";
+
 export interface CatalogImportRowIssue {
   code: string;
   message: string;
@@ -287,6 +497,9 @@ export interface CatalogImportNormalizedRow {
   price?: number | null;
   stockQuantity?: number | null;
   characteristics: Record<string, string>;
+  productTypeId?: string | null;
+  productTypeResolutionSource?: string | null;
+  productTypeResolutionConfidence?: number | null;
 }
 
 export interface CatalogImportRow {
@@ -316,8 +529,67 @@ export interface GetCatalogImportRowsResponse {
 export interface GetCatalogImportRowsParams {
   batchId: string;
   status?: CatalogImportRowFilterStatus | null;
+  search?: string | null;
+  issueCode?: string | null;
+  problemKind?: CatalogImportRowProblemKind | null;
+  manufacturerGroupKey?: string | null;
   page: number;
   pageSize: number;
+}
+
+export type CatalogImportManufacturerGroupResolutionSource =
+  | "ExactName"
+  | "ApprovedAlias"
+  | "IgnoredNoise"
+  | "Unresolved"
+  | "Manual"
+  | "Mixed";
+
+export interface CatalogImportManufacturerGroup {
+  groupKey: string;
+  sourceValue: string;
+  resolutionSource: CatalogImportManufacturerGroupResolutionSource;
+  resolvedManufacturerName?: string | null;
+  exactNameRowsCount: number;
+  approvedAliasRowsCount: number;
+  ignoredNoiseRowsCount: number;
+  unresolvedRowsCount: number;
+  manualRowsCount: number;
+  rowsCount: number;
+}
+
+export interface GetCatalogImportManufacturerGroupsResponse {
+  batchId: string;
+  batchVersion: number;
+  items: CatalogImportManufacturerGroup[];
+}
+
+export interface GetCatalogImportManufacturerGroupsParams {
+  batchId: string;
+  expectedVersion: number;
+}
+
+export interface CatalogImportRowProblemCode {
+  code: string;
+  rowsCount: number;
+  errorRowsCount: number;
+  warningRowsCount: number;
+}
+
+export interface GetCatalogImportRowProblemCodesResponse {
+  batchId: string;
+  batchVersion: number;
+  totalRowsCount: number;
+  errorRowsCount: number;
+  warningRowsCount: number;
+  items: CatalogImportRowProblemCode[];
+}
+
+export interface GetCatalogImportRowProblemCodesParams {
+  batchId: string;
+  expectedVersion: number;
+  status?: CatalogImportRowFilterStatus | null;
+  search?: string | null;
 }
 
 export const catalogImportColumnTargetKinds = [
@@ -360,14 +632,14 @@ export interface UpdateCatalogImportColumnMappingRequest {
 }
 
 export interface UpdateCatalogImportMappingRequest {
-  productTypeId: string;
+  productTypeId: string | null;
   columns: UpdateCatalogImportColumnMappingRequest[];
 }
 
 export interface UpdateCatalogImportMappingResponse {
   batchId: string;
   status: CatalogImportBatchStatus;
-  productTypeId: string;
+  productTypeId: string | null;
   columnsCount: number;
   unmappedColumnsCount: number;
   unconfirmedColumnsCount: number;

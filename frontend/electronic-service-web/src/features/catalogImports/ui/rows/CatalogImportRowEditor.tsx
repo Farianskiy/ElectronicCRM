@@ -11,6 +11,8 @@ import type {
 } from "@/features/catalogMetadata/model/types";
 import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
 import { AppSelect } from "@/shared/ui/AppSelect";
+import { AppButton } from "@/shared/ui/AppButton";
+import { AppInput } from "@/shared/ui/AppInput";
 import { updateCatalogImportRow } from "../../api/updateCatalogImportRow";
 import { catalogImportQueryKeys } from "../../model/queryKeys";
 import type {
@@ -32,15 +34,16 @@ interface ParsedNumberResult {
   error?: string;
 }
 
-const inputClassName = [
-  "w-full rounded-2xl border border-white/10",
-  "bg-black/30 px-4 py-3",
-  "text-sm text-slate-100 outline-none transition",
-  "placeholder:text-slate-600",
-  "hover:border-white/20",
-  "focus:border-teal-400",
-  "focus:ring-2 focus:ring-teal-400/20",
-  "disabled:cursor-not-allowed disabled:opacity-50",
+const textareaClassName = [
+  "min-h-28 w-full min-w-0 resize-y rounded-xl border px-4 py-3",
+  "border-[var(--app-border)] bg-[var(--app-surface)]",
+  "text-sm text-[var(--app-text)]",
+  "placeholder:text-[var(--app-muted)]",
+  "transition-colors motion-reduce:transition-none",
+  "enabled:hover:border-[var(--app-border-strong)]",
+  "focus:outline-none focus:border-[var(--app-accent)]",
+  "focus:ring-2 focus:ring-[var(--app-accent)]",
+  "disabled:cursor-not-allowed disabled:opacity-60",
 ].join(" ");
 
 function parseNullableDecimal(
@@ -185,6 +188,7 @@ export function CatalogImportRowEditor({
     characteristicsQuery.error;
 
   const saveMutation = useMutation({
+    mutationKey: catalogImportQueryKeys.saveRows(batchId),
     mutationFn: (request: UpdateCatalogImportRowRequest) =>
       updateCatalogImportRow(batchId, row.rowId, request),
 
@@ -196,6 +200,11 @@ export function CatalogImportRowEditor({
 
         queryClient.invalidateQueries({
           queryKey: catalogImportQueryKeys.rowsRoot(batchId),
+        }),
+
+        queryClient.invalidateQueries({
+          queryKey: catalogImportQueryKeys.rowProblemCodesRoot(batchId),
+          refetchType: "none",
         }),
 
         queryClient.invalidateQueries({
@@ -285,30 +294,34 @@ export function CatalogImportRowEditor({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-6">
+    <form
+      onSubmit={handleSubmit}
+      className="grid min-w-0 gap-5 rounded-2xl border border-[var(--app-accent-border)] bg-[var(--app-panel)] p-4 text-[var(--app-text)] sm:p-5"
+    >
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
         <div>
-          <h3 className="text-lg font-semibold text-white">
+          <h3 className="text-lg font-semibold text-[var(--app-text)]">
             Редактирование строки {row.rowNumber}
           </h3>
 
-          <p className="mt-1 text-sm text-slate-400">
+          <p className="mt-1 text-sm text-[var(--app-muted)]">
             После сохранения строка будет повторно проверена backend.
           </p>
         </div>
 
-        <button
+        <AppButton
           type="button"
+          size="sm"
+          variant="secondary"
           disabled={saveMutation.isPending}
           onClick={onCancel}
-          className="rounded-xl border border-white/10 bg-white/[0.05] px-4 py-2 text-sm text-slate-300 transition hover:bg-white/[0.1] disabled:opacity-50"
         >
           Закрыть
-        </button>
+        </AppButton>
       </div>
 
       {metadataError && (
-        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+        <div className="rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-4 text-sm text-[var(--app-danger)]">
           {getApiErrorMessage(
             metadataError,
             "Не удалось загрузить справочники для редактирования строки.",
@@ -317,14 +330,14 @@ export function CatalogImportRowEditor({
       )}
 
       {isMetadataLoading && (
-        <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-slate-300">
+        <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4 text-sm text-[var(--app-text)]">
           Загружаем производителей и характеристики...
         </div>
       )}
 
-      <div className="grid gap-5 xl:grid-cols-2">
+      <div className="grid gap-4 xl:grid-cols-2">
         <label className="grid gap-2">
-          <span className="text-sm font-medium text-slate-300">
+          <span className="text-sm font-medium text-[var(--app-text)]">
             Наименование
           </span>
 
@@ -337,15 +350,17 @@ export function CatalogImportRowEditor({
               setFormErrors([]);
               saveMutation.reset();
             }}
-            className={inputClassName}
+            className={textareaClassName}
             placeholder="Наименование товара"
           />
         </label>
 
         <label className="grid content-start gap-2">
-          <span className="text-sm font-medium text-slate-300">Артикул</span>
+          <span className="text-sm font-medium text-[var(--app-text)]">
+            Артикул
+          </span>
 
-          <input
+          <AppInput
             type="text"
             value={article}
             disabled={isBusy}
@@ -354,13 +369,12 @@ export function CatalogImportRowEditor({
               setFormErrors([]);
               saveMutation.reset();
             }}
-            className={inputClassName}
             placeholder="Артикул товара"
           />
         </label>
 
         <div className="grid content-start gap-2">
-          <span className="text-sm font-medium text-slate-300">
+          <span className="text-sm font-medium text-[var(--app-text)]">
             Производитель
           </span>
 
@@ -386,17 +400,19 @@ export function CatalogImportRowEditor({
           />
 
           {row.data.manufacturer && (
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-[var(--app-muted)]">
               Значение после анализа: {row.data.manufacturer}
             </p>
           )}
         </div>
 
-        <div className="grid gap-5 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2">
           <label className="grid content-start gap-2">
-            <span className="text-sm font-medium text-slate-300">Цена</span>
+            <span className="text-sm font-medium text-[var(--app-text)]">
+              Цена
+            </span>
 
-            <input
+            <AppInput
               type="text"
               inputMode="decimal"
               value={price}
@@ -406,15 +422,16 @@ export function CatalogImportRowEditor({
                 setFormErrors([]);
                 saveMutation.reset();
               }}
-              className={inputClassName}
               placeholder="0.00"
             />
           </label>
 
           <label className="grid content-start gap-2">
-            <span className="text-sm font-medium text-slate-300">Остаток</span>
+            <span className="text-sm font-medium text-[var(--app-text)]">
+              Остаток
+            </span>
 
-            <input
+            <AppInput
               type="text"
               inputMode="numeric"
               value={stockQuantity}
@@ -424,31 +441,32 @@ export function CatalogImportRowEditor({
                 setFormErrors([]);
                 saveMutation.reset();
               }}
-              className={inputClassName}
               placeholder="0"
             />
           </label>
         </div>
       </div>
 
-      <section className="rounded-2xl border border-white/10 bg-white/[0.025] p-5">
+      <section className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-panel-strong)] p-5">
         <div>
-          <h3 className="font-semibold text-white">Характеристики товара</h3>
+          <h3 className="font-semibold text-[var(--app-text)]">
+            Характеристики товара
+          </h3>
 
-          <p className="mt-1 text-sm text-slate-400">
+          <p className="mt-1 text-sm text-[var(--app-muted)]">
             Тип товара:{" "}
-            <span className="text-slate-200">
+            <span className="text-[var(--app-text)]">
               {selectedProductType?.name ?? productTypeId}
             </span>
           </p>
         </div>
 
         {characteristics.length === 0 ? (
-          <p className="mt-4 text-sm text-slate-500">
+          <p className="mt-4 text-sm text-[var(--app-muted)]">
             Для выбранного типа характеристики не определены.
           </p>
         ) : (
-          <div className="mt-5 grid gap-5 xl:grid-cols-2">
+          <div className="mt-5 grid gap-4 xl:grid-cols-2">
             {characteristics.map((characteristic) => (
               <CharacteristicInput
                 key={characteristic.id}
@@ -465,12 +483,12 @@ export function CatalogImportRowEditor({
       </section>
 
       {formErrors.length > 0 && (
-        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-5">
-          <h3 className="font-semibold text-red-100">
+        <div className="rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-5">
+          <h3 className="font-semibold text-[var(--app-danger)]">
             Проверьте введённые значения
           </h3>
 
-          <ul className="mt-3 grid gap-2 text-sm text-red-200">
+          <ul className="mt-3 grid gap-2 text-sm text-[var(--app-danger)]">
             {formErrors.map((error) => (
               <li key={error}>• {error}</li>
             ))}
@@ -479,7 +497,7 @@ export function CatalogImportRowEditor({
       )}
 
       {saveMutation.isError && (
-        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-5 text-sm text-red-200">
+        <div className="rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-5 text-sm text-[var(--app-danger)]">
           {getApiErrorMessage(
             saveMutation.error,
             "Не удалось сохранить строку импорта.",
@@ -487,25 +505,26 @@ export function CatalogImportRowEditor({
         </div>
       )}
 
-      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-        <button
+      <div className="flex flex-col-reverse gap-3 border-t border-[var(--app-border)] pt-4 sm:flex-row sm:justify-end">
+        <AppButton
           type="button"
+          variant="secondary"
           disabled={saveMutation.isPending}
           onClick={onCancel}
-          className="rounded-2xl border border-white/10 bg-white/[0.05] px-5 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/[0.1] disabled:opacity-50"
         >
           Отмена
-        </button>
+        </AppButton>
 
-        <button
+        <AppButton
           type="submit"
+          variant="primary"
+          loading={saveMutation.isPending}
           disabled={isBusy || Boolean(metadataError)}
-          className="rounded-2xl bg-teal-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-teal-400 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {saveMutation.isPending
             ? "Сохраняем и проверяем..."
             : "Сохранить строку"}
-        </button>
+        </AppButton>
       </div>
     </form>
   );
@@ -527,7 +546,9 @@ function CharacteristicInput({
   if (characteristic.dataType === "Boolean") {
     return (
       <div className="grid content-start gap-2">
-        <span className="text-sm font-medium text-slate-300">{label}</span>
+        <span className="text-sm font-medium text-[var(--app-text)]">
+          {label}
+        </span>
 
         <AppSelect
           ariaLabel={label}
@@ -555,15 +576,16 @@ function CharacteristicInput({
 
   return (
     <label className="grid content-start gap-2">
-      <span className="text-sm font-medium text-slate-300">{label}</span>
+      <span className="text-sm font-medium text-[var(--app-text)]">
+        {label}
+      </span>
 
-      <input
+      <AppInput
         type="text"
         inputMode={characteristic.dataType === "Number" ? "decimal" : "text"}
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
-        className={inputClassName}
         placeholder={
           characteristic.dataType === "Number"
             ? "Введите число"

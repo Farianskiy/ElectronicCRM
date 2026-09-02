@@ -9,6 +9,8 @@ import type {
   CatalogProductTypeCharacteristicMetadata,
 } from "@/features/catalogMetadata/model/types";
 import { AppSelect } from "@/shared/ui/AppSelect";
+import { AppButton } from "@/shared/ui/AppButton";
+import { AppInput } from "@/shared/ui/AppInput";
 import { setCatalogProductCharacteristic } from "../api/setCatalogProductCharacteristic";
 import { removeCatalogProductCharacteristic } from "../api/removeCatalogProductCharacteristic";
 import type { CatalogProductDetails } from "../model/types";
@@ -261,42 +263,56 @@ export function TechnicalProductCharacteristicsEditor({
   const mutationError = saveMutation.error ?? removeMutation.error;
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
+    <div className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-panel-strong)] p-5">
       <div>
-        <h3 className="font-semibold text-white">Характеристики</h3>
+        <h3 className="text-base font-semibold text-[var(--app-text)]">
+          Характеристики
+        </h3>
 
-        <p className="mt-2 text-sm text-slate-400">
+        <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">
           Можно изменить существующее значение или добавить отсутствующую
           характеристику.
         </p>
       </div>
 
       {metadataQuery.isLoading && (
-        <p className="mt-5 text-sm text-slate-400">
+        <p role="status" className="mt-5 text-sm text-[var(--app-muted)]">
           Загружаем характеристики типа товара...
         </p>
       )}
 
       {metadataQuery.isError && (
-        <div className="mt-5 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+        <div
+          role="alert"
+          className="mt-5 whitespace-pre-wrap rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-4 text-sm leading-6 text-[var(--app-danger)] [overflow-wrap:anywhere]"
+        >
           {getErrorMessage(metadataQuery.error)}
         </div>
       )}
 
       {validationError && (
-        <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
+        <div
+          role="alert"
+          className="mt-5 rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-4 text-sm leading-6 text-[var(--app-danger)] [overflow-wrap:anywhere]"
+        >
           {validationError}
         </div>
       )}
 
       {mutationError && (
-        <div className="mt-5 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+        <div
+          role="alert"
+          className="mt-5 whitespace-pre-wrap rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-4 text-sm leading-6 text-[var(--app-danger)] [overflow-wrap:anywhere]"
+        >
           {getErrorMessage(mutationError)}
         </div>
       )}
 
       {successMessage && (
-        <div className="mt-5 rounded-2xl border border-green-500/30 bg-green-500/10 p-4 text-sm text-green-200">
+        <div
+          role="status"
+          className="mt-5 rounded-2xl border border-[var(--app-success-border)] bg-[var(--app-success-soft)] p-4 text-sm leading-6 text-[var(--app-success)] [overflow-wrap:anywhere]"
+        >
           {successMessage}
         </div>
       )}
@@ -304,12 +320,12 @@ export function TechnicalProductCharacteristicsEditor({
       {!metadataQuery.isLoading &&
         !metadataQuery.isError &&
         characteristics.length === 0 && (
-          <p className="mt-5 text-sm text-slate-400">
+          <p className="mt-5 rounded-2xl border border-dashed border-[var(--app-border-strong)] bg-[var(--app-surface)] p-4 text-sm leading-6 text-[var(--app-muted)]">
             Для этого типа товара характеристики не настроены.
           </p>
         )}
 
-      <div className="mt-5 grid gap-4">
+      <div className="mt-5 grid min-w-0 gap-4">
         {characteristics.map((characteristic) => {
           const rawValue =
             draftValues[characteristic.code] ??
@@ -347,115 +363,122 @@ export function TechnicalProductCharacteristicsEditor({
           return (
             <div
               key={characteristic.id}
-              className="grid gap-4 rounded-2xl border border-white/10 bg-white/[0.02] p-4 lg:grid-cols-[minmax(220px,1fr)_minmax(260px,1.4fr)_auto] lg:items-end"
+              className="grid min-w-0 gap-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-panel)] p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] lg:items-end xl:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1fr)]"
             >
-              <div>
+              <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-medium text-slate-100">{label}</p>
+                  <p className="min-w-0 font-medium text-[var(--app-text)] [overflow-wrap:anywhere]">
+                    {label}
+                  </p>
 
                   {characteristic.isRequired && (
-                    <span className="rounded-full bg-amber-500/15 px-2 py-1 text-xs font-medium text-amber-300">
+                    <span className="rounded-full border border-[var(--app-accent-border)] bg-[var(--app-accent-soft)] px-2 py-1 text-xs font-medium text-[var(--app-accent)]">
                       Обязательная
                     </span>
                   )}
                 </div>
 
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs leading-5 text-[var(--app-muted)] [overflow-wrap:anywhere]">
                   {characteristic.code} · {characteristic.dataType}
                 </p>
               </div>
 
-              {characteristic.dataType === "Boolean" ? (
-                <AppSelect
-                  ariaLabel={label}
-                  value={fieldValue}
-                  onChange={(value) =>
-                    handleValueChange(characteristic.code, value)
-                  }
-                  options={[
-                    {
-                      value: "",
-                      label: "Не указано",
-                    },
-                    {
-                      value: "true",
-                      label: "Да",
-                    },
-                    {
-                      value: "false",
-                      label: "Нет",
-                    },
-                  ]}
-                />
-              ) : (
-                <input
-                  type="text"
-                  inputMode={
-                    characteristic.dataType === "Number" ? "decimal" : "text"
-                  }
-                  value={fieldValue}
-                  onChange={(event) =>
-                    handleValueChange(characteristic.code, event.target.value)
-                  }
-                  placeholder={
-                    characteristic.dataType === "Number"
-                      ? "Введите число"
-                      : "Введите значение"
-                  }
-                  className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-slate-100 outline-none placeholder:text-slate-600 focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20"
-                />
-              )}
+              <div className="min-w-0">
+                {characteristic.dataType === "Boolean" ? (
+                  <AppSelect
+                    ariaLabel={label}
+                    value={fieldValue}
+                    onChange={(value) =>
+                      handleValueChange(characteristic.code, value)
+                    }
+                    options={[
+                      {
+                        value: "",
+                        label: "Не указано",
+                      },
+                      {
+                        value: "true",
+                        label: "Да",
+                      },
+                      {
+                        value: "false",
+                        label: "Нет",
+                      },
+                    ]}
+                  />
+                ) : (
+                  <AppInput
+                    type="text"
+                    aria-label={label}
+                    inputMode={
+                      characteristic.dataType === "Number" ? "decimal" : "text"
+                    }
+                    value={fieldValue}
+                    onChange={(event) =>
+                      handleValueChange(characteristic.code, event.target.value)
+                    }
+                    placeholder={
+                      characteristic.dataType === "Number"
+                        ? "Введите число"
+                        : "Введите значение"
+                    }
+                  />
+                )}
+              </div>
 
-              <div className="flex flex-wrap gap-2 lg:justify-end">
-                <button
+              <div className="flex min-w-0 flex-wrap gap-2 lg:col-span-2 lg:justify-end xl:col-span-1">
+                <AppButton
                   type="button"
+                  variant="primary"
                   disabled={operationsArePending}
+                  loading={isSaving}
                   onClick={() => {
                     setCharacteristicCodePendingRemoval(null);
                     removeMutation.reset();
                     handleSave(characteristic);
                   }}
-                  className="rounded-2xl bg-teal-500 px-5 py-3 text-sm font-medium text-white transition hover:bg-teal-400 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {isSaving
                     ? "Сохраняем..."
                     : hasSavedValue
                       ? "Сохранить"
                       : "Добавить"}
-                </button>
+                </AppButton>
 
                 {hasSavedValue && !characteristic.isRequired && (
                   <>
                     {isAwaitingRemovalConfirmation ? (
                       <>
-                        <button
+                        <AppButton
                           type="button"
+                          variant="danger"
                           disabled={operationsArePending}
+                          loading={isRemoving}
                           onClick={() =>
                             removeMutation.mutate({
                               code: characteristic.code,
                               name: characteristic.name,
                             })
                           }
-                          className="rounded-2xl bg-red-500 px-4 py-3 text-sm font-medium text-white transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           {isRemoving ? "Удаляем..." : "Подтвердить"}
-                        </button>
+                        </AppButton>
 
-                        <button
+                        <AppButton
                           type="button"
+                          variant="secondary"
                           disabled={operationsArePending}
                           onClick={() =>
                             setCharacteristicCodePendingRemoval(null)
                           }
-                          className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-medium text-slate-300 transition hover:bg-white/[0.08]"
                         >
                           Отмена
-                        </button>
+                        </AppButton>
                       </>
                     ) : (
-                      <button
+                      <AppButton
                         type="button"
+                        variant="danger"
                         disabled={operationsArePending}
                         onClick={() => {
                           saveMutation.reset();
@@ -467,10 +490,9 @@ export function TechnicalProductCharacteristicsEditor({
                             characteristic.code,
                           );
                         }}
-                        className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         Удалить
-                      </button>
+                      </AppButton>
                     )}
                   </>
                 )}

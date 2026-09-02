@@ -61,7 +61,10 @@ public sealed class UpdateCatalogImportRowController : ControllerBase
             value.Data.ManufacturerId,
             value.Data.Price,
             value.Data.StockQuantity,
-            value.Data.Characteristics);
+            value.Data.Characteristics,
+            value.Data.ProductTypeId,
+            value.Data.ProductTypeResolutionSource,
+            value.Data.ProductTypeResolutionConfidence);
 
         var issues = value.Issues
             .Select(issue =>

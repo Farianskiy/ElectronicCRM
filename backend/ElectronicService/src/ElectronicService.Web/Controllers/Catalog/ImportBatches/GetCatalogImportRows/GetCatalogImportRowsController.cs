@@ -30,6 +30,10 @@ public sealed class
     [FromServices] GetCatalogImportRowsQueryHandler handler,
     CancellationToken cancellationToken,
     [FromQuery] CatalogImportRowStatus? status = null,
+    [FromQuery] CatalogImportRowProblemKind? problemKind = null,
+    [FromQuery] string? search = null,
+    [FromQuery] string? issueCode = null,
+    [FromQuery] string? manufacturerGroupKey = null,
     [FromQuery] int page = 1,
     [FromQuery] int pageSize = 50)
     {
@@ -42,6 +46,10 @@ public sealed class
             batchId,
             currentUserId,
             status,
+            search,
+            issueCode,
+            problemKind,
+            manufacturerGroupKey,
             page,
             pageSize);
 
@@ -68,7 +76,10 @@ public sealed class
                         item.Data.ManufacturerId,
                         item.Data.Price,
                         item.Data.StockQuantity,
-                        item.Data.Characteristics),
+                        item.Data.Characteristics,
+                        item.Data.ProductTypeId,
+                        item.Data.ProductTypeResolutionSource,
+                        item.Data.ProductTypeResolutionConfidence),
                     item.Issues
                         .Select(issue =>
                             new CatalogImportRowIssueResponse(

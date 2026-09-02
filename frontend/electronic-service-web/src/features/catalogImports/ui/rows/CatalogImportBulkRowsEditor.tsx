@@ -11,6 +11,9 @@ import type {
 } from "@/features/catalogMetadata/model/types";
 import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
 import { AppSelect } from "@/shared/ui/AppSelect";
+import { AppButton } from "@/shared/ui/AppButton";
+import { AppInput } from "@/shared/ui/AppInput";
+import { CatalogImportRowStatusBadge } from "../CatalogImportRowStatusBadge";
 import { bulkUpdateCatalogImportRows } from "../../api/bulkUpdateCatalogImportRows";
 import { catalogImportQueryKeys } from "../../model/queryKeys";
 import type {
@@ -45,15 +48,16 @@ interface ParsedNumberResult {
   error?: string;
 }
 
-const inputClassName = [
-  "w-full rounded-2xl border border-white/10",
-  "bg-black/30 px-4 py-3",
-  "text-sm text-slate-100 outline-none transition",
-  "placeholder:text-slate-600",
-  "hover:border-white/20",
-  "focus:border-teal-400",
-  "focus:ring-2 focus:ring-teal-400/20",
-  "disabled:cursor-not-allowed disabled:opacity-50",
+const textareaClassName = [
+  "min-h-24 w-full min-w-0 resize-y rounded-xl border px-4 py-3",
+  "border-[var(--app-border)] bg-[var(--app-surface)]",
+  "text-sm text-[var(--app-text)]",
+  "placeholder:text-[var(--app-muted)]",
+  "transition-colors motion-reduce:transition-none",
+  "enabled:hover:border-[var(--app-border-strong)]",
+  "focus:outline-none focus:border-[var(--app-accent)]",
+  "focus:ring-2 focus:ring-[var(--app-accent)]",
+  "disabled:cursor-not-allowed disabled:opacity-60",
 ].join(" ");
 
 function createInitialDrafts(
@@ -207,6 +211,7 @@ export function CatalogImportBulkRowsEditor({
     characteristicsQuery.error;
 
   const saveMutation = useMutation({
+    mutationKey: catalogImportQueryKeys.saveRows(batchId),
     mutationFn: (request: BulkUpdateCatalogImportRowsRequest) =>
       bulkUpdateCatalogImportRows(batchId, request),
 
@@ -215,9 +220,16 @@ export function CatalogImportBulkRowsEditor({
         queryClient.invalidateQueries({
           queryKey: catalogImportQueryKeys.details(batchId),
         }),
+
         queryClient.invalidateQueries({
           queryKey: catalogImportQueryKeys.rowsRoot(batchId),
         }),
+
+        queryClient.invalidateQueries({
+          queryKey: catalogImportQueryKeys.rowProblemCodesRoot(batchId),
+          refetchType: "none",
+        }),
+
         queryClient.invalidateQueries({
           queryKey: catalogImportQueryKeys.myRoot,
         }),
@@ -383,37 +395,40 @@ export function CatalogImportBulkRowsEditor({
   return (
     <form
       onSubmit={handleSubmit}
-      className="mt-5 grid gap-5 rounded-3xl border border-teal-500/30 bg-teal-500/[0.05] p-5"
+      className="grid min-w-0 gap-5 rounded-2xl border border-[var(--app-accent-border)] bg-[var(--app-panel)] p-4 text-[var(--app-text)] sm:p-5"
     >
       <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
         <div>
-          <h3 className="text-xl font-semibold text-white">
+          <h3 className="text-xl font-semibold text-[var(--app-text)]">
             Массовое редактирование строк
           </h3>
 
-          <p className="mt-2 text-sm leading-6 text-slate-400">
+          <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">
             Выбрано строк:{" "}
-            <span className="font-semibold text-teal-200">{rows.length}</span>.
-            Все изменения будут отправлены одним запросом и проверены backend.
+            <span className="font-semibold text-[var(--app-accent)]">
+              {rows.length}
+            </span>
+            . Все изменения будут отправлены одним запросом и проверены backend.
           </p>
 
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-[var(--app-muted)]">
             Версия пакета: {expectedVersion}
           </p>
         </div>
 
-        <button
+        <AppButton
           type="button"
+          size="sm"
+          variant="secondary"
           disabled={saveMutation.isPending}
           onClick={onCancel}
-          className="rounded-xl border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-50"
         >
           Закрыть редактор
-        </button>
+        </AppButton>
       </div>
 
       {metadataError && (
-        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+        <div className="rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-4 text-sm text-[var(--app-danger)]">
           {getApiErrorMessage(
             metadataError,
             "Не удалось загрузить справочники для массового редактирования.",
@@ -422,12 +437,12 @@ export function CatalogImportBulkRowsEditor({
       )}
 
       {isMetadataLoading && (
-        <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-slate-300">
+        <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4 text-sm text-[var(--app-text)]">
           Загружаем производителей и характеристики выбранного типа товара...
         </div>
       )}
 
-      <div className="grid gap-5">
+      <div className="grid gap-4">
         {rows.map((row) => {
           const draft = drafts[row.rowId];
 
@@ -440,36 +455,36 @@ export function CatalogImportBulkRowsEditor({
           return (
             <section
               key={row.rowId}
-              className="rounded-2xl border border-white/10 bg-black/20 p-5"
+              className={[
+                "min-w-0 rounded-2xl border bg-[var(--app-panel-strong)] p-4",
+                errors.length > 0
+                  ? "border-[var(--app-danger)]"
+                  : "border-[var(--app-border)]",
+              ].join(" ")}
             >
               <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                 <div>
-                  <h4 className="font-semibold text-white">
+                  <h4 className="font-semibold text-[var(--app-text)]">
                     Строка {row.rowNumber}
                   </h4>
 
-                  <p className="mt-1 break-all text-xs text-slate-500">
+                  <p className="mt-1 break-all text-xs text-[var(--app-muted)]">
                     {row.rowId}
                   </p>
                 </div>
 
-                <span
-                  className={[
-                    "w-fit rounded-full border px-3 py-1 text-xs font-medium",
-                    row.status === "Error"
-                      ? "border-red-500/30 bg-red-500/10 text-red-200"
-                      : row.status === "Valid"
-                        ? "border-green-500/30 bg-green-500/10 text-green-200"
-                        : "border-amber-500/30 bg-amber-500/10 text-amber-200",
-                  ].join(" ")}
-                >
-                  Текущий статус: {row.status}
-                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-[var(--app-muted)]">
+                    Статус до сохранения:
+                  </span>
+
+                  <CatalogImportRowStatusBadge status={row.status} />
+                </div>
               </div>
 
-              <div className="mt-5 grid gap-5 xl:grid-cols-2">
+              <div className="mt-5 grid gap-4 xl:grid-cols-2">
                 <label className="grid gap-2">
-                  <span className="text-sm font-medium text-slate-300">
+                  <span className="text-sm font-medium text-[var(--app-text)]">
                     Наименование
                   </span>
 
@@ -485,17 +500,17 @@ export function CatalogImportBulkRowsEditor({
                         name: value,
                       }));
                     }}
-                    className={inputClassName}
+                    className={textareaClassName}
                     placeholder="Наименование товара"
                   />
                 </label>
 
                 <label className="grid content-start gap-2">
-                  <span className="text-sm font-medium text-slate-300">
+                  <span className="text-sm font-medium text-[var(--app-text)]">
                     Артикул
                   </span>
 
-                  <input
+                  <AppInput
                     type="text"
                     value={draft.article}
                     disabled={isBusy}
@@ -507,13 +522,12 @@ export function CatalogImportBulkRowsEditor({
                         article: value,
                       }));
                     }}
-                    className={inputClassName}
                     placeholder="Артикул товара"
                   />
                 </label>
 
                 <div className="grid content-start gap-2">
-                  <span className="text-sm font-medium text-slate-300">
+                  <span className="text-sm font-medium text-[var(--app-text)]">
                     Производитель
                   </span>
 
@@ -540,19 +554,19 @@ export function CatalogImportBulkRowsEditor({
                   />
 
                   {row.data.manufacturer && (
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-[var(--app-muted)]">
                       Значение после анализа: {row.data.manufacturer}
                     </p>
                   )}
                 </div>
 
-                <div className="grid gap-5 sm:grid-cols-2">
+                <div className="grid gap-4 sm:grid-cols-2">
                   <label className="grid content-start gap-2">
-                    <span className="text-sm font-medium text-slate-300">
+                    <span className="text-sm font-medium text-[var(--app-text)]">
                       Цена
                     </span>
 
-                    <input
+                    <AppInput
                       type="text"
                       inputMode="decimal"
                       value={draft.price}
@@ -565,17 +579,16 @@ export function CatalogImportBulkRowsEditor({
                           price: value,
                         }));
                       }}
-                      className={inputClassName}
                       placeholder="0.00"
                     />
                   </label>
 
                   <label className="grid content-start gap-2">
-                    <span className="text-sm font-medium text-slate-300">
+                    <span className="text-sm font-medium text-[var(--app-text)]">
                       Остаток
                     </span>
 
-                    <input
+                    <AppInput
                       type="text"
                       inputMode="numeric"
                       value={draft.stockQuantity}
@@ -588,20 +601,19 @@ export function CatalogImportBulkRowsEditor({
                           stockQuantity: value,
                         }));
                       }}
-                      className={inputClassName}
                       placeholder="0"
                     />
                   </label>
                 </div>
               </div>
 
-              <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.025] p-4">
-                <h5 className="font-semibold text-white">
+              <div className="mt-5 rounded-2xl border border-[var(--app-border)] bg-[var(--app-panel)] p-4">
+                <h5 className="font-semibold text-[var(--app-text)]">
                   Характеристики товара
                 </h5>
 
                 {characteristics.length === 0 ? (
-                  <p className="mt-3 text-sm text-slate-500">
+                  <p className="mt-3 text-sm text-[var(--app-muted)]">
                     Для выбранного типа характеристики не определены.
                   </p>
                 ) : (
@@ -629,12 +641,12 @@ export function CatalogImportBulkRowsEditor({
               </div>
 
               {errors.length > 0 && (
-                <div className="mt-5 rounded-2xl border border-red-500/30 bg-red-500/10 p-4">
-                  <h5 className="font-semibold text-red-100">
+                <div className="mt-5 rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-4">
+                  <h5 className="font-semibold text-[var(--app-danger)]">
                     Ошибки строки {row.rowNumber}
                   </h5>
 
-                  <ul className="mt-3 grid gap-2 text-sm text-red-200">
+                  <ul className="mt-3 grid gap-2 text-sm text-[var(--app-danger)]">
                     {errors.map((error) => (
                       <li key={error}>• {error}</li>
                     ))}
@@ -647,13 +659,13 @@ export function CatalogImportBulkRowsEditor({
       </div>
 
       {generalError && (
-        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-5 text-sm text-red-200">
+        <div className="rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-5 text-sm text-[var(--app-danger)]">
           {generalError}
         </div>
       )}
 
       {saveMutation.isError && (
-        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-5 text-sm text-red-200">
+        <div className="rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-5 text-sm text-[var(--app-danger)]">
           {getApiErrorMessage(
             saveMutation.error,
             "Не удалось массово сохранить строки импорта.",
@@ -661,25 +673,26 @@ export function CatalogImportBulkRowsEditor({
         </div>
       )}
 
-      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-        <button
+      <div className="flex flex-col-reverse gap-3 border-t border-[var(--app-border)] pt-4 sm:flex-row sm:justify-end">
+        <AppButton
           type="button"
+          variant="secondary"
           disabled={saveMutation.isPending}
           onClick={onCancel}
-          className="rounded-2xl border border-white/10 bg-white/[0.05] px-5 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-50"
         >
           Отмена
-        </button>
+        </AppButton>
 
-        <button
+        <AppButton
           type="submit"
+          variant="primary"
+          loading={saveMutation.isPending}
           disabled={isBusy || Boolean(metadataError)}
-          className="rounded-2xl bg-teal-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-teal-400 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {saveMutation.isPending
             ? "Сохраняем и проверяем строки..."
             : `Сохранить строки: ${rows.length}`}
-        </button>
+        </AppButton>
       </div>
     </form>
   );
@@ -703,7 +716,9 @@ function BulkCharacteristicInput({
   if (characteristic.dataType === "Boolean") {
     return (
       <div className="grid content-start gap-2">
-        <span className="text-sm font-medium text-slate-300">{label}</span>
+        <span className="text-sm font-medium text-[var(--app-text)]">
+          {label}
+        </span>
 
         <AppSelect
           ariaLabel={`${label}, строка ${rowNumber}`}
@@ -731,15 +746,16 @@ function BulkCharacteristicInput({
 
   return (
     <label className="grid content-start gap-2">
-      <span className="text-sm font-medium text-slate-300">{label}</span>
+      <span className="text-sm font-medium text-[var(--app-text)]">
+        {label}
+      </span>
 
-      <input
+      <AppInput
         type="text"
         inputMode={characteristic.dataType === "Number" ? "decimal" : "text"}
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
-        className={inputClassName}
         placeholder={
           characteristic.dataType === "Number"
             ? "Введите число"

@@ -20,6 +20,7 @@ import { RecognitionProfileManagementPanel } from "@/features/catalogRecognition
 import { RecognitionDictionaryTermCreationPanel } from "@/features/catalogDictionaries/ui/RecognitionDictionaryTermCreationPanel";
 import { RecognitionDictionaryManagementPanel } from "@/features/catalogDictionaries/ui/RecognitionDictionaryManagementPanel";
 import { RecognitionDatasetExportPanel } from "@/features/catalogRecognition/ui/RecognitionDatasetExportPanel";
+import { ProductTypeSuggestionPreviewPanel } from "@/features/catalogProductTypeSuggestions/ui/ProductTypeSuggestionPreviewPanel";
 
 interface RecognitionExample {
   label: string;
@@ -138,6 +139,8 @@ function CatalogRecognitionContent() {
       />
 
       <RecognitionExplanation />
+
+      <ProductTypeSuggestionPreviewPanel />
 
       <RecognitionDatasetExportPanel />
 

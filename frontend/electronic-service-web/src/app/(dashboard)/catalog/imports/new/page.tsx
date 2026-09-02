@@ -15,7 +15,8 @@ import { createCatalogImportBatch } from "@/features/catalogImports/api/createCa
 import type { AnalyzeCatalogImportBatchResponse } from "@/features/catalogImports/model/types";
 import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
 import { formatFileSize } from "@/shared/lib/formatters";
-import { PageHeader } from "@/shared/ui/PageHeader";
+import { PageWorkspace } from "@/shared/ui/PageWorkspace";
+import { AppButton } from "@/shared/ui/AppButton";
 import { catalogImportQueryKeys } from "@/features/catalogImports";
 
 const maximumFileSizeBytes = 10 * 1024 * 1024;
@@ -76,6 +77,11 @@ export default function NewCatalogImportPage() {
     },
 
     onSuccess: async (analysisResult) => {
+      queryClient.setQueryData(
+        catalogImportQueryKeys.analysis(analysisResult.batchId),
+        analysisResult,
+      );
+
       await queryClient.invalidateQueries({
         queryKey: catalogImportQueryKeys.myRoot,
       });
@@ -183,36 +189,40 @@ export default function NewCatalogImportPage() {
   }
 
   return (
-    <div className="grid gap-6">
-      <PageHeader
-        title="Загрузка Excel"
-        description="Создайте новый пакет импорта и запустите автоматический анализ файла."
-      />
-
-      <div>
+    <PageWorkspace
+      eyebrow="Работа с каталогом"
+      title="Загрузка Excel"
+      description="Создайте новый пакет импорта и запустите автоматический анализ файла."
+      contentClassName="grid min-w-0 gap-6"
+      actions={
         <Link
           href="/catalog/imports"
-          className="inline-flex rounded-xl bg-white/[0.06] px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/[0.1]"
+          className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-button-secondary-border)] bg-[var(--app-button-secondary-bg)] px-4 py-2.5 text-sm font-semibold text-[var(--app-text)] transition-colors hover:border-[var(--app-border-strong)] hover:bg-[var(--app-surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] motion-reduce:transition-none sm:w-auto"
         >
-          ← Назад к импортам
+          <span aria-hidden="true">←</span>
+          Назад к импортам
         </Link>
-      </div>
+      }
+    >
+      <form onSubmit={handleSubmit} className="grid min-w-0 gap-6">
+        <section className="min-w-0 rounded-3xl border border-[var(--app-border)] bg-[var(--app-panel)] p-5 shadow-sm shadow-[var(--app-shadow)] sm:p-6">
+          <h2 className="text-xl font-semibold text-[var(--app-text)]">
+            Исходный Excel-файл
+          </h2>
 
-      <form onSubmit={handleSubmit} className="grid gap-6">
-        <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
-          <div>
-            <h2 className="text-xl font-semibold text-white">
-              Исходный Excel-файл
-            </h2>
-
-            <p className="mt-2 text-sm leading-6 text-slate-400">
-              Поддерживается формат .xlsx. Максимальный размер файла — 10 МБ.
-            </p>
-          </div>
+          <p
+            id="excel-file-requirements"
+            className="mt-2 text-sm leading-6 text-[var(--app-muted)]"
+          >
+            Поддерживается формат .xlsx. Максимальный размер файла — 10 МБ.
+          </p>
 
           <div
             role="button"
-            tabIndex={0}
+            aria-label="Выбрать Excel-файл"
+            aria-describedby="excel-file-requirements"
+            aria-disabled={isBusy}
+            tabIndex={isBusy ? -1 : 0}
             onClick={() => {
               if (!isBusy) {
                 fileInputRef.current?.click();
@@ -228,12 +238,16 @@ export default function NewCatalogImportPage() {
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
             className={[
-              "mt-6 cursor-pointer rounded-3xl border-2 border-dashed",
-              "p-8 text-center transition",
+              "mt-6 min-w-0 rounded-3xl border-2 border-dashed",
+              "p-6 text-center transition-colors sm:p-8",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]",
+              "motion-reduce:transition-none",
               isDragging
-                ? "border-teal-400 bg-teal-500/10"
-                : "border-white/15 bg-black/20 hover:border-teal-500/50 hover:bg-teal-500/[0.05]",
-              isBusy ? "cursor-not-allowed opacity-60" : "",
+                ? "border-[var(--app-accent)] bg-[var(--app-accent-soft)]"
+                : "border-[var(--app-border-strong)] bg-[var(--app-surface)]",
+              isBusy
+                ? "cursor-not-allowed opacity-60"
+                : "cursor-pointer hover:border-[var(--app-accent)] hover:bg-[var(--app-accent-soft)]",
             ].join(" ")}
           >
             <input
@@ -245,53 +259,58 @@ export default function NewCatalogImportPage() {
               className="hidden"
             />
 
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-teal-500/10 text-2xl text-teal-300">
+            <div
+              aria-hidden="true"
+              className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--app-accent-soft)] text-sm font-bold text-[var(--app-accent)]"
+            >
               XLSX
             </div>
 
-            <h3 className="mt-4 text-lg font-semibold text-white">
+            <h3 className="mt-4 text-lg font-semibold text-[var(--app-text)]">
               {selectedFile
                 ? "Excel-файл выбран"
                 : "Перетащите Excel-файл сюда"}
             </h3>
 
-            <p className="mt-2 text-sm text-slate-400">
-              {selectedFile
-                ? "Нажмите на область, чтобы выбрать другой файл."
-                : "Или нажмите на область и выберите файл на компьютере."}
+            <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">
+              {isBusy
+                ? "Дождитесь завершения обработки файла."
+                : selectedFile
+                  ? "Нажмите на область, чтобы выбрать другой файл."
+                  : "Или нажмите на область и выберите файл на компьютере."}
             </p>
           </div>
 
           {selectedFile && (
-            <div className="mt-5 flex flex-col justify-between gap-4 rounded-2xl border border-teal-500/20 bg-teal-500/[0.06] p-4 sm:flex-row sm:items-center">
+            <div className="mt-5 flex min-w-0 flex-col justify-between gap-4 rounded-2xl border border-[var(--app-accent-border)] bg-[var(--app-accent-soft)] p-4 sm:flex-row sm:items-center">
               <div className="min-w-0">
-                <p className="truncate font-medium text-white">
+                <p className="font-medium text-[var(--app-text)] [overflow-wrap:anywhere]">
                   {selectedFile.name}
                 </p>
-
-                <p className="mt-1 text-sm text-slate-400">
+                <p className="mt-1 text-sm text-[var(--app-muted)]">
                   {formatFileSize(selectedFile.size)}
                 </p>
               </div>
 
-              <button
+              <AppButton
                 type="button"
+                variant="danger"
                 disabled={isBusy}
                 onClick={clearFile}
-                className="rounded-xl border border-white/10 bg-white/[0.05] px-4 py-2 text-sm text-slate-300 transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-50"
+                className="w-full sm:w-auto"
               >
                 Убрать файл
-              </button>
+              </AppButton>
             </div>
           )}
         </section>
 
-        <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
-          <h2 className="text-xl font-semibold text-white">
+        <section className="min-w-0 rounded-3xl border border-[var(--app-border)] bg-[var(--app-panel)] p-5 shadow-sm shadow-[var(--app-shadow)] sm:p-6">
+          <h2 className="text-xl font-semibold text-[var(--app-text)]">
             Что произойдёт после загрузки
           </h2>
 
-          <div className="mt-5 grid gap-4 md:grid-cols-3">
+          <div className="mt-5 grid min-w-0 gap-4 md:grid-cols-3">
             <StepCard
               number="1"
               title="Загрузка"
@@ -302,7 +321,7 @@ export default function NewCatalogImportPage() {
             <StepCard
               number="2"
               title="Анализ"
-              description="Backend прочитает колонки, строки и проверит значения."
+              description="Система прочитает колонки, строки и проверит значения."
               active={phase === "analyzing"}
             />
 
@@ -316,18 +335,24 @@ export default function NewCatalogImportPage() {
         </section>
 
         {validationError && (
-          <section className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+          <section
+            role="alert"
+            className="min-w-0 rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-4 text-sm text-[var(--app-danger)] [overflow-wrap:anywhere]"
+          >
             {validationError}
           </section>
         )}
 
         {uploadMutation.isError && (
-          <section className="rounded-2xl border border-red-500/30 bg-red-500/10 p-5">
-            <h2 className="font-semibold text-red-100">
+          <section
+            role="alert"
+            className="min-w-0 rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-5"
+          >
+            <h2 className="font-semibold text-[var(--app-danger)]">
               Не удалось завершить импорт
             </h2>
 
-            <p className="mt-2 text-sm leading-6 text-red-200">
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--app-danger)] [overflow-wrap:anywhere]">
               {getApiErrorMessage(
                 uploadMutation.error,
                 "Не удалось загрузить или проанализировать Excel-файл.",
@@ -336,13 +361,13 @@ export default function NewCatalogImportPage() {
 
             {createdBatchId && (
               <div className="mt-4">
-                <p className="text-sm text-red-200/80">
+                <p className="text-sm text-[var(--app-text)]">
                   Пакет уже был создан, но анализ завершился ошибкой.
                 </p>
 
                 <Link
                   href={`/catalog/imports/${createdBatchId}`}
-                  className="mt-3 inline-flex rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-100 transition hover:bg-red-500/20"
+                  className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-[var(--app-button-primary-border)] bg-[var(--app-button-primary-bg)] px-4 py-2.5 text-sm font-semibold text-[var(--app-button-primary-text)] transition-colors hover:border-[var(--app-button-primary-hover-border)] hover:bg-[var(--app-button-primary-hover-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] motion-reduce:transition-none sm:w-auto"
                 >
                   Открыть созданный пакет
                 </Link>
@@ -354,27 +379,38 @@ export default function NewCatalogImportPage() {
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <Link
             href="/catalog/imports"
+            aria-disabled={isBusy}
+            tabIndex={isBusy ? -1 : undefined}
+            onClick={(event) => {
+              if (isBusy) {
+                event.preventDefault();
+              }
+            }}
             className={[
-              "rounded-2xl border border-white/10",
-              "bg-white/[0.05] px-5 py-3",
-              "text-center text-sm font-medium text-slate-200",
-              "transition hover:bg-white/[0.1]",
-              isBusy ? "pointer-events-none opacity-50" : "",
+              "inline-flex min-h-11 items-center justify-center rounded-xl border px-4 py-2.5",
+              "border-[var(--app-button-secondary-border)] bg-[var(--app-button-secondary-bg)]",
+              "text-sm font-semibold text-[var(--app-text)] transition-colors",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]",
+              "motion-reduce:transition-none",
+              isBusy
+                ? "pointer-events-none opacity-50"
+                : "hover:border-[var(--app-border-strong)] hover:bg-[var(--app-surface-hover)]",
             ].join(" ")}
           >
             Отмена
           </Link>
 
-          <button
+          <AppButton
             type="submit"
+            variant="primary"
             disabled={!selectedFile || isBusy}
-            className="rounded-2xl bg-teal-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-teal-400 disabled:cursor-not-allowed disabled:opacity-50"
+            loading={isBusy}
           >
-            {getPhaseLabel(phase)}
-          </button>
+            <span role="status">{getPhaseLabel(phase)}</span>
+          </AppButton>
         </div>
       </form>
-    </div>
+    </PageWorkspace>
   );
 }
 
@@ -391,26 +427,29 @@ function StepCard({
 }) {
   return (
     <div
+      aria-current={active ? "step" : undefined}
       className={[
-        "rounded-2xl border p-4 transition",
+        "min-w-0 rounded-2xl border p-4 transition-colors motion-reduce:transition-none",
         active
-          ? "border-teal-400/50 bg-teal-500/10"
-          : "border-white/10 bg-black/20",
+          ? "border-[var(--app-accent-border)] bg-[var(--app-accent-soft)]"
+          : "border-[var(--app-border)] bg-[var(--app-surface)]",
       ].join(" ")}
     >
       <div
         className={[
-          "flex h-9 w-9 items-center justify-center",
-          "rounded-xl text-sm font-bold",
-          active ? "bg-teal-500 text-white" : "bg-white/[0.06] text-slate-300",
+          "flex h-9 w-9 items-center justify-center rounded-xl text-sm font-bold",
+          active
+            ? "bg-[var(--app-button-primary-bg)] text-[var(--app-button-primary-text)]"
+            : "bg-[var(--app-panel)] text-[var(--app-muted)]",
         ].join(" ")}
       >
         {number}
       </div>
 
-      <h3 className="mt-4 font-semibold text-white">{title}</h3>
-
-      <p className="mt-2 text-sm leading-6 text-slate-400">{description}</p>
+      <h3 className="mt-4 font-semibold text-[var(--app-text)]">{title}</h3>
+      <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">
+        {description}
+      </p>
     </div>
   );
 }

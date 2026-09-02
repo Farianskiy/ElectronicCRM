@@ -1,18 +1,158 @@
 @import "tailwindcss";
 
+:root,
+html[data-theme="dark"] {
+  color-scheme: dark;
+
+  --app-background: #0d1117;
+  --app-sidebar: #10151c;
+  --app-header: rgba(16, 21, 28, 0.96);
+
+  --app-surface: #171d25;
+  --app-surface-hover: #202833;
+  --app-panel: #151a21;
+  --app-panel-hover: #1b222b;
+  --app-panel-strong: #1a2029;
+
+  --app-border: #252d37;
+  --app-border-strong: #34404d;
+
+  --app-text: #f8fafc;
+  --app-muted: #94a3b8;
+  --app-subtle: #64748b;
+
+  --app-accent: #5eead4;
+  --app-accent-strong: #14b8a6;
+  --app-accent-soft: rgba(45, 212, 191, 0.12);
+  --app-accent-border: rgba(45, 212, 191, 0.24);
+
+  --app-role-text: #ddd6fe;
+  --app-role-soft: rgba(139, 92, 246, 0.13);
+  --app-role-border: rgba(167, 139, 250, 0.25);
+
+  --app-success: #86efac;
+  --app-success-soft: rgba(34, 197, 94, 0.12);
+  --app-success-border: rgba(74, 222, 128, 0.25);
+
+  --app-danger: #fca5a5;
+  --app-danger-soft: rgba(248, 113, 113, 0.12);
+  --app-danger-border: rgba(248, 113, 113, 0.25);
+
+    --app-warning: #fcd34d;
+  --app-warning-soft: rgba(245, 158, 11, 0.05);
+  --app-warning-border: rgba(245, 158, 11, 0.3);
+
+  --app-button-primary-bg: var(--app-accent-soft);
+  --app-button-primary-text: var(--app-accent);
+  --app-button-primary-border: var(--app-accent-border);
+  --app-button-primary-hover-bg: var(--app-surface-hover);
+  --app-button-primary-hover-border: var(--app-accent);
+
+  --app-button-secondary-bg: var(--app-surface);
+  --app-button-secondary-border: var(--app-border);
+
+  --app-button-danger-bg: var(--app-danger-soft);
+  --app-button-danger-border: var(--app-danger-border);
+  --app-button-danger-hover-bg: var(--app-surface-hover);
+
+  --app-button-danger-solid-bg: #dc2626;
+  --app-button-danger-solid-text: #ffffff;
+  --app-button-danger-solid-hover-bg: #b91c1c;
+
+  --app-button-warning-bg: #f59e0b;
+  --app-button-warning-text: #422006;
+  --app-button-warning-border: #f59e0b;
+  --app-button-warning-hover-bg: #fbbf24;
+  --app-button-warning-hover-border: #fbbf24;
+
+  --app-overlay: rgba(0, 0, 0, 0.72);
+  --app-shadow: rgba(0, 0, 0, 0.5);
+}
+
+html[data-theme="light"] {
+  color-scheme: light;
+
+  --app-background: #edf1f4;
+  --app-sidebar: #f7f9fa;
+  --app-header: rgba(255, 255, 255, 0.96);
+
+  --app-surface: #f1f5f7;
+  --app-surface-hover: #e6ecef;
+  --app-panel: #ffffff;
+  --app-panel-hover: #f7f9fa;
+  --app-panel-strong: #f8fafb;
+
+  --app-border: #d8e0e6;
+  --app-border-strong: #c5d0d9;
+
+  --app-text: #172033;
+  --app-muted: #526174;
+  --app-subtle: #748295;
+
+  --app-accent: #0f766e;
+  --app-accent-strong: #0d9488;
+  --app-accent-soft: #ccfbf1;
+  --app-accent-border: #99e6d9;
+
+  --app-role-text: #6d28d9;
+  --app-role-soft: #ede9fe;
+  --app-role-border: #c4b5fd;
+
+  --app-success: #15803d;
+  --app-success-soft: #dcfce7;
+  --app-success-border: #86efac;
+
+  --app-danger: #b91c1c;
+  --app-danger-soft: #fee2e2;
+  --app-danger-border: #fca5a5;
+
+  --app-warning: #92400e;
+  --app-warning-soft: #fffbeb;
+  --app-warning-border: #f2b84b;
+
+  --app-button-primary-bg: #0f766e;
+  --app-button-primary-text: #ffffff;
+  --app-button-primary-border: #0f766e;
+  --app-button-primary-hover-bg: #115e59;
+  --app-button-primary-hover-border: #115e59;
+
+  --app-button-secondary-bg: #ffffff;
+  --app-button-secondary-border: var(--app-border-strong);
+
+  --app-button-danger-bg: #ffffff;
+  --app-button-danger-border: #dc2626;
+  --app-button-danger-hover-bg: #fef2f2;
+
+  --app-button-danger-solid-bg: #b91c1c;
+  --app-button-danger-solid-text: #ffffff;
+  --app-button-danger-solid-hover-bg: #991b1b;
+
+  --app-button-warning-bg: #f59e0b;
+  --app-button-warning-text: #422006;
+  --app-button-warning-border: #b45309;
+  --app-button-warning-hover-bg: #fbbf24;
+  --app-button-warning-hover-border: #92400e;
+
+  --app-overlay: rgba(15, 23, 42, 0.45);
+  --app-shadow: rgba(15, 23, 42, 0.16);
+}
+
 * {
   box-sizing: border-box;
 }
 
 html {
-  background: #0f1115;
+  background: var(--app-background);
 }
 
 body {
   margin: 0;
   min-height: 100vh;
-  background: #0f1115;
-  color: #f8fafc;
+  background: var(--app-background);
+  color: var(--app-text);
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
 }
 
 button,

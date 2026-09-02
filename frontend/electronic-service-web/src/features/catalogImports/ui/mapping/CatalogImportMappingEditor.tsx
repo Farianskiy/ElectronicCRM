@@ -23,11 +23,12 @@ import {
 import { validateCatalogImportMapping } from "../../model/mappingValidation";
 import { catalogImportQueryKeys } from "../../model/queryKeys";
 import { CatalogImportCharacteristicAssignment } from "./CatalogImportCharacteristicAssignment";
-import { CatalogImportRecognitionShadowPanel } from "../recognition/CatalogImportRecognitionShadowPanel";
-import { CatalogImportManufacturerResolutionPanel } from "../manufacturers/CatalogImportManufacturerResolutionPanel";
 
 interface CatalogImportMappingEditorProps {
   batchId: string;
+  onAnalysisChange: (
+    analysis: AnalyzeCatalogImportBatchResponse | null,
+  ) => void;
 }
 
 interface SaveMappingResult {
@@ -53,10 +54,8 @@ function formatConfidence(confidence: number): string {
 
 export function CatalogImportMappingEditor({
   batchId,
+  onAnalysisChange,
 }: CatalogImportMappingEditorProps) {
-  const [analysis, setAnalysis] =
-    useState<AnalyzeCatalogImportBatchResponse | null>(null);
-
   const mappingQuery = useQuery({
     queryKey: catalogImportQueryKeys.mapping(batchId),
     queryFn: () => getCatalogImportMapping(batchId),
@@ -98,27 +97,13 @@ export function CatalogImportMappingEditor({
   }
 
   return (
-    <>
-      <CatalogImportMappingForm
-        key={`${mapping.version}-${mapping.productTypeId ?? "none"}`}
-        batchId={batchId}
-        initialMapping={mapping}
-        productTypes={productTypes}
-        onAnalysisChange={setAnalysis}
-      />
-
-      <CatalogImportManufacturerResolutionPanel
-        batchId={batchId}
-        productTypeId={analysis?.productTypeId ?? mapping.productTypeId}
-        summary={analysis?.manufacturerResolutionSummary ?? null}
-        onAnalysisChange={setAnalysis}
-      />
-
-      <CatalogImportRecognitionShadowPanel
-        recognitionShadow={analysis?.recognitionShadow ?? null}
-        recognitionEnrichment={analysis?.recognitionEnrichment ?? null}
-      />
-    </>
+    <CatalogImportMappingForm
+      key={`${mapping.version}-${mapping.productTypeId ?? "none"}`}
+      batchId={batchId}
+      initialMapping={mapping}
+      productTypes={productTypes}
+      onAnalysisChange={onAnalysisChange}
+    />
   );
 }
 
@@ -173,13 +158,8 @@ function CatalogImportMappingForm({
   );
 
   const mappingValidation = useMemo(
-    () =>
-      validateCatalogImportMapping(
-        selectedProductTypeId,
-        columns,
-        characteristics,
-      ),
-    [selectedProductTypeId, columns, characteristics],
+    () => validateCatalogImportMapping(columns, characteristics),
+    [columns, characteristics],
   );
 
   const mappingMetrics = mappingValidation.metrics;
@@ -187,7 +167,7 @@ function CatalogImportMappingForm({
   const saveMutation = useMutation({
     mutationFn: async (): Promise<SaveMappingResult> => {
       const mapping = await updateCatalogImportMapping(batchId, {
-        productTypeId: selectedProductTypeId,
+        productTypeId: selectedProductTypeId || null,
         columns: columns.map((column) => ({
           columnId: column.columnId,
           targetKind: column.targetKind,
@@ -454,8 +434,9 @@ function CatalogImportMappingForm({
           </h2>
 
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
-            Выберите тип товара и укажите назначение каждой колонки Excel.
-            Лишние колонки нужно явно отметить как игнорируемые.
+            Укажите назначение каждой колонки Excel. Общий тип выбирайте только
+            для файлов, в которых все строки относятся к одному типу товара. В
+            смешанном файле оставьте автоматическое определение по строкам.
           </p>
         </div>
 
@@ -469,7 +450,7 @@ function CatalogImportMappingForm({
       <form onSubmit={handleSubmit} className="mt-6 grid gap-6">
         <div className="grid gap-2">
           <label className="text-sm font-medium text-slate-300">
-            Тип товара
+            Общий тип товара · необязательно
           </label>
 
           <AppSelect
@@ -482,7 +463,7 @@ function CatalogImportMappingForm({
             options={[
               {
                 value: "",
-                label: "Выберите тип товара",
+                label: "Определять отдельно для каждой строки",
               },
               ...productTypes.map((productType) => ({
                 value: productType.id,
@@ -608,8 +589,8 @@ function CatalogImportMappingForm({
 
           <p className="mt-2 text-sm leading-6 text-slate-300">
             {mappingMetrics.isComplete
-              ? "Все обязательные поля и характеристики назначены. Можно сохранить mapping и повторно запустить анализ."
-              : "Заполните обязательные системные поля, выберите характеристики и устраните дублирующиеся назначения."}
+              ? "Обязательные поля назначены. Можно сохранить сопоставление и запустить анализ наименований."
+              : "Назначьте обязательные системные поля, обработайте неизвестные колонки и устраните дублирующиеся назначения."}
           </p>
         </div>
 
@@ -619,8 +600,9 @@ function CatalogImportMappingForm({
           </p>
 
           <p className="mt-2 text-sm leading-6 text-slate-300">
-            Наименование, артикул и производитель должны быть назначены ровно по
-            одному разу. Цена и остаток необязательны.
+            Наименование и артикул должны быть назначены ровно по одному разу.
+            Производитель может быть указан отдельной колонкой или определён из
+            наименования. Цена и остаток необязательны.
           </p>
         </div>
 

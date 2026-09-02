@@ -4,6 +4,7 @@ export interface AskCatalogAssistantRequest {
   minimumScore: number;
   page: number;
   pageSize: number;
+  selectedManufacturer: string | null;
 }
 
 export interface CatalogAssistantCharacteristic {
@@ -18,6 +19,27 @@ export interface CatalogAssistantClarification {
   suggestedTargetValue: string;
   confidence: number;
   question: string;
+  canCreateSuggestion: boolean;
+}
+
+export interface CatalogAssistantManufacturerRecognitionCandidate {
+  manufacturerName: string;
+  rawValue: string;
+  normalizedValue: string;
+  confidence: number;
+  source: string;
+  startIndex: number;
+  length: number;
+  endIndex: number;
+}
+
+export interface CatalogAssistantManufacturerRecognition {
+  productName: string;
+  status: string;
+  isResolved: boolean;
+  isConflict: boolean;
+  selectedCandidate: CatalogAssistantManufacturerRecognitionCandidate | null;
+  candidates: CatalogAssistantManufacturerRecognitionCandidate[];
 }
 
 export interface CatalogAssistantParsedRequest {
@@ -27,6 +49,7 @@ export interface CatalogAssistantParsedRequest {
   manufacturer: string | null;
   characteristics: CatalogAssistantCharacteristic[];
   clarification: CatalogAssistantClarification | null;
+  manufacturerRecognition: CatalogAssistantManufacturerRecognition;
 }
 
 export interface CatalogAssistantProduct {

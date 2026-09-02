@@ -5,7 +5,7 @@ namespace ElectronicService.Core.Catalog.ImportBatches.UpdateCatalogImportMappin
 public sealed record UpdateCatalogImportMappingCommand(
     Guid BatchId,
     Guid CurrentUserId,
-    Guid ProductTypeId,
+    Guid? ProductTypeId,
     IReadOnlyCollection<UpdateCatalogImportColumnMapping> Columns);
 
 public sealed record UpdateCatalogImportColumnMapping(

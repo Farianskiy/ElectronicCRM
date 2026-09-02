@@ -10,4 +10,7 @@ public sealed record CatalogImportNormalizedRowData(
     Guid? ManufacturerId = null,
     string? ManufacturerResolutionSource = null,
     Guid? ManufacturerAliasId = null,
-    IReadOnlyDictionary<string, CatalogImportCharacteristicValueOrigin>? CharacteristicOrigins = null);
+    IReadOnlyDictionary<string, CatalogImportCharacteristicValueOrigin>? CharacteristicOrigins = null,
+    Guid? ProductTypeId = null,
+    string? ProductTypeResolutionSource = null,
+    decimal? ProductTypeResolutionConfidence = null);

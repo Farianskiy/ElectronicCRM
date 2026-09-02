@@ -14,5 +14,8 @@ public sealed record AnalyzeCatalogImportBatchResult(
     int ValidRowsCount,
     int ErrorRowsCount,
     CatalogImportManufacturerResolutionSummary ManufacturerResolutionSummary,
+    CatalogImportManufacturerRecognitionShadowResult ManufacturerRecognitionShadow,
+    CatalogImportProductTypeSuggestionShadowResult ProductTypeSuggestionShadow,
     CatalogImportRecognitionShadowResult? RecognitionShadow,
+    CatalogImportProductNameExplanationSummary ProductNameExplanation,
     CatalogImportRecognitionEnrichmentSummary RecognitionEnrichment);

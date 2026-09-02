@@ -7,7 +7,7 @@ import type { FormEvent } from "react";
 import { useState } from "react";
 import { searchCatalogProducts } from "@/features/catalogProducts/api/searchCatalogProducts";
 import { formatPrice } from "@/shared/lib/formatters";
-import { PageHeader } from "@/shared/ui/PageHeader";
+import { PageWorkspace } from "@/shared/ui/PageWorkspace";
 import { getCatalogManufacturers } from "@/features/catalogMetadata/api/getCatalogManufacturers";
 import { getCatalogProductTypeCharacteristics } from "@/features/catalogMetadata/api/getCatalogProductTypeCharacteristics";
 import { getCatalogProductTypes } from "@/features/catalogMetadata/api/getCatalogProductTypes";
@@ -17,6 +17,8 @@ import type {
   SearchProductCharacteristicRequest,
 } from "@/features/catalogProducts/model/types";
 import { AppSelect } from "@/shared/ui/AppSelect";
+import { AppInput } from "@/shared/ui/AppInput";
+import { AppButton } from "@/shared/ui/AppButton";
 
 function getErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
@@ -47,11 +49,14 @@ function ProductAvailabilityBadge({
 
   return (
     <span
-      className={
+      title={isAvailable ? "В наличии" : "Нет в наличии"}
+      className={[
+        "inline-flex items-center rounded-full border px-3 py-1",
+        "text-xs font-semibold tabular-nums",
         isAvailable
-          ? "rounded-full bg-green-500/15 px-3 py-1 text-xs font-medium text-green-300"
-          : "rounded-full bg-red-500/15 px-3 py-1 text-xs font-medium text-red-300"
-      }
+          ? "border-[var(--app-success-border)] bg-[var(--app-success-soft)] text-[var(--app-success)]"
+          : "border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] text-[var(--app-danger)]",
+      ].join(" ")}
     >
       {stockQuantity}
     </span>
@@ -60,21 +65,28 @@ function ProductAvailabilityBadge({
 
 function ProductRow({ product }: { product: CatalogProductListItem }) {
   return (
-    <tr className="bg-white/[0.02] transition hover:bg-white/[0.05]">
+    <tr className="bg-[var(--app-panel)] transition-colors hover:bg-[var(--app-panel-hover)] motion-reduce:transition-none">
+      <td className="min-w-[240px] max-w-[420px] px-4 py-4">
+        <p className="break-words font-medium text-[var(--app-text)]">
+          {product.name}
+        </p>
+      </td>
+
+      <td className="px-4 py-4 text-[var(--app-muted)]">{product.article}</td>
+
+      <td className="px-4 py-4 text-[var(--app-muted)]">
+        {product.manufacturerName}
+      </td>
+
       <td className="px-4 py-4">
-        <p className="font-medium text-white">{product.name}</p>
+        <p className="text-[var(--app-text)]">{product.productTypeName}</p>
+
+        <p className="mt-1 break-words text-xs text-[var(--app-muted)]">
+          {product.productTypeCode}
+        </p>
       </td>
 
-      <td className="px-4 py-4 text-slate-300">{product.article}</td>
-
-      <td className="px-4 py-4 text-slate-300">{product.manufacturerName}</td>
-
-      <td className="px-4 py-4 text-slate-300">
-        <p>{product.productTypeName}</p>
-        <p className="mt-1 text-xs text-slate-500">{product.productTypeCode}</p>
-      </td>
-
-      <td className="px-4 py-4 text-slate-300">
+      <td className="whitespace-nowrap px-4 py-4 tabular-nums text-[var(--app-text)]">
         {formatPrice(product.priceAmount, product.priceCurrency)}
       </td>
 
@@ -85,7 +97,8 @@ function ProductRow({ product }: { product: CatalogProductListItem }) {
       <td className="px-4 py-4">
         <Link
           href={`/catalog/products/${product.id}`}
-          className="rounded-xl bg-white/[0.06] px-3 py-2 text-xs font-medium text-slate-200 transition hover:bg-teal-500 hover:text-white"
+          aria-label={`Открыть товар: ${product.name}`}
+          className="inline-flex min-h-10 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] px-3 py-2 text-xs font-semibold text-[var(--app-text)] transition-colors hover:border-[var(--app-accent-border)] hover:bg-[var(--app-accent-soft)] hover:text-[var(--app-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] motion-reduce:transition-none"
         >
           Открыть
         </Link>
@@ -127,8 +140,10 @@ function CharacteristicFilterField({
 
   if (characteristic.dataType === "Boolean") {
     return (
-      <label className="grid gap-2">
-        <span className="text-sm font-medium text-slate-300">{label}</span>
+      <label className="grid min-w-0 content-start gap-2">
+        <span className="text-sm font-medium text-[var(--app-text)]">
+          {label}
+        </span>
 
         <AppSelect
           ariaLabel={label}
@@ -154,10 +169,12 @@ function CharacteristicFilterField({
   }
 
   return (
-    <label className="grid gap-2">
-      <span className="text-sm font-medium text-slate-300">{label}</span>
+    <label className="grid min-w-0 content-start gap-2">
+      <span className="text-sm font-medium text-[var(--app-text)]">
+        {label}
+      </span>
 
-      <input
+      <AppInput
         type={characteristic.dataType === "Number" ? "number" : "text"}
         step={characteristic.dataType === "Number" ? "any" : undefined}
         value={value}
@@ -167,7 +184,6 @@ function CharacteristicFilterField({
             ? "Введите число"
             : "Введите значение"
         }
-        className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-slate-100 outline-none placeholder:text-slate-600 focus:border-teal-400"
       />
     </label>
   );
@@ -276,30 +292,45 @@ export default function CatalogProductsPage() {
   }
 
   return (
-    <div className="grid gap-6">
-      <PageHeader
-        title="Каталог товаров"
-        description="Поиск и просмотр товаров, цен, остатков и характеристик."
-      />
+    <PageWorkspace
+      eyebrow="Работа с каталогом"
+      title="Каталог товаров"
+      description="Поиск и просмотр товаров, цен, остатков и характеристик."
+      contentClassName="grid min-w-0 gap-6"
+    >
+      <section
+        aria-labelledby="catalog-filters-title"
+        className="min-w-0 rounded-3xl border border-[var(--app-border)] bg-[var(--app-panel)] p-5 shadow-sm shadow-[var(--app-shadow)] sm:p-6"
+      >
+        <div className="mb-5">
+          <h2
+            id="catalog-filters-title"
+            className="text-lg font-semibold text-[var(--app-text)]"
+          >
+            Поиск и фильтры
+          </h2>
 
-      <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
-        <form onSubmit={handleSearch} className="grid gap-5">
-          <label className="grid gap-2">
-            <span className="text-sm font-medium text-slate-300">
-              Поиск товара
-            </span>
+          <p className="mt-1 text-sm leading-6 text-[var(--app-muted)]">
+            Задайте условия и нажмите «Найти», чтобы обновить список товаров.
+          </p>
+        </div>
 
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Название, артикул, тип или производитель"
-              className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-slate-100 outline-none placeholder:text-slate-600 focus:border-teal-400"
-            />
-          </label>
+        <form onSubmit={handleSearch} className="grid min-w-0 gap-5">
+          <div className="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <label className="grid min-w-0 content-start gap-2 md:col-span-2">
+              <span className="text-sm font-medium text-[var(--app-text)]">
+                Поиск товара
+              </span>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="grid gap-2">
-              <span className="text-sm font-medium text-slate-300">
+              <AppInput
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Название, артикул, тип или производитель"
+              />
+            </label>
+
+            <label className="grid min-w-0 content-start gap-2">
+              <span className="text-sm font-medium text-[var(--app-text)]">
                 Тип товара
               </span>
 
@@ -324,8 +355,8 @@ export default function CatalogProductsPage() {
               />
             </label>
 
-            <label className="grid gap-2">
-              <span className="text-sm font-medium text-slate-300">
+            <label className="grid min-w-0 content-start gap-2">
+              <span className="text-sm font-medium text-[var(--app-text)]">
                 Производитель
               </span>
 
@@ -354,25 +385,37 @@ export default function CatalogProductsPage() {
           </div>
 
           {productTypeCode && (
-            <section className="rounded-2xl border border-white/10 bg-black/20 p-4">
-              <h3 className="text-sm font-semibold text-white">
+            <section
+              aria-labelledby="catalog-characteristic-filters-title"
+              className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-panel-strong)] p-4 sm:p-5"
+            >
+              <h3
+                id="catalog-characteristic-filters-title"
+                className="text-sm font-semibold text-[var(--app-text)]"
+              >
                 Характеристики
               </h3>
 
               {characteristicsQuery.isLoading ? (
-                <p className="mt-3 text-sm text-slate-400">
+                <p
+                  role="status"
+                  className="mt-3 text-sm text-[var(--app-muted)]"
+                >
                   Загружаем характеристики...
                 </p>
               ) : characteristicsQuery.isError ? (
-                <p className="mt-3 rounded-2xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
+                <p
+                  role="alert"
+                  className="mt-3 rounded-xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-3 text-sm text-[var(--app-danger)]"
+                >
                   {getErrorMessage(characteristicsQuery.error)}
                 </p>
               ) : filterableCharacteristics.length === 0 ? (
-                <p className="mt-3 text-sm text-slate-400">
+                <p className="mt-3 text-sm leading-6 text-[var(--app-muted)]">
                   Для этого типа нет характеристик, разрешённых для фильтрации.
                 </p>
               ) : (
-                <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <div className="mt-4 grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-3">
                   {filterableCharacteristics.map((characteristic) => (
                     <CharacteristicFilterField
                       key={characteristic.id}
@@ -388,117 +431,190 @@ export default function CatalogProductsPage() {
             </section>
           )}
 
-          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
-            <label className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
+          <div className="flex flex-col gap-4 border-t border-[var(--app-border)] pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <label className="flex min-h-11 cursor-pointer items-center gap-3 self-start rounded-xl px-2 py-2">
               <input
                 type="checkbox"
                 checked={onlyInStock}
                 onChange={(event) => setOnlyInStock(event.target.checked)}
+                className="h-4 w-4 shrink-0 cursor-pointer accent-[var(--app-accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--app-panel)]"
               />
 
-              <span className="text-sm text-slate-300">Только в наличии</span>
+              <span className="text-sm font-medium text-[var(--app-text)]">
+                Только в наличии
+              </span>
             </label>
 
-            <div className="flex gap-3">
-              <button
-                type="submit"
-                className="rounded-2xl bg-teal-500 px-5 py-3 text-sm font-medium text-white transition hover:bg-teal-400"
-              >
+            <div className="grid grid-cols-2 gap-3 sm:flex sm:items-center">
+              <AppButton type="submit" variant="primary">
                 Найти
-              </button>
+              </AppButton>
 
-              <button
+              <AppButton
                 type="button"
+                variant="secondary"
                 onClick={handleReset}
-                className="rounded-2xl bg-white/[0.06] px-5 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/[0.1]"
               >
                 Сбросить
-              </button>
+              </AppButton>
             </div>
           </div>
         </form>
       </section>
 
-      {productsQuery.isError && (
-        <section className="rounded-3xl border border-red-500/30 bg-red-500/10 p-5 text-red-200">
-          {getErrorMessage(productsQuery.error)}
-        </section>
-      )}
-
-      <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
-        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+      <section
+        aria-labelledby="catalog-results-title"
+        className="min-w-0 rounded-3xl border border-[var(--app-border)] bg-[var(--app-panel)] p-5 shadow-sm shadow-[var(--app-shadow)] sm:p-6"
+      >
+        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
           <div>
-            <h2 className="text-xl font-semibold text-white">Товары</h2>
-            <p className="mt-1 text-sm text-slate-400">
-              Найдено backend-ом: {totalCount}. Показано на странице:{" "}
-              {products.length}
-            </p>
+            <h2
+              id="catalog-results-title"
+              className="text-xl font-semibold text-[var(--app-text)]"
+            >
+              Товары
+            </h2>
+
+            {productsQuery.data && (
+              <p className="mt-1 text-sm tabular-nums text-[var(--app-muted)]">
+                Найдено: {totalCount}. На странице: {products.length}.
+              </p>
+            )}
           </div>
 
-          <p className="text-sm text-slate-400">
-            Страница {page} из {totalPages}
-          </p>
+          {productsQuery.isFetching && productsQuery.data && (
+            <p role="status" className="text-sm text-[var(--app-muted)]">
+              Обновляем список...
+            </p>
+          )}
         </div>
 
-        {productsQuery.isLoading ? (
-          <div className="mt-6 rounded-2xl border border-white/10 bg-black/20 p-5 text-slate-300">
-            Загружаем товары...
-          </div>
-        ) : products.length === 0 ? (
-          <div className="mt-6 rounded-2xl border border-white/10 bg-black/20 p-5">
-            <h3 className="text-lg font-semibold text-white">
-              Ничего не найдено
+        {productsQuery.isError && (
+          <div
+            role="alert"
+            className="mt-5 rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-4"
+          >
+            <h3 className="text-sm font-semibold text-[var(--app-danger)]">
+              Не удалось загрузить товары
             </h3>
-            <p className="mt-2 text-sm text-slate-400">
-              Попробуй изменить запрос или отключить фильтр наличия.
+
+            <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-[var(--app-danger)]">
+              {getErrorMessage(productsQuery.error)}
+            </p>
+
+            {products.length > 0 && (
+              <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">
+                Ниже показаны ранее загруженные данные. Они могут быть
+                неактуальны.
+              </p>
+            )}
+          </div>
+        )}
+
+        {productsQuery.isLoading ? (
+          <div
+            role="status"
+            className="mt-5 flex min-h-40 items-center justify-center gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-6"
+          >
+            <span
+              aria-hidden="true"
+              className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-[var(--app-accent-border)] border-t-[var(--app-accent)] motion-reduce:animate-none"
+            />
+
+            <p className="text-sm text-[var(--app-muted)]">
+              Загружаем товары...
             </p>
           </div>
-        ) : (
-          <div className="mt-6 overflow-x-auto rounded-2xl border border-white/10">
+        ) : products.length > 0 ? (
+          <div
+            role="region"
+            aria-label="Таблица товаров с горизонтальной прокруткой"
+            tabIndex={0}
+            className="mt-5 min-w-0 max-w-full overflow-x-auto rounded-2xl border border-[var(--app-border)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--app-accent)]"
+          >
             <table className="w-full min-w-[980px] border-collapse text-left text-sm">
-              <thead className="bg-black/30 text-slate-400">
+              <caption className="sr-only">Результаты поиска товаров</caption>
+
+              <thead className="bg-[var(--app-surface)] text-[var(--app-muted)]">
                 <tr>
-                  <th className="px-4 py-3 font-medium">Наименование</th>
-                  <th className="px-4 py-3 font-medium">Артикул</th>
-                  <th className="px-4 py-3 font-medium">Производитель</th>
-                  <th className="px-4 py-3 font-medium">Тип</th>
-                  <th className="px-4 py-3 font-medium">Цена</th>
-                  <th className="px-4 py-3 font-medium">Остаток</th>
-                  <th className="px-4 py-3 font-medium">Действие</th>
+                  <th scope="col" className="px-4 py-3 font-medium">
+                    Наименование
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-medium">
+                    Артикул
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-medium">
+                    Производитель
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-medium">
+                    Тип
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-medium">
+                    Цена
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-medium">
+                    Остаток
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-medium">
+                    Действие
+                  </th>
                 </tr>
               </thead>
 
-              <tbody className="divide-y divide-white/10">
+              <tbody className="divide-y divide-[var(--app-border)]">
                 {products.map((product) => (
                   <ProductRow key={product.id} product={product} />
                 ))}
               </tbody>
             </table>
           </div>
-        )}
+        ) : productsQuery.isSuccess ? (
+          <div
+            role="status"
+            className="mt-5 rounded-2xl border border-dashed border-[var(--app-border-strong)] bg-[var(--app-surface)] px-5 py-10 text-center"
+          >
+            <h3 className="text-base font-semibold text-[var(--app-text)]">
+              Ничего не найдено
+            </h3>
 
-        <div className="mt-5 flex items-center justify-between">
-          <button
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[var(--app-muted)]">
+              Попробуйте изменить поисковый запрос, выбрать другой тип товара
+              или производителя либо отключить фильтр наличия.
+            </p>
+          </div>
+        ) : null}
+
+        <nav
+          aria-label="Страницы каталога товаров"
+          className="mt-5 grid grid-cols-2 items-center gap-3 border-t border-[var(--app-border)] pt-4 sm:flex sm:justify-between"
+        >
+          <AppButton
             type="button"
+            variant="secondary"
             disabled={page <= 1}
             onClick={() => setPage((current) => Math.max(1, current - 1))}
-            className="rounded-xl bg-white/[0.06] px-4 py-2 text-sm font-medium text-slate-200 disabled:opacity-40"
           >
             Назад
-          </button>
+          </AppButton>
 
-          <button
+          <p className="order-first col-span-2 text-center text-sm tabular-nums text-[var(--app-muted)] sm:order-none">
+            {productsQuery.data
+              ? `Страница ${page} из ${totalPages}`
+              : `Страница ${page}`}
+          </p>
+
+          <AppButton
             type="button"
+            variant="secondary"
             disabled={page >= totalPages}
             onClick={() =>
               setPage((current) => Math.min(totalPages, current + 1))
             }
-            className="rounded-xl bg-white/[0.06] px-4 py-2 text-sm font-medium text-slate-200 disabled:opacity-40"
           >
             Вперёд
-          </button>
-        </div>
+          </AppButton>
+        </nav>
       </section>
-    </div>
+    </PageWorkspace>
   );
 }

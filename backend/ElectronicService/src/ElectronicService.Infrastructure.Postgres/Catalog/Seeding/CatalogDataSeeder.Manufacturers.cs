@@ -34,6 +34,7 @@ public sealed partial class CatalogDataSeeder
         new("ЧЕНТ", "CHINT"),
         new("ЧНТ", "CHINT"),
         new("ЧАНТ", "CHINT"),
+        new("ЧЕМНТ", "CHINT"),
 
         new("АВВ", "ABB"),
 

@@ -5,4 +5,5 @@ public sealed record AskCatalogAssistantCommand(
     bool OnlyInStock,
     decimal MinimumScore,
     int Page,
-    int PageSize);
+    int PageSize,
+    string? SelectedManufacturer);

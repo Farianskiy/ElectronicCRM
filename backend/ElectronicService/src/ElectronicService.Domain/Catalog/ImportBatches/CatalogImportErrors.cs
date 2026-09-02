@@ -248,6 +248,24 @@ public static class CatalogImportErrors
             $"не разрешена для типа товара '{productTypeId}'.");
     }
 
+    public static DomainError RowsSearchIsTooLong(
+        int maximumLength)
+    {
+        return new DomainError(
+            "catalog.import.rows.search_too_long",
+            $"Поисковый запрос не должен превышать " +
+            $"'{maximumLength}' символов.");
+    }
+
+    public static DomainError InvalidRowIssueCode()
+    {
+        return new DomainError(
+            "catalog.import.rows.invalid_issue_code",
+            "Код проблемы может содержать только " +
+            "латинские буквы, цифры, точку, дефис " +
+            "и символ подчёркивания.");
+    }
+
     public static DomainError InvalidPagination()
     {
         return new DomainError(

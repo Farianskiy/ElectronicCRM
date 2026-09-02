@@ -13,6 +13,8 @@ import { TechnicalProductGeneralInformationEditor } from "./TechnicalProductGene
 import { TechnicalProductTypeMigrationPreview } from "@/features/catalogProductTypeMigration/ui/TechnicalProductTypeMigrationPreview";
 import { TechnicalProductAuditHistory } from "@/features/catalogProductAuditHistory/ui/TechnicalProductAuditHistory";
 import { catalogProductAuditHistoryQueryKey } from "@/features/catalogProductAuditHistory/model/queryKeys";
+import { AppButton } from "@/shared/ui/AppButton";
+import { AppInput } from "@/shared/ui/AppInput";
 
 interface TechnicalProductEditorProps {
   product: CatalogProductDetails;
@@ -166,125 +168,145 @@ export function TechnicalProductEditor({
   const mutationError = priceMutation.error ?? stockMutation.error;
 
   return (
-    <section className="rounded-3xl border border-teal-500/20 bg-teal-500/[0.04] p-6">
+    <section className="min-w-0 rounded-3xl border border-[var(--app-accent-border)] bg-[var(--app-panel)] p-5 shadow-sm shadow-[var(--app-shadow)] sm:p-6">
       <div>
-        <h2 className="text-xl font-semibold text-white">
+        <h2 className="text-xl font-semibold text-[var(--app-text)]">
           Редактирование товара
         </h2>
 
-        <p className="mt-2 text-sm text-slate-400">
+        <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">
           Изменения доступны только техническому пользователю.
         </p>
       </div>
 
       {validationError && (
-        <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
+        <div
+          role="alert"
+          className="mt-5 rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-4 text-sm leading-6 text-[var(--app-danger)] [overflow-wrap:anywhere]"
+        >
           {validationError}
         </div>
       )}
 
       {mutationError && (
-        <div className="mt-5 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+        <div
+          role="alert"
+          className="mt-5 whitespace-pre-wrap rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-4 text-sm leading-6 text-[var(--app-danger)] [overflow-wrap:anywhere]"
+        >
           {getErrorMessage(mutationError)}
         </div>
       )}
 
       {successMessage && (
-        <div className="mt-5 rounded-2xl border border-green-500/30 bg-green-500/10 p-4 text-sm text-green-200">
+        <div
+          role="status"
+          className="mt-5 rounded-2xl border border-[var(--app-success-border)] bg-[var(--app-success-soft)] p-4 text-sm leading-6 text-[var(--app-success)] [overflow-wrap:anywhere]"
+        >
           {successMessage}
         </div>
       )}
 
-      <div className="mt-6">
+      <div className="mt-6 min-w-0">
         <TechnicalProductGeneralInformationEditor product={product} />
       </div>
 
-      <div className="mt-6">
+      <div className="mt-6 min-w-0">
         <TechnicalProductTypeMigrationPreview
           key={`${product.id}:${product.productTypeId}`}
           product={product}
         />
       </div>
 
-      <div className="mt-6 grid gap-5 lg:grid-cols-2">
+      <div className="mt-6 grid min-w-0 gap-5 lg:grid-cols-2">
         <form
           onSubmit={handlePriceSubmit}
-          className="rounded-2xl border border-white/10 bg-black/20 p-5"
+          className="flex min-w-0 flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-panel-strong)] p-5"
         >
-          <h3 className="font-semibold text-white">Цена</h3>
+          <h3 className="text-base font-semibold text-[var(--app-text)]">
+            Цена
+          </h3>
 
-          <div className="mt-4 grid gap-4 sm:grid-cols-[1fr_120px]">
-            <label className="grid gap-2">
-              <span className="text-sm text-slate-300">Значение</span>
+          <div className="mt-4 grid min-w-0 gap-4 sm:grid-cols-[minmax(0,1fr)_120px]">
+            <label className="grid min-w-0 gap-2">
+              <span className="text-sm font-medium text-[var(--app-text)]">
+                Значение
+              </span>
 
-              <input
+              <AppInput
                 type="number"
                 min="0"
                 step="0.01"
                 required
                 value={priceAmount}
                 onChange={(event) => setPriceAmountDraft(event.target.value)}
-                className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-slate-100 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20"
               />
             </label>
 
-            <label className="grid gap-2">
-              <span className="text-sm text-slate-100">Валюта</span>
+            <label className="grid min-w-0 gap-2">
+              <span className="text-sm font-medium text-[var(--app-text)]">
+                Валюта
+              </span>
 
-              <input
+              <AppInput
                 value={priceCurrency}
                 onChange={(event) => setPriceCurrencyDraft(event.target.value)}
                 maxLength={3}
                 required
-                className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 uppercase text-slate-100 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20"
+                className="uppercase"
               />
             </label>
           </div>
 
-          <button
+          <AppButton
             type="submit"
-            disabled={priceMutation.isPending}
-            className="mt-5 rounded-2xl bg-teal-500 px-5 py-3 text-sm font-medium text-white transition hover:bg-teal-400 disabled:cursor-not-allowed disabled:opacity-50"
+            variant="primary"
+            loading={priceMutation.isPending}
+            className="mt-5 w-full sm:w-auto sm:self-start"
           >
             {priceMutation.isPending ? "Сохраняем..." : "Сохранить цену"}
-          </button>
+          </AppButton>
         </form>
 
         <form
           onSubmit={handleStockSubmit}
-          className="rounded-2xl border border-white/10 bg-black/20 p-5"
+          className="flex min-w-0 flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-panel-strong)] p-5"
         >
-          <h3 className="font-semibold text-white">Остаток</h3>
+          <h3 className="text-base font-semibold text-[var(--app-text)]">
+            Остаток
+          </h3>
 
-          <label className="mt-4 grid gap-2">
-            <span className="text-sm text-slate-300">Количество на складе</span>
+          <label className="mt-4 grid min-w-0 gap-2">
+            <span className="text-sm font-medium text-[var(--app-text)]">
+              Количество на складе
+            </span>
 
-            <input
+            <AppInput
               type="number"
               min="0"
               step="any"
               required
               value={stockQuantity}
               onChange={(event) => setStockQuantityDraft(event.target.value)}
-              className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-slate-100 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20"
             />
           </label>
 
-          <button
+          <AppButton
             type="submit"
-            disabled={stockMutation.isPending}
-            className="mt-5 rounded-2xl bg-teal-500 px-5 py-3 text-sm font-medium text-white transition hover:bg-teal-400 disabled:cursor-not-allowed disabled:opacity-50"
+            variant="primary"
+            loading={stockMutation.isPending}
+            className="mt-5 w-full sm:w-auto sm:self-start"
           >
             {stockMutation.isPending ? "Сохраняем..." : "Сохранить остаток"}
-          </button>
+          </AppButton>
         </form>
       </div>
-      <div className="mt-6 grid gap-5">
+
+      <div className="mt-6 grid min-w-0 gap-5">
         <TechnicalProductCharacteristicsEditor product={product} />
 
         <TechnicalProductAliasesEditor product={product} />
 
-        <div className="mt-6">
+        <div className="mt-6 min-w-0">
           <TechnicalProductAuditHistory
             key={product.id}
             productId={product.id}

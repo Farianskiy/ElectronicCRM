@@ -4,6 +4,9 @@ namespace ElectronicService.Core.Catalog.Manufacturers.Resolution;
 
 public sealed class ManufacturerResolutionIndex
 {
+    private const decimal ExactNameConfidence = 0.9900m;
+    private const decimal ApprovedAliasConfidence = 0.9800m;
+
     private readonly Dictionary<string, ManufacturerResolutionEntry> _entriesByNormalizedInputName;
     private readonly Dictionary<string, ManufacturerNoiseResolutionEntry> _noiseEntriesByNormalizedInputName;
 
@@ -110,5 +113,149 @@ public sealed class ManufacturerResolutionIndex
         }
 
         return ManufacturerResolutionResult.Unresolved(trimmedInputName, normalizedInputName);
+    }
+
+    public ManufacturerNameRecognitionResult RecognizeInText(string? productName)
+    {
+        if (string.IsNullOrWhiteSpace(productName))
+        {
+            return ManufacturerNameRecognitionResult.Unresolved(productName ?? string.Empty);
+        }
+
+        var normalizedProductName = NormalizeTextPreservingLength(productName);
+        var candidates = new List<ManufacturerNameRecognitionCandidate>();
+
+        foreach (var entry in _entriesByNormalizedInputName.Values)
+        {
+            foreach (var startIndex in FindWholeTermStartIndexes(normalizedProductName, entry.NormalizedInputName))
+            {
+                candidates.Add(new ManufacturerNameRecognitionCandidate(
+                    entry.ManufacturerId,
+                    entry.ManufacturerName,
+                    productName.Substring(startIndex, entry.NormalizedInputName.Length),
+                    entry.NormalizedInputName,
+                    GetConfidence(entry.Source),
+                    entry.Source,
+                    entry.ManufacturerAliasId,
+                    startIndex,
+                    entry.NormalizedInputName.Length));
+            }
+        }
+
+        var orderedCandidates = candidates
+            .OrderByDescending(candidate => GetSourcePrecedence(candidate.Source))
+            .ThenByDescending(candidate => candidate.Length)
+            .ThenBy(candidate => candidate.StartIndex)
+            .ThenBy(candidate => candidate.ManufacturerName, StringComparer.Ordinal)
+            .ThenBy(candidate => candidate.NormalizedValue, StringComparer.Ordinal)
+            .ToList()
+            .AsReadOnly();
+
+        if (orderedCandidates.Count == 0)
+        {
+            return ManufacturerNameRecognitionResult.Unresolved(productName);
+        }
+
+        var distinctManufacturerCount = orderedCandidates
+            .Select(candidate => candidate.ManufacturerId)
+            .Distinct()
+            .Take(2)
+            .Count();
+
+        if (distinctManufacturerCount > 1)
+        {
+            return ManufacturerNameRecognitionResult.Conflict(productName, orderedCandidates);
+        }
+
+        return ManufacturerNameRecognitionResult.Resolved(
+            productName,
+            orderedCandidates[0],
+            orderedCandidates);
+    }
+
+    private static IEnumerable<int> FindWholeTermStartIndexes(string text, string term)
+    {
+        if (string.IsNullOrEmpty(term) || term.Length > text.Length)
+        {
+            yield break;
+        }
+
+        var searchStartIndex = 0;
+
+        while (searchStartIndex <= text.Length - term.Length)
+        {
+            var matchIndex = text.IndexOf(
+                term,
+                searchStartIndex,
+                StringComparison.Ordinal);
+
+            if (matchIndex < 0)
+            {
+                yield break;
+            }
+
+            if (HasWholeTokenBoundaries(text, matchIndex, term.Length))
+            {
+                yield return matchIndex;
+            }
+
+            searchStartIndex = matchIndex + 1;
+        }
+    }
+
+    private static bool HasWholeTokenBoundaries(string text, int startIndex, int length)
+    {
+        var hasStartBoundary =
+            startIndex == 0 ||
+            !IsTokenCharacter(text[startIndex - 1]);
+
+        var endIndex = startIndex + length;
+
+        var hasEndBoundary =
+            endIndex == text.Length ||
+            !IsTokenCharacter(text[endIndex]);
+
+        return hasStartBoundary && hasEndBoundary;
+    }
+
+    private static bool IsTokenCharacter(char character)
+    {
+        return char.IsLetterOrDigit(character);
+    }
+
+    private static string NormalizeTextPreservingLength(string value)
+    {
+        var normalizedCharacters = value.ToCharArray();
+
+        for (var index = 0; index < normalizedCharacters.Length; index++)
+        {
+            normalizedCharacters[index] = normalizedCharacters[index] switch
+            {
+                'ё' or 'Ё' => 'Е',
+                _ => char.ToUpperInvariant(normalizedCharacters[index])
+            };
+        }
+
+        return new string(normalizedCharacters);
+    }
+
+    private static decimal GetConfidence(ManufacturerResolutionSource source)
+    {
+        return source switch
+        {
+            ManufacturerResolutionSource.ExactName => ExactNameConfidence,
+            ManufacturerResolutionSource.ApprovedAlias => ApprovedAliasConfidence,
+            _ => throw new InvalidOperationException($"Unsupported manufacturer resolution source: {source}.")
+        };
+    }
+
+    private static int GetSourcePrecedence(ManufacturerResolutionSource source)
+    {
+        return source switch
+        {
+            ManufacturerResolutionSource.ExactName => 2,
+            ManufacturerResolutionSource.ApprovedAlias => 1,
+            _ => 0
+        };
     }
 }

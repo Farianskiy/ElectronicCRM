@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using ElectronicService.Core.Catalog.Recognition.Abstractions;
 using ElectronicService.Core.Catalog.Recognition.Models;
 using ElectronicService.Core.Catalog.Recognition.Normalization;
+using ElectronicService.Core.Catalog.ProductNames.Explanation;
 using ElectronicService.Domain.Catalog.Characteristics;
 using ElectronicService.Domain.Catalog.ImportBatches;
 using ElectronicService.Domain.Catalog.ProductTypes;
@@ -75,6 +76,9 @@ public sealed class CatalogImportRecognitionShadowService
             new List<CatalogImportRecognitionShadowSample>(
                 MaximumSamples);
 
+        var evidenceRows =
+            new List<CatalogImportProductNameEvidenceRow>();
+
         var conflictGroups =
             new Dictionary<
                 ConflictGroupKey,
@@ -117,6 +121,22 @@ public sealed class CatalogImportRecognitionShadowService
                 failedRowsCount++;
 
                 continue;
+            }
+
+            var rowEvidence = recognitionResult.Candidates
+                .Where(characteristic =>
+                    definitionsByCode.ContainsKey(
+                        CatalogRecognitionTextNormalizer.NormalizeCode(
+                            characteristic.CharacteristicCode)))
+                .Select(MapExplanationEvidence)
+                .ToArray();
+
+            if (rowEvidence.Length > 0)
+            {
+                evidenceRows.Add(
+                    new CatalogImportProductNameEvidenceRow(
+                        row.RowNumber,
+                        rowEvidence));
             }
 
             var recognizedByCode = recognitionResult
@@ -439,8 +459,25 @@ public sealed class CatalogImportRecognitionShadowService
                 item.AmbiguousCount),
             characteristicResults,
             conflictGroupResults,
-            samples);
+            samples,
+            evidenceRows);
     }
+
+    private static CatalogProductNameEvidenceSpan MapExplanationEvidence(
+        CatalogRecognizedCharacteristic characteristic)
+    {
+        return new CatalogProductNameEvidenceSpan(
+            CatalogProductNameEvidenceKind.Characteristic,
+            characteristic.CharacteristicCode,
+            characteristic.NormalizedValue,
+            characteristic.RawValue,
+            characteristic.Source.ToString(),
+            characteristic.Confidence,
+            characteristic.Priority,
+            characteristic.StartIndex,
+            characteristic.Length);
+    }
+
 
     private static void AddConflictGroup(
         Dictionary<ConflictGroupKey, MutableConflictGroup> conflictGroups,

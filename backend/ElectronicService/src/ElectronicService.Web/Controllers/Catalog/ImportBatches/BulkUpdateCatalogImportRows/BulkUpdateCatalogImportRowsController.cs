@@ -70,7 +70,10 @@ public sealed class BulkUpdateCatalogImportRowsController : ControllerBase
                     row.Data.ManufacturerId,
                     row.Data.Price,
                     row.Data.StockQuantity,
-                    row.Data.Characteristics);
+                    row.Data.Characteristics,
+                    row.Data.ProductTypeId,
+                    row.Data.ProductTypeResolutionSource,
+                    row.Data.ProductTypeResolutionConfidence);
 
                 var issues = row.Issues
                     .Select(issue =>

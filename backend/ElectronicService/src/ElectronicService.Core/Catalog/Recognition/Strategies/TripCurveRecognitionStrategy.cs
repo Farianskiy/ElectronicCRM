@@ -36,19 +36,21 @@ public sealed partial class TripCurveRecognitionStrategy : ICatalogCharacteristi
     }
 
     private CatalogRecognizedCharacteristic CreateCandidate(
-        Match match,
-        string groupName,
-        decimal confidence,
-        string recognizerKey)
+    Match match,
+    string groupName,
+    decimal confidence,
+    string recognizerKey)
     {
+        var valueGroup = match.Groups[groupName];
+
         return new CatalogRecognizedCharacteristic(
             CharacteristicCode,
-            match.Value.Trim(),
-            CatalogRecognitionTextNormalizer.NormalizeCurve(match.Groups[groupName].Value),
+            valueGroup.Value,
+            CatalogRecognitionTextNormalizer.NormalizeCurve(valueGroup.Value),
             confidence,
             CatalogRecognitionSource.Rule,
-            match.Index,
-            match.Length,
+            valueGroup.Index,
+            valueGroup.Length,
             Priority,
             recognizerKey);
     }

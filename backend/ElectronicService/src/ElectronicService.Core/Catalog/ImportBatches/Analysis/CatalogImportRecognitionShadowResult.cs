@@ -24,7 +24,8 @@ public sealed record CatalogImportRecognitionShadowResult(
     int AmbiguousCount,
     IReadOnlyCollection<CatalogImportRecognitionShadowCharacteristicStatistics> Characteristics,
     IReadOnlyCollection<CatalogImportRecognitionShadowConflictGroup> ConflictGroups,
-    IReadOnlyCollection<CatalogImportRecognitionShadowSample> Samples);
+    IReadOnlyCollection<CatalogImportRecognitionShadowSample> Samples,
+    IReadOnlyCollection<CatalogImportProductNameEvidenceRow> EvidenceRows);
 
 public sealed record CatalogImportRecognitionShadowCharacteristicStatistics(
     string CharacteristicCode,

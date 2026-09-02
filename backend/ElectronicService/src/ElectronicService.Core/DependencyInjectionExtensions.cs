@@ -38,6 +38,7 @@ using ElectronicService.Core.Catalog.Manufacturers.CreateApprovedAlias;
 using ElectronicService.Core.Catalog.Manufacturers.CreateFromUnresolvedPhrase;
 using ElectronicService.Core.Catalog.Manufacturers.Management;
 using ElectronicService.Core.Catalog.Manufacturers.MarkPhraseAsNoise;
+using ElectronicService.Core.Catalog.Manufacturers.PreviewRecognition;
 using ElectronicService.Core.Catalog.Metadata.GetManufacturers;
 using ElectronicService.Core.Catalog.Metadata.GetProductTypeCharacteristics;
 using ElectronicService.Core.Catalog.Metadata.GetProductTypes;
@@ -62,6 +63,8 @@ using ElectronicService.Core.Catalog.ProductTypes.GetAvailableCharacteristicDefi
 using ElectronicService.Core.Catalog.ProductTypes.GetCharacteristicSchema;
 using ElectronicService.Core.Catalog.ProductTypes.RemoveCharacteristic;
 using ElectronicService.Core.Catalog.ProductTypes.SetCharacteristicRequired;
+using ElectronicService.Core.Catalog.ProductTypes.Suggestions;
+using ElectronicService.Core.Catalog.ProductNames.Explanation;
 using ElectronicService.Core.Catalog.Recognition;
 using ElectronicService.Core.Catalog.Recognition.Abstractions;
 using ElectronicService.Core.Catalog.Recognition.Management;
@@ -80,6 +83,8 @@ using ElectronicService.Core.Users.MakeUserTechnical;
 using Microsoft.Extensions.DependencyInjection;
 using ElectronicService.Core.Catalog.Recognition.Learning;
 using ElectronicService.Core.Catalog.Recognition.Datasets;
+using ElectronicService.Core.Catalog.ImportBatches.GetRowProblemCodes;
+using ElectronicService.Core.Catalog.ImportBatches.GetManufacturerGroups;
 
 namespace ElectronicService.Core;
 
@@ -116,6 +121,11 @@ public static class DependencyInjectionExtensions
         services.AddScoped<ICatalogCharacteristicRecognitionStrategy, IpRatingRecognitionStrategy>();
         services.AddScoped<ICatalogCharacteristicRecognitionStrategy, BooleanAliasRecognitionStrategy>();
         services.AddScoped<ICatalogProductNameRecognitionService, CatalogProductNameRecognitionService>();
+        services.AddSingleton<ICatalogProductNameEvidenceCoverageService, CatalogProductNameEvidenceCoverageService>();
+        services.AddScoped<ICatalogImportProductNameExplanationService, CatalogImportProductNameExplanationService>();
+        services.AddScoped<ICatalogImportManufacturerRecognitionShadowService, CatalogImportManufacturerRecognitionShadowService>();
+        services.AddScoped<ICatalogImportProductTypeAssignmentService, CatalogImportProductTypeAssignmentService>();
+        services.AddScoped<ICatalogImportProductTypeSuggestionShadowService, CatalogImportProductTypeSuggestionShadowService>();
         services.AddScoped<ICatalogImportRecognitionShadowService, CatalogImportRecognitionShadowService>();
         services.AddScoped<ICatalogImportRecognitionEnrichmentService, CatalogImportRecognitionEnrichmentService>();
         services.AddScoped<ICatalogImportRecognitionFeedbackCollector, CatalogImportRecognitionFeedbackCollector>();
@@ -154,6 +164,9 @@ public static class DependencyInjectionExtensions
         services.AddScoped<AnalyzeCatalogImportBatchCommandHandler>();
         services.AddScoped<GetCatalogImportBatchQueryHandler>();
         services.AddScoped<GetCatalogImportRowsQueryHandler>();
+        services.AddScoped<GetCatalogImportRowProblemCodesQueryHandler>();
+        services.AddScoped<GetCatalogImportManufacturerGroupsQueryHandler>();
+        services.AddScoped<ElectronicService.Core.Catalog.ImportBatches.GetRowExplanations.GetCatalogImportRowExplanationsQueryHandler>();
         services.AddScoped<ICatalogImportRowValidator, CatalogImportRowValidator>();
         services.AddScoped<UpdateCatalogImportRowCommandHandler>();
         services.AddScoped<SubmitCatalogImportBatchCommandHandler>();
@@ -181,6 +194,9 @@ public static class DependencyInjectionExtensions
         services.AddScoped<CreateApprovedManufacturerAliasCommandHandler>();
         services.AddScoped<CreateManufacturerFromUnresolvedPhraseCommandHandler>();
         services.AddScoped<MarkManufacturerPhraseAsNoiseCommandHandler>();
+        services.AddScoped<PreviewManufacturerNameRecognitionQueryHandler>();
+        services.AddScoped<ICatalogProductTypeSuggestionService, CatalogProductTypeSuggestionService>();
+        services.AddScoped<PreviewCatalogProductTypeSuggestionQueryHandler>();
 
 
         return services;

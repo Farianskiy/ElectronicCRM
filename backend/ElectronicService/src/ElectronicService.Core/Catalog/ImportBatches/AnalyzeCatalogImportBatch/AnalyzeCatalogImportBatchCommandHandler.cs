@@ -21,8 +21,12 @@ public sealed class AnalyzeCatalogImportBatchCommandHandler
     private readonly ICatalogProductMetadataRepository _metadataRepository;
 
     private readonly ICatalogImportWorkbookAnalyzer _workbookAnalyzer;
+    private readonly ICatalogImportProductTypeAssignmentService _productTypeAssignmentService;
 
+    private readonly ICatalogImportManufacturerRecognitionShadowService _manufacturerRecognitionShadowService;
+    private readonly ICatalogImportProductTypeSuggestionShadowService _productTypeSuggestionShadowService;
     private readonly ICatalogImportRecognitionShadowService _recognitionShadowService;
+    private readonly ICatalogImportProductNameExplanationService _productNameExplanationService;
     private readonly ICatalogImportRecognitionEnrichmentService _recognitionEnrichmentService;
     private readonly ICatalogImportRecognitionFeedbackCollector _recognitionFeedbackCollector;
     private readonly IManufacturerResolver _manufacturerResolver;
@@ -32,7 +36,11 @@ public sealed class AnalyzeCatalogImportBatchCommandHandler
         IUserRepository userRepository,
         ICatalogProductMetadataRepository metadataRepository,
         ICatalogImportWorkbookAnalyzer workbookAnalyzer,
+        ICatalogImportProductTypeAssignmentService productTypeAssignmentService,
+        ICatalogImportManufacturerRecognitionShadowService manufacturerRecognitionShadowService,
+        ICatalogImportProductTypeSuggestionShadowService productTypeSuggestionShadowService,
         ICatalogImportRecognitionShadowService recognitionShadowService,
+        ICatalogImportProductNameExplanationService productNameExplanationService,
         ICatalogImportRecognitionEnrichmentService recognitionEnrichmentService,
         ICatalogImportRecognitionFeedbackCollector recognitionFeedbackCollector,
         IManufacturerResolver manufacturerResolver)
@@ -41,7 +49,11 @@ public sealed class AnalyzeCatalogImportBatchCommandHandler
         ArgumentNullException.ThrowIfNull(userRepository);
         ArgumentNullException.ThrowIfNull(metadataRepository);
         ArgumentNullException.ThrowIfNull(workbookAnalyzer);
+        ArgumentNullException.ThrowIfNull(productTypeAssignmentService);
+        ArgumentNullException.ThrowIfNull(manufacturerRecognitionShadowService);
+        ArgumentNullException.ThrowIfNull(productTypeSuggestionShadowService);
         ArgumentNullException.ThrowIfNull(recognitionShadowService);
+        ArgumentNullException.ThrowIfNull(productNameExplanationService);
         ArgumentNullException.ThrowIfNull(recognitionEnrichmentService);
         ArgumentNullException.ThrowIfNull(recognitionFeedbackCollector);
         ArgumentNullException.ThrowIfNull(manufacturerResolver);
@@ -50,7 +62,11 @@ public sealed class AnalyzeCatalogImportBatchCommandHandler
         _userRepository = userRepository;
         _metadataRepository = metadataRepository;
         _workbookAnalyzer = workbookAnalyzer;
+        _productTypeAssignmentService = productTypeAssignmentService;
+        _manufacturerRecognitionShadowService = manufacturerRecognitionShadowService;
+        _productTypeSuggestionShadowService = productTypeSuggestionShadowService;
         _recognitionShadowService = recognitionShadowService;
+        _productNameExplanationService = productNameExplanationService;
         _recognitionEnrichmentService = recognitionEnrichmentService;
         _recognitionFeedbackCollector = recognitionFeedbackCollector;
         _manufacturerResolver = manufacturerResolver;
@@ -265,6 +281,38 @@ public sealed class AnalyzeCatalogImportBatchCommandHandler
 
         var analysis = analysisResult.Value;
 
+        var productTypeAssignmentResult =
+            await _productTypeAssignmentService
+                .AssignAsync(
+                    analysis,
+                    productType,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+        if (productTypeAssignmentResult.IsFailure)
+        {
+            return Result.Failure<
+                AnalyzeCatalogImportBatchResult,
+                DomainError>(
+                    productTypeAssignmentResult.Error);
+        }
+
+        analysis = productTypeAssignmentResult.Value;
+
+        var manufacturerRecognitionShadow =
+                    _manufacturerRecognitionShadowService.Analyze(
+                analysis,
+                manufacturerResolutionIndex,
+                cancellationToken);
+
+        var productTypeSuggestionShadow =
+            await _productTypeSuggestionShadowService
+                .AnalyzeAsync(
+                    analysis,
+                    productType,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
         CatalogImportRecognitionShadowResult? recognitionShadow = null;
         var recognitionEnrichment = CatalogImportRecognitionEnrichmentSummary.Empty;
         var effectiveAnalysis = analysis;
@@ -296,6 +344,14 @@ public sealed class AnalyzeCatalogImportBatchCommandHandler
             effectiveAnalysis = enrichmentResult.Value.Analysis;
             recognitionEnrichment = enrichmentResult.Value.Summary;
         }
+
+        var productNameExplanation =
+            _productNameExplanationService.Analyze(
+                analysis,
+                manufacturerRecognitionShadow,
+                productTypeSuggestionShadow,
+                recognitionShadow,
+                cancellationToken);
 
         var registerResult = batch.RegisterAnalysisResult(
                 effectiveAnalysis.Rows.Count,
@@ -343,7 +399,10 @@ public sealed class AnalyzeCatalogImportBatchCommandHandler
                 effectiveAnalysis.ValidRowsCount,
                 effectiveAnalysis.ErrorRowsCount,
                 effectiveAnalysis.ManufacturerResolutionSummary,
+                manufacturerRecognitionShadow,
+                productTypeSuggestionShadow,
                 recognitionShadow,
+                productNameExplanation,
                 recognitionEnrichment));
     }
 }

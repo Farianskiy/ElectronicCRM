@@ -61,14 +61,11 @@ public sealed class CatalogImportWorkbookAnalyzer
         ["СЕРИЯ"] = "СЕРИЯ ТОВАРА"
     };
 
-    private static readonly
-        CatalogImportColumnTargetKind[]
-        RequiredStandardTargets =
-        [
-            CatalogImportColumnTargetKind.Name,
-            CatalogImportColumnTargetKind.Article,
-            CatalogImportColumnTargetKind.Manufacturer
-        ];
+    private static readonly CatalogImportColumnTargetKind[] RequiredStandardTargets =
+    [
+        CatalogImportColumnTargetKind.Name,
+        CatalogImportColumnTargetKind.Article
+    ];
 
     public Result<CatalogImportWorkbookAnalysis, DomainError> Analyze(
         Guid batchId,
@@ -913,39 +910,27 @@ public sealed class CatalogImportWorkbookAnalyzer
     }
 
     private static bool IsMappingRequired(
-    IReadOnlyCollection<ColumnCandidate>
-        candidates,
-    ProductType? productType)
+        IReadOnlyCollection<ColumnCandidate> candidates,
+        ProductType? productType)
     {
         /*
-         * Без выбранного типа товара невозможно
-         * определить обязательные характеристики.
-         */
-        if (productType is null)
-        {
-            return true;
-        }
-
-        /*
-         * Хотя бы одна неизвестная или
-         * неподтверждённая колонка требует
-         * ручного сопоставления.
+         * Неизвестную или неподтверждённую колонку
+         * пользователь должен сопоставить вручную.
          */
         if (candidates.Any(candidate =>
                 candidate.TargetKind
-                    == CatalogImportColumnTargetKind
-                        .Unmapped
+                    == CatalogImportColumnTargetKind.Unmapped
                 || !candidate.IsConfirmed))
         {
             return true;
         }
 
         /*
-         * Проверяем обязательные стандартные поля:
+         * Для запуска анализа достаточно
+         * наименования и артикула.
          *
-         * Name
-         * Article
-         * Manufacturer
+         * Производитель и тип товара могут быть
+         * определены из наименования строки.
          */
         if (RequiredStandardTargets.Any(
                 requiredTarget =>
@@ -958,9 +943,18 @@ public sealed class CatalogImportWorkbookAnalyzer
         }
 
         /*
-         * Проверяем наличие подтверждённой
-         * Excel-колонки для каждой обязательной
-         * характеристики выбранного типа товара.
+         * Если общий тип пакета не выбран,
+         * проверку его Excel-характеристик
+         * выполнять нельзя и не требуется.
+         */
+        if (productType is null)
+        {
+            return false;
+        }
+
+        /*
+         * Старый сценарий с явно выбранным
+         * единым типом пока сохраняем.
          */
         return productType.Characteristics
             .Where(characteristic =>
@@ -1156,6 +1150,60 @@ public sealed class CatalogImportWorkbookAnalyzer
             }
         }
 
+        /*
+ * Если отдельного столбца производителя нет,
+ * пробуем определить его непосредственно
+ * из наименования товара.
+ */
+        if (string.IsNullOrWhiteSpace(manufacturer)
+            && !string.IsNullOrWhiteSpace(name))
+        {
+            var nameRecognition =
+                manufacturerResolutionIndex
+                    .RecognizeInText(name);
+
+            if (nameRecognition.IsResolved)
+            {
+                var selectedCandidate =
+                    nameRecognition.SelectedCandidate
+                    ?? throw new InvalidOperationException(
+                        "Resolved manufacturer recognition does not contain a selected candidate.");
+
+                manufacturerId =
+                    selectedCandidate.ManufacturerId;
+
+                manufacturer =
+                    selectedCandidate.ManufacturerName;
+
+                manufacturerResolutionSource =
+                    selectedCandidate.Source.ToString();
+
+                manufacturerAliasId =
+                    selectedCandidate.ManufacturerAliasId;
+
+                warnings.Add(
+                    CreateIssue(
+                        "manufacturer.resolved_from_name",
+                        $"Производитель '{manufacturer}' определён из наименования товара.",
+                        "manufacturerId",
+                        FindColumnNumber(
+                            CatalogImportColumnTargetKind.Name,
+                            candidates)));
+            }
+            else if (nameRecognition.IsConflict
+                     && !mappingRequired)
+            {
+                issues.Add(
+                    CreateIssue(
+                        "manufacturer.name_conflict",
+                        "В наименовании найдены несколько производителей. Необходимо выбрать одного.",
+                        "manufacturerId",
+                        FindColumnNumber(
+                            CatalogImportColumnTargetKind.Name,
+                            candidates)));
+            }
+        }
+
         decimal? price = null;
         int? stockQuantity = null;
 
@@ -1297,12 +1345,31 @@ public sealed class CatalogImportWorkbookAnalyzer
                 candidates,
                 issues);
 
-            AddRequiredCharacteristicIssues(
-                productType!,
-                rawValues,
-                candidates,
-                definitionsById,
-                issues);
+            if (productType is null)
+            {
+                /*
+                 * Пока строковый ProductTypeId ещё
+                 * не сохраняется, строка не должна
+                 * случайно стать готовой к применению.
+                 */
+                issues.Add(
+                    CreateIssue(
+                        "product_type.required",
+                        "Тип товара для строки ещё не определён.",
+                        "productTypeId",
+                        FindColumnNumber(
+                            CatalogImportColumnTargetKind.Name,
+                            candidates)));
+            }
+            else
+            {
+                AddRequiredCharacteristicIssues(
+                    productType,
+                    rawValues,
+                    candidates,
+                    definitionsById,
+                    issues);
+            }
         }
 
         CatalogImportRowStatus status;

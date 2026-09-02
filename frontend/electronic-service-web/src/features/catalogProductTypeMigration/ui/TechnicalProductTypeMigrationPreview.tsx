@@ -12,6 +12,7 @@ import type {
   ProductTypeMigrationMissingRequiredCharacteristic,
 } from "../model/types";
 import { ApplyProductTypeMigrationForm } from "./ApplyProductTypeMigrationForm";
+import { AppButton } from "@/shared/ui/AppButton";
 
 interface TechnicalProductTypeMigrationPreviewProps {
   product: CatalogProductDetails;
@@ -112,35 +113,62 @@ export function TechnicalProductTypeMigrationPreview({
   const preview = previewMutation.data;
 
   return (
-    <section className="rounded-2xl border border-amber-500/25 bg-amber-500/[0.05] p-5">
-      <div>
-        <h3 className="font-semibold text-white">Смена типа товара</h3>
+    <section className="min-w-0 rounded-2xl border border-[var(--app-warning-border)] bg-[var(--app-warning-soft)] p-5">
+      <div className="flex min-w-0 items-start gap-3">
+        <svg
+          aria-hidden="true"
+          focusable="false"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="mt-0.5 h-5 w-5 shrink-0 text-[var(--app-warning)]"
+        >
+          <path d="M10.3 3.9 1.8 18.1a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
+          <path d="M12 9v4" />
+          <path d="M12 17h.01" />
+        </svg>
 
-        <p className="mt-2 text-sm text-slate-400">
-          Сначала будет построен план миграции. На этом шаге данные товара не
-          изменяются.
-        </p>
+        <div className="min-w-0">
+          <h3 className="font-semibold text-[var(--app-warning)]">
+            Смена типа товара
+          </h3>
+
+          <p className="mt-2 text-sm text-[var(--app-text)]">
+            Смена типа может удалить несовместимые характеристики. Сначала
+            проверьте последствия — предпросмотр не изменяет данные товара.
+          </p>
+        </div>
       </div>
 
-      <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
-        <p className="text-xs text-slate-500">Текущий тип</p>
+      <div className="mt-5 min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-panel)] p-4">
+        <p className="text-xs text-[var(--app-muted)]">Текущий тип</p>
 
-        <p className="mt-2 font-medium text-white">{product.productTypeName}</p>
+        <p className="mt-2 font-medium text-[var(--app-text)] [overflow-wrap:anywhere]">
+          {product.productTypeName}
+        </p>
 
-        <p className="mt-1 font-mono text-xs text-slate-500">
+        <p className="mt-1 font-mono text-xs text-[var(--app-muted)] [overflow-wrap:anywhere]">
           {product.productTypeCode}
         </p>
       </div>
 
       {productTypesQuery.isError && (
-        <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+        <div
+          role="alert"
+          className="mt-4 whitespace-pre-wrap rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-4 text-sm text-[var(--app-danger)] [overflow-wrap:anywhere]"
+        >
           {getErrorMessage(productTypesQuery.error)}
         </div>
       )}
 
-      <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
-        <div className="grid gap-2">
-          <span className="text-sm text-slate-300">Новый тип товара</span>
+      <div className="mt-5 grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+        <div className="grid min-w-0 gap-2">
+          <span className="text-sm font-medium text-[var(--app-text)]">
+            Новый тип товара
+          </span>
 
           <AppSelect
             ariaLabel="Новый тип товара"
@@ -164,43 +192,50 @@ export function TechnicalProductTypeMigrationPreview({
           />
         </div>
 
-        <button
+        <AppButton
           type="button"
+          variant="warning"
           disabled={!selectedTargetType || previewMutation.isPending}
+          loading={previewMutation.isPending}
           onClick={handlePreview}
-          className="rounded-2xl bg-amber-500 px-5 py-3 text-sm font-medium text-slate-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
+          className="w-full lg:w-auto"
         >
           {previewMutation.isPending
             ? "Анализируем..."
             : "Показать последствия"}
-        </button>
+        </AppButton>
       </div>
 
       {previewMutation.isError && (
-        <div className="mt-5 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+        <div
+          role="alert"
+          className="mt-5 whitespace-pre-wrap rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-4 text-sm text-[var(--app-danger)] [overflow-wrap:anywhere]"
+        >
           {getErrorMessage(previewMutation.error)}
         </div>
       )}
 
       {preview && (
-        <div className="mt-6 grid gap-5">
-          <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
-            <p className="text-sm text-slate-400">Планируемое изменение</p>
+        <div className="mt-6 grid min-w-0 gap-5">
+          <div className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-panel)] p-5">
+            <p className="text-sm text-[var(--app-muted)]">
+              Планируемое изменение
+            </p>
 
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <span className="font-medium text-white">
+            <div className="mt-3 flex min-w-0 flex-wrap items-center gap-3">
+              <span className="min-w-0 font-medium text-[var(--app-text)] [overflow-wrap:anywhere]">
                 {preview.currentProductTypeName}
               </span>
 
-              <span className="text-slate-500">→</span>
+              <span className="shrink-0 text-[var(--app-muted)]">→</span>
 
-              <span className="font-medium text-amber-200">
+              <span className="min-w-0 font-medium text-[var(--app-accent)] [overflow-wrap:anywhere]">
                 {preview.targetProductTypeName}
               </span>
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid min-w-0 gap-3 sm:grid-cols-3">
             <SummaryCard
               label="Сохранятся"
               value={preview.preservedCharacteristics.length}
@@ -218,11 +253,13 @@ export function TechnicalProductTypeMigrationPreview({
           </div>
 
           <div
-            className={
+            role="status"
+            className={[
+              "rounded-2xl border p-4 text-sm",
               preview.canApplyWithoutAdditionalValues
-                ? "rounded-2xl border border-green-500/30 bg-green-500/10 p-4 text-sm text-green-200"
-                : "rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200"
-            }
+                ? "border-[var(--app-success-border)] bg-[var(--app-success-soft)] text-[var(--app-success)]"
+                : "border-[var(--app-accent-border)] bg-[var(--app-accent-soft)] text-[var(--app-accent)]",
+            ].join(" ")}
           >
             {preview.canApplyWithoutAdditionalValues
               ? "Все обязательные характеристики нового типа уже заполнены."
@@ -274,10 +311,12 @@ export function TechnicalProductTypeMigrationPreview({
 
 function SummaryCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-      <p className="text-xs text-slate-500">{label}</p>
+    <div className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-panel)] p-4">
+      <p className="text-xs text-[var(--app-muted)]">{label}</p>
 
-      <p className="mt-2 text-2xl font-semibold text-white">{value}</p>
+      <p className="mt-2 text-2xl font-semibold text-[var(--app-text)]">
+        {value}
+      </p>
     </div>
   );
 }
@@ -291,43 +330,50 @@ function MigrationValueGroup({
 }: {
   title: string;
   description: string;
-
   items: ProductTypeMigrationCharacteristicValue[];
-
   emptyText: string;
   variant: "preserved" | "removed";
 }) {
   const borderClass =
-    variant === "preserved" ? "border-green-500/20" : "border-red-500/20";
+    variant === "preserved"
+      ? "border-[var(--app-success-border)]"
+      : "border-[var(--app-danger-border)]";
+
+  const titleClass =
+    variant === "preserved"
+      ? "text-[var(--app-success)]"
+      : "text-[var(--app-danger)]";
 
   return (
-    <section className={`rounded-2xl border ${borderClass} bg-black/20 p-5`}>
-      <h4 className="font-semibold text-white">{title}</h4>
+    <section
+      className={`min-w-0 rounded-2xl border ${borderClass} bg-[var(--app-panel)] p-5`}
+    >
+      <h4 className={`font-semibold ${titleClass}`}>{title}</h4>
 
-      <p className="mt-2 text-sm text-slate-400">{description}</p>
+      <p className="mt-2 text-sm text-[var(--app-muted)]">{description}</p>
 
       {items.length === 0 ? (
-        <p className="mt-4 text-sm text-slate-500">{emptyText}</p>
+        <p className="mt-4 text-sm text-[var(--app-muted)]">{emptyText}</p>
       ) : (
-        <div className="mt-4 grid gap-3">
+        <div className="mt-4 grid min-w-0 gap-3">
           {items.map((item) => (
             <div
               key={item.definitionId}
-              className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"
+              className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4"
             >
-              <div className="flex flex-wrap justify-between gap-3">
-                <div>
-                  <p className="font-medium text-slate-100">
+              <div className="grid min-w-0 gap-3 sm:grid-cols-2 sm:items-start">
+                <div className="min-w-0">
+                  <p className="font-medium text-[var(--app-text)] [overflow-wrap:anywhere]">
                     {item.name}
                     {item.unit ? `, ${item.unit}` : ""}
                   </p>
 
-                  <p className="mt-1 font-mono text-xs text-slate-500">
+                  <p className="mt-1 font-mono text-xs text-[var(--app-muted)] [overflow-wrap:anywhere]">
                     {item.code} · {formatDataType(item.dataType)}
                   </p>
                 </div>
 
-                <p className="text-sm font-medium text-slate-200">
+                <p className="min-w-0 whitespace-pre-wrap text-sm font-medium text-[var(--app-text)] [overflow-wrap:anywhere] sm:text-right">
                   {formatValue(item.dataType, item.value)}
                 </p>
               </div>
@@ -345,32 +391,32 @@ function MissingRequiredGroup({
   items: ProductTypeMigrationMissingRequiredCharacteristic[];
 }) {
   return (
-    <section className="rounded-2xl border border-amber-500/20 bg-black/20 p-5">
-      <h4 className="font-semibold text-white">
+    <section className="min-w-0 rounded-2xl border border-[var(--app-accent-border)] bg-[var(--app-panel)] p-5">
+      <h4 className="font-semibold text-[var(--app-text)]">
         Недостающие обязательные характеристики
       </h4>
 
-      <p className="mt-2 text-sm text-slate-400">
+      <p className="mt-2 text-sm text-[var(--app-muted)]">
         Эти значения потребуются перед применением нового типа.
       </p>
 
       {items.length === 0 ? (
-        <p className="mt-4 text-sm text-green-300">
+        <p className="mt-4 text-sm text-[var(--app-success)]">
           Недостающих обязательных значений нет.
         </p>
       ) : (
-        <div className="mt-4 grid gap-3">
+        <div className="mt-4 grid min-w-0 gap-3">
           {items.map((item) => (
             <div
               key={item.definitionId}
-              className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.05] p-4"
+              className="min-w-0 rounded-2xl border border-[var(--app-accent-border)] bg-[var(--app-accent-soft)] p-4"
             >
-              <p className="font-medium text-amber-100">
+              <p className="font-medium text-[var(--app-text)] [overflow-wrap:anywhere]">
                 {item.name}
                 {item.unit ? `, ${item.unit}` : ""}
               </p>
 
-              <p className="mt-1 font-mono text-xs text-slate-500">
+              <p className="mt-1 font-mono text-xs text-[var(--app-muted)] [overflow-wrap:anywhere]">
                 {item.code} · {formatDataType(item.dataType)}
               </p>
             </div>

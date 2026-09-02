@@ -16,7 +16,6 @@ const standardTargetKinds: readonly CatalogImportColumnTargetKind[] = [
 const requiredStandardTargetKinds: readonly CatalogImportColumnTargetKind[] = [
   "Name",
   "Article",
-  "Manufacturer",
 ];
 
 export interface CatalogImportMappingMetrics {
@@ -40,7 +39,6 @@ export interface CatalogImportMappingValidationResult {
 }
 
 export function validateCatalogImportMapping(
-  productTypeId: string,
   columns: CatalogImportMappingColumn[],
   characteristics: CatalogProductTypeCharacteristicMetadata[],
 ): CatalogImportMappingValidationResult {
@@ -55,10 +53,6 @@ export function validateCatalogImportMapping(
       ...(columnErrors[columnId] ?? []),
       message,
     ];
-  }
-
-  if (!productTypeId) {
-    errors.push("Выберите тип товара.");
   }
 
   const unmappedColumns = columns.filter(
@@ -241,9 +235,7 @@ export function validateCatalogImportMapping(
     }
   }
 
-  const isComplete =
-    errors.length === 0 &&
-    productTypeId.length > 0;
+  const isComplete = errors.length === 0;
 
   return {
     errors,

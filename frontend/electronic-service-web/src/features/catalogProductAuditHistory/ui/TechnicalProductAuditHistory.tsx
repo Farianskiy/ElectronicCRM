@@ -5,6 +5,7 @@ import axios from "axios";
 import { useState } from "react";
 import { getCatalogProductAuditHistory } from "../api/getCatalogProductAuditHistory";
 import { catalogProductAuditHistoryQueryKey } from "../model/queryKeys";
+import { AppButton } from "@/shared/ui/AppButton";
 import type {
   ProductAuditHistoryChange,
   ProductAuditHistoryItem,
@@ -131,29 +132,34 @@ function formatDiffValue(value?: string | null): string {
 
 function AuditChangeRow({ change }: { change: ProductAuditHistoryChange }) {
   return (
-    <div className="grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 lg:grid-cols-[minmax(180px,0.8fr)_1fr_40px_1fr] lg:items-center">
-      <div>
-        <p className="text-xs text-slate-500">Поле</p>
+    <div className="grid min-w-0 gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1fr)_24px_minmax(0,1fr)] lg:items-center">
+      <div className="min-w-0">
+        <p className="text-xs text-[var(--app-muted)]">Поле</p>
 
-        <p className="mt-1 break-words text-sm font-medium text-slate-200">
+        <p className="mt-1 text-sm font-medium text-[var(--app-text)] [overflow-wrap:anywhere]">
           {change.label}
         </p>
       </div>
 
-      <div className="min-w-0 rounded-xl border border-red-500/20 bg-red-500/[0.05] p-3">
-        <p className="text-xs text-red-300/70">Было</p>
+      <div className="min-w-0 rounded-xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-3">
+        <p className="text-xs font-medium text-[var(--app-danger)]">Было</p>
 
-        <p className="mt-1 break-words text-sm text-red-100">
+        <p className="mt-1 whitespace-pre-wrap text-sm text-[var(--app-text)] [overflow-wrap:anywhere]">
           {formatDiffValue(change.before)}
         </p>
       </div>
 
-      <div className="hidden text-center text-slate-500 lg:block">→</div>
+      <div
+        aria-hidden="true"
+        className="hidden text-center text-[var(--app-muted)] lg:block"
+      >
+        →
+      </div>
 
-      <div className="min-w-0 rounded-xl border border-green-500/20 bg-green-500/[0.05] p-3">
-        <p className="text-xs text-green-300/70">Стало</p>
+      <div className="min-w-0 rounded-xl border border-[var(--app-success-border)] bg-[var(--app-success-soft)] p-3">
+        <p className="text-xs font-medium text-[var(--app-success)]">Стало</p>
 
-        <p className="mt-1 break-words text-sm text-green-100">
+        <p className="mt-1 whitespace-pre-wrap text-sm text-[var(--app-text)] [overflow-wrap:anywhere]">
           {formatDiffValue(change.after)}
         </p>
       </div>
@@ -163,38 +169,57 @@ function AuditChangeRow({ change }: { change: ProductAuditHistoryChange }) {
 
 function AuditHistoryItem({ item }: { item: ProductAuditHistoryItem }) {
   return (
-    <details className="group rounded-2xl border border-white/10 bg-black/20">
-      <summary className="cursor-pointer px-5 py-4 marker:text-slate-500">
-        <div className="ml-2 inline-flex max-w-[calc(100%-24px)] flex-col gap-3 align-middle sm:w-[calc(100%-24px)] sm:flex-row sm:items-center sm:justify-between">
+    <details className="group min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-panel)]">
+      <summary className="flex cursor-pointer list-none items-start gap-3 rounded-2xl px-4 py-4 transition-colors hover:bg-[var(--app-panel-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] motion-reduce:transition-none sm:px-5 [&::-webkit-details-marker]:hidden">
+        <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
-            <p className="font-medium text-white">
+            <p className="font-medium text-[var(--app-text)] [overflow-wrap:anywhere]">
               {formatOperation(item.operation)}
             </p>
 
-            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--app-muted)]">
               <span>{formatDate(item.changedAtUtc)}</span>
 
-              <span>{formatSource(item.source)}</span>
+              <span className="[overflow-wrap:anywhere]">
+                {formatSource(item.source)}
+              </span>
 
-              <span title={item.changedByUserId ?? "Системная операция"}>
+              <span
+                title={item.changedByUserId ?? "Системная операция"}
+                className="[overflow-wrap:anywhere]"
+              >
                 Пользователь: {formatUserId(item.changedByUserId)}
               </span>
             </div>
           </div>
 
-          <span className="shrink-0 rounded-full border border-teal-500/20 bg-teal-500/10 px-3 py-1 text-xs text-teal-200">
+          <span className="w-fit shrink-0 rounded-full border border-[var(--app-accent-border)] bg-[var(--app-accent-soft)] px-3 py-1 text-xs text-[var(--app-accent)]">
             {formatChangesCount(item.changes.length)}
           </span>
         </div>
+
+        <svg
+          aria-hidden="true"
+          focusable="false"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="mt-0.5 h-5 w-5 shrink-0 text-[var(--app-muted)] transition-transform group-open:rotate-180 motion-reduce:transition-none"
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
       </summary>
 
-      <div className="border-t border-white/10 p-5">
+      <div className="min-w-0 border-t border-[var(--app-border)] p-4 sm:p-5">
         {item.changes.length === 0 ? (
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-[var(--app-muted)]">
             Значимые различия между снимками не обнаружены.
           </p>
         ) : (
-          <div className="grid gap-3">
+          <div className="grid min-w-0 gap-3">
             {item.changes.map((change) => (
               <AuditChangeRow key={change.field} change={change} />
             ))}
@@ -202,10 +227,12 @@ function AuditHistoryItem({ item }: { item: ProductAuditHistoryItem }) {
         )}
 
         {item.sourceId && (
-          <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.02] px-4 py-3">
-            <p className="text-xs text-slate-500">Идентификатор источника</p>
+          <div className="mt-4 min-w-0 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-3">
+            <p className="text-xs text-[var(--app-muted)]">
+              Идентификатор источника
+            </p>
 
-            <p className="mt-1 break-all font-mono text-xs text-slate-300">
+            <p className="mt-1 break-all font-mono text-xs text-[var(--app-text)]">
               {item.sourceId}
             </p>
           </div>
@@ -242,47 +269,54 @@ export function TechnicalProductAuditHistory({
   const hasNextPage = page !== undefined && pageNumber < page.totalPages;
 
   return (
-    <section className="rounded-2xl border border-violet-500/20 bg-violet-500/[0.04] p-5">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h3 className="font-semibold text-white">История изменений</h3>
+    <section className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-panel-strong)] p-5">
+      <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h3 className="font-semibold text-[var(--app-text)]">
+            История изменений
+          </h3>
 
-          <p className="mt-2 text-sm text-slate-400">
-            Журнал ручных изменений товара. Нажмите на событие, чтобы увидеть
-            значения до и после операции.
+          <p className="mt-2 text-sm text-[var(--app-muted)]">
+            Журнал изменений товара. Нажмите на событие, чтобы увидеть значения
+            до и после операции.
           </p>
         </div>
 
-        <button
+        <AppButton
           type="button"
+          variant="secondary"
           disabled={historyQuery.isFetching}
+          loading={historyQuery.isFetching}
           onClick={() => {
             void historyQuery.refetch();
           }}
-          className="shrink-0 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-50"
+          className="w-full sm:w-auto"
         >
           {historyQuery.isFetching ? "Обновляем..." : "Обновить"}
-        </button>
+        </AppButton>
       </div>
 
       {historyQuery.isLoading && (
-        <p className="mt-5 text-sm text-slate-400">
+        <p role="status" className="mt-5 text-sm text-[var(--app-muted)]">
           Загружаем историю товара...
         </p>
       )}
 
       {historyQuery.isError && (
-        <div className="mt-5 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+        <div
+          role="alert"
+          className="mt-5 whitespace-pre-wrap rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-4 text-sm text-[var(--app-danger)] [overflow-wrap:anywhere]"
+        >
           {getErrorMessage(historyQuery.error)}
         </div>
       )}
 
       {page && (
         <>
-          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-400">
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 text-sm text-[var(--app-muted)]">
             <span>
               Всего событий:{" "}
-              <strong className="font-medium text-slate-200">
+              <strong className="font-medium text-[var(--app-text)]">
                 {page.totalCount}
               </strong>
             </span>
@@ -295,11 +329,11 @@ export function TechnicalProductAuditHistory({
           </div>
 
           {page.items.length === 0 ? (
-            <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-5 text-sm text-slate-500">
+            <div className="mt-5 rounded-2xl border border-dashed border-[var(--app-border-strong)] bg-[var(--app-surface)] p-5 text-sm text-[var(--app-muted)]">
               История изменений этого товара пока пуста.
             </div>
           ) : (
-            <div className="mt-5 grid gap-3">
+            <div className="mt-5 grid min-w-0 gap-3">
               {page.items.map((item) => (
                 <AuditHistoryItem key={item.id} item={item} />
               ))}
@@ -307,32 +341,34 @@ export function TechnicalProductAuditHistory({
           )}
 
           {page.totalPages > 1 && (
-            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <button
+            <div className="mt-5 flex flex-col gap-3 border-t border-[var(--app-border)] pt-5 sm:flex-row sm:items-center sm:justify-between">
+              <AppButton
                 type="button"
+                variant="secondary"
                 disabled={!hasPreviousPage || historyQuery.isFetching}
                 onClick={() =>
                   setPageNumber((currentPage) => Math.max(1, currentPage - 1))
                 }
-                className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-40"
+                className="w-full sm:w-auto"
               >
                 Назад
-              </button>
+              </AppButton>
 
-              <span className="text-center text-sm text-slate-400">
+              <span className="text-center text-sm text-[var(--app-muted)]">
                 {page.pageNumber}
                 {" / "}
                 {page.totalPages}
               </span>
 
-              <button
+              <AppButton
                 type="button"
+                variant="secondary"
                 disabled={!hasNextPage || historyQuery.isFetching}
                 onClick={() => setPageNumber((currentPage) => currentPage + 1)}
-                className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-40"
+                className="w-full sm:w-auto"
               >
                 Далее
-              </button>
+              </AppButton>
             </div>
           )}
         </>
