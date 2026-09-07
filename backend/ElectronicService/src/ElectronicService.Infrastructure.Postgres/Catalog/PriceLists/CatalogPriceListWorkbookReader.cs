@@ -540,10 +540,7 @@ public sealed class CatalogPriceListWorkbookReader
                         GetValue(
                             cellValues,
                             "J")),
-                    NormalizeOptionalValue(
-                        GetValue(
-                            cellValues,
-                            "C")),
+                    null,
                     NormalizeOptionalValue(
                         GetValue(
                             cellValues,
