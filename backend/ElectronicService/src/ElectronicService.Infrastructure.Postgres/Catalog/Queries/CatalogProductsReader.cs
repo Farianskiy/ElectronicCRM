@@ -4,6 +4,7 @@ using ElectronicService.Core.Catalog.Products.GetProductById;
 using ElectronicService.Core.Catalog.Products.GetProducts;
 using ElectronicService.Core.Catalog.Products.SearchProducts;
 using ElectronicService.Domain.Catalog.Characteristics;
+using ElectronicService.Domain.Catalog.PriceLists;
 using ElectronicService.Infrastructure.Postgres.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -35,6 +36,9 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
             ? DefaultPageSize
             : Math.Clamp(pageSize, 1, MaxPageSize);
 
+        var activePricesQuery =
+            CreateActivePricesQuery();
+
         var productsQuery =
             from product in _dbContext.Products.AsNoTracking()
             join productType in _dbContext.ProductTypes.AsNoTracking()
@@ -45,7 +49,22 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
             {
                 Product = product,
                 ProductType = productType,
-                Manufacturer = productManufacturer
+                Manufacturer = productManufacturer,
+                ActivePriceAmount =
+                    activePricesQuery
+                        .Where(price =>
+                            price.ProductId == product.Id)
+                        .OrderBy(price => price.RowNumber)
+                        .Select(price =>
+                            (decimal?)price.Amount)
+                        .FirstOrDefault(),
+                ActivePriceCurrency =
+                    activePricesQuery
+                        .Where(price =>
+                            price.ProductId == product.Id)
+                        .OrderBy(price => price.RowNumber)
+                        .Select(price => price.Currency)
+                        .FirstOrDefault()
             };
 
         if (!string.IsNullOrWhiteSpace(search))
@@ -95,8 +114,10 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
                 item.ProductType.Code,
                 item.ProductType.Name,
                 item.Manufacturer.Name,
-                item.Product.Price.Amount,
-                item.Product.Price.Currency,
+                item.ActivePriceAmount
+                    ?? item.Product.Price.Amount,
+                item.ActivePriceCurrency
+                    ?? item.Product.Price.Currency,
                 item.Product.StockQuantity.Value))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -112,6 +133,9 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
         Guid productId,
         CancellationToken cancellationToken = default)
     {
+        var activePricesQuery =
+            CreateActivePricesQuery();
+
         var product = await (
             from productEntity in _dbContext.Products.AsNoTracking()
             join productType in _dbContext.ProductTypes.AsNoTracking()
@@ -132,8 +156,27 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
                 ManufacturerId = manufacturer.Id,
                 ManufacturerName = manufacturer.Name,
 
-                PriceAmount = productEntity.Price.Amount,
-                PriceCurrency = productEntity.Price.Currency,
+                ActivePriceAmount =
+                    activePricesQuery
+                        .Where(price =>
+                            price.ProductId
+                            == productEntity.Id)
+                        .OrderBy(price => price.RowNumber)
+                        .Select(price =>
+                            (decimal?)price.Amount)
+                        .FirstOrDefault(),
+                ActivePriceCurrency =
+                    activePricesQuery
+                        .Where(price =>
+                            price.ProductId
+                            == productEntity.Id)
+                        .OrderBy(price => price.RowNumber)
+                        .Select(price => price.Currency)
+                        .FirstOrDefault(),
+                ProductPriceAmount =
+                    productEntity.Price.Amount,
+                ProductPriceCurrency =
+                    productEntity.Price.Currency,
                 StockQuantity = productEntity.StockQuantity.Value
             })
             .FirstOrDefaultAsync(cancellationToken)
@@ -198,8 +241,10 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
             product.ManufacturerId,
             product.ManufacturerName,
 
-            product.PriceAmount,
-            product.PriceCurrency,
+            product.ActivePriceAmount
+                ?? product.ProductPriceAmount,
+            product.ActivePriceCurrency
+                ?? product.ProductPriceCurrency,
             product.StockQuantity,
             characteristics,
             aliases);
@@ -217,6 +262,9 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
             ? DefaultPageSize
             : Math.Clamp(query.PageSize, 1, MaxPageSize);
 
+        var activePricesQuery =
+            CreateActivePricesQuery();
+
         var productsQuery =
             from product in _dbContext.Products.AsNoTracking()
             join productType in _dbContext.ProductTypes.AsNoTracking()
@@ -227,7 +275,22 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
             {
                 Product = product,
                 ProductType = productType,
-                Manufacturer = productManufacturer
+                Manufacturer = productManufacturer,
+                ActivePriceAmount =
+                    activePricesQuery
+                        .Where(price =>
+                            price.ProductId == product.Id)
+                        .OrderBy(price => price.RowNumber)
+                        .Select(price =>
+                            (decimal?)price.Amount)
+                        .FirstOrDefault(),
+                ActivePriceCurrency =
+                    activePricesQuery
+                        .Where(price =>
+                            price.ProductId == product.Id)
+                        .OrderBy(price => price.RowNumber)
+                        .Select(price => price.Currency)
+                        .FirstOrDefault()
             };
 
         if (!string.IsNullOrWhiteSpace(query.Search))
@@ -397,8 +460,10 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
                 item.ProductType.Code,
                 item.ProductType.Name,
                 item.Manufacturer.Name,
-                item.Product.Price.Amount,
-                item.Product.Price.Currency,
+                item.ActivePriceAmount
+                    ?? item.Product.Price.Amount,
+                item.ActivePriceCurrency
+                    ?? item.Product.Price.Currency,
                 item.Product.StockQuantity.Value))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -408,6 +473,30 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
             normalizedPage,
             normalizedPageSize,
             totalCount);
+    }
+
+    private IQueryable<ActiveCatalogPrice>
+        CreateActivePricesQuery()
+    {
+        return
+            from row in
+                _dbContext.CatalogPriceListRows
+                    .AsNoTracking()
+            join priceList in
+                _dbContext.CatalogPriceLists
+                    .AsNoTracking()
+                on row.PriceListId equals priceList.Id
+            where priceList.Status
+                      == CatalogPriceListStatus.Active
+                  && row.Status
+                      == CatalogPriceListRowStatus.Valid
+                  && row.ProductId.HasValue
+                  && row.BasePriceAmount.HasValue
+            select new ActiveCatalogPrice(
+                row.ProductId.GetValueOrDefault(),
+                row.BasePriceAmount.GetValueOrDefault(),
+                priceList.Currency,
+                row.RowNumber);
     }
 
     private static string FormatCharacteristicValue(
@@ -491,4 +580,10 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
         result = false;
         return false;
     }
+
+    private sealed record ActiveCatalogPrice(
+        Guid ProductId,
+        decimal Amount,
+        string Currency,
+        int RowNumber);
 }
