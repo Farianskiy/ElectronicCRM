@@ -13,4 +13,5 @@ public sealed record CatalogImportNormalizedRowData(
     IReadOnlyDictionary<string, CatalogImportCharacteristicValueOrigin>? CharacteristicOrigins = null,
     Guid? ProductTypeId = null,
     string? ProductTypeResolutionSource = null,
-    decimal? ProductTypeResolutionConfidence = null);
+    decimal? ProductTypeResolutionConfidence = null,
+    IReadOnlyDictionary<string, CatalogImportCharacteristicRecognitionSuggestion>? CharacteristicRecognitionSuggestions = null);

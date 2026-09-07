@@ -64,6 +64,14 @@ public sealed class CatalogProductNameRecognitionService : ICatalogProductNameRe
             ? request.ProductTypeId
             : null;
 
+        var hasManufacturerScope =
+            request.ManufacturerId.HasValue &&
+            request.ManufacturerId.Value != Guid.Empty;
+
+        Guid? effectiveManufacturerId = hasManufacturerScope
+            ? request.ManufacturerId
+            : null;
+
         IReadOnlyCollection<CatalogCharacteristicRecognitionProfileResult> recognitionProfiles = [];
 
         if (effectiveProductTypeId.HasValue)
@@ -82,6 +90,7 @@ public sealed class CatalogProductNameRecognitionService : ICatalogProductNameRe
         var dictionaryCandidates = await RecognizeDictionaryTermsAsync(
                 request.ProductName,
                 effectiveProductTypeId,
+                effectiveManufacturerId,
                 allowedCharacteristicCodes,
                 cancellationToken)
             .ConfigureAwait(false);
@@ -268,6 +277,7 @@ public sealed class CatalogProductNameRecognitionService : ICatalogProductNameRe
     private async Task<IReadOnlyCollection<CatalogRecognizedCharacteristic>> RecognizeDictionaryTermsAsync(
         string productName,
         Guid? productTypeId,
+        Guid? manufacturerId,
         IReadOnlySet<string>? allowedCharacteristicCodes,
         CancellationToken cancellationToken)
     {
@@ -284,9 +294,10 @@ public sealed class CatalogProductNameRecognitionService : ICatalogProductNameRe
                 CharacteristicDictionaryTermKind,
                 StringComparison.Ordinal))
             .Where(term => !string.IsNullOrWhiteSpace(term.TargetCode))
-            .Where(term => IsDictionaryTermAvailableForProductType(
+            .Where(term => IsDictionaryTermAvailableForScope(
                 term,
-                productTypeId))
+                productTypeId,
+                manufacturerId))
             .Select(term => CreateDictionaryCandidate(
                 term,
                 normalizedProductName,
@@ -298,24 +309,31 @@ public sealed class CatalogProductNameRecognitionService : ICatalogProductNameRe
                     candidate.Characteristic.CharacteristicCode,
                 StringComparer.Ordinal)
             .SelectMany(candidateGroup =>
-                SelectDictionaryCandidates(
-                    candidateGroup,
-                    productTypeId))
+                SelectDictionaryCandidates(candidateGroup))
             .Select(candidate => candidate.Characteristic)
             .ToArray();
     }
 
-    private static bool IsDictionaryTermAvailableForProductType(
+    private static bool IsDictionaryTermAvailableForScope(
         CatalogDictionaryTermResult term,
-        Guid? productTypeId)
+        Guid? productTypeId,
+        Guid? manufacturerId)
     {
-        if (!term.ProductTypeId.HasValue)
+        if (term.ProductTypeId.HasValue &&
+            (!productTypeId.HasValue ||
+             term.ProductTypeId.Value != productTypeId.Value))
         {
-            return true;
+            return false;
         }
 
-        return productTypeId.HasValue &&
-               term.ProductTypeId.Value == productTypeId.Value;
+        if (term.ManufacturerId.HasValue &&
+            (!manufacturerId.HasValue ||
+             term.ManufacturerId.Value != manufacturerId.Value))
+        {
+            return false;
+        }
+
+        return true;
     }
 
     private static DictionaryCandidate? CreateDictionaryCandidate(
@@ -346,9 +364,24 @@ public sealed class CatalogProductNameRecognitionService : ICatalogProductNameRe
             return null;
         }
 
-        var scopeKey = term.ProductTypeId.HasValue
-            ? $"product-type:{term.ProductTypeId.Value}"
-            : "global";
+        string scopeKey;
+
+        if (term.ManufacturerId.HasValue && term.ProductTypeId.HasValue)
+        {
+            scopeKey = $"manufacturer:{term.ManufacturerId.Value}:product-type:{term.ProductTypeId.Value}";
+        }
+        else if (term.ProductTypeId.HasValue)
+        {
+            scopeKey = $"product-type:{term.ProductTypeId.Value}";
+        }
+        else if (term.ManufacturerId.HasValue)
+        {
+            scopeKey = $"manufacturer:{term.ManufacturerId.Value}";
+        }
+        else
+        {
+            scopeKey = "global";
+        }
 
         return new DictionaryCandidate(
             new CatalogRecognizedCharacteristic(
@@ -363,48 +396,50 @@ public sealed class CatalogProductNameRecognitionService : ICatalogProductNameRe
                 term.Priority,
                 $"dictionary:{term.Id}:scope:{scopeKey}"),
             normalizedPhrase.Length,
+            term.ManufacturerId,
             term.ProductTypeId);
     }
 
     private static IEnumerable<DictionaryCandidate> SelectDictionaryCandidates(
-        IGrouping<string, DictionaryCandidate> candidates,
-        Guid? productTypeId)
+        IGrouping<string, DictionaryCandidate> candidates)
     {
-        var candidateArray = candidates.ToArray();
-
-        var scopedCandidates = candidateArray
-            .Where(candidate =>
-                productTypeId.HasValue &&
-                candidate.ProductTypeId.HasValue &&
-                candidate.ProductTypeId.Value == productTypeId.Value)
+        var candidatesWithScopePriority = candidates
+            .Select(candidate => new
+            {
+                Candidate = candidate,
+                ScopePriority = GetDictionaryScopePriority(candidate)
+            })
+            .Where(item => item.ScopePriority > 0)
             .ToArray();
 
-        var candidatesInEffectiveScope = scopedCandidates.Length > 0
-            ? scopedCandidates
-            : candidateArray
-                .Where(candidate => !candidate.ProductTypeId.HasValue)
-                .ToArray();
-
-        if (candidatesInEffectiveScope.Length == 0)
+        if (candidatesWithScopePriority.Length == 0)
         {
             return [];
         }
 
-        var maximumPhraseLength = candidatesInEffectiveScope
-            .Max(candidate => candidate.PhraseLength);
+        var maximumScopePriority = candidatesWithScopePriority
+            .Max(item => item.ScopePriority);
 
-        var longestCandidates = candidatesInEffectiveScope
-            .Where(candidate =>
-                candidate.PhraseLength == maximumPhraseLength)
+        var candidatesInEffectiveScope = candidatesWithScopePriority
+            .Where(item => item.ScopePriority == maximumScopePriority)
+            .Select(item => item.Candidate)
             .ToArray();
 
-        var maximumPriority = longestCandidates
+        var maximumPriority = candidatesInEffectiveScope
             .Max(candidate =>
                 candidate.Characteristic.Priority);
 
-        return longestCandidates
+        var highestPriorityCandidates = candidatesInEffectiveScope
             .Where(candidate =>
                 candidate.Characteristic.Priority == maximumPriority)
+            .ToArray();
+
+        var maximumPhraseLength = highestPriorityCandidates
+            .Max(candidate => candidate.PhraseLength);
+
+        return highestPriorityCandidates
+            .Where(candidate =>
+                candidate.PhraseLength == maximumPhraseLength)
             .GroupBy(
                 candidate =>
                     candidate.Characteristic.NormalizedValue,
@@ -413,6 +448,24 @@ public sealed class CatalogProductNameRecognitionService : ICatalogProductNameRe
                 .OrderBy(candidate =>
                     candidate.Characteristic.StartIndex)
                 .First());
+    }
+
+    private static int GetDictionaryScopePriority(
+        DictionaryCandidate candidate)
+    {
+        if (candidate.ManufacturerId.HasValue &&
+            candidate.ProductTypeId.HasValue)
+        {
+            return 300;
+        }
+
+        if (candidate.ManufacturerId.HasValue ||
+            candidate.ProductTypeId.HasValue)
+        {
+            return 200;
+        }
+
+        return 100;
     }
 
     private static int GetSourcePrecedence(
@@ -472,5 +525,6 @@ public sealed class CatalogProductNameRecognitionService : ICatalogProductNameRe
     private sealed record DictionaryCandidate(
         CatalogRecognizedCharacteristic Characteristic,
         int PhraseLength,
+        Guid? ManufacturerId,
         Guid? ProductTypeId);
 }

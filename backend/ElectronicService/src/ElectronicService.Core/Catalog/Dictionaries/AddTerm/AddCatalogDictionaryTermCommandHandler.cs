@@ -115,6 +115,7 @@ public sealed class AddCatalogDictionaryTermCommandHandler
             command.Priority,
             CatalogDictionaryTermStatus.Approved,
             CatalogDictionaryTermSource.Admin,
+            manufacturerId: null,
             productTypeId);
 
         if (termResult.IsFailure)

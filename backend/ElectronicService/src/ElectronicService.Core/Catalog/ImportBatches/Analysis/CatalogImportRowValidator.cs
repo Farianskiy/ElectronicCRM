@@ -68,6 +68,7 @@ public sealed class CatalogImportRowValidator : ICatalogImportRowValidator
             data.Characteristics,
             productType,
             characteristicDefinitions,
+            normalizedManufacturer,
             issues);
 
         var normalizedCharacteristicOrigins = NormalizeCharacteristicOrigins(
@@ -88,7 +89,11 @@ public sealed class CatalogImportRowValidator : ICatalogImportRowValidator
             data.ManufacturerId,
             data.ManufacturerResolutionSource,
             data.ManufacturerAliasId,
-            normalizedCharacteristicOrigins);
+            normalizedCharacteristicOrigins,
+            productType.Id,
+            data.ProductTypeResolutionSource,
+            data.ProductTypeResolutionConfidence,
+            data.CharacteristicRecognitionSuggestions);
 
         return new CatalogImportRowValidationResult(
             status,
@@ -183,6 +188,7 @@ public sealed class CatalogImportRowValidator : ICatalogImportRowValidator
         IReadOnlyDictionary<string, string> characteristics,
         ProductType productType,
         IReadOnlyCollection<CharacteristicDefinition> characteristicDefinitions,
+        string? manufacturerName,
         List<CatalogImportRowIssue> issues)
     {
         var definitionsById = characteristicDefinitions.ToDictionary(
@@ -233,9 +239,10 @@ public sealed class CatalogImportRowValidator : ICatalogImportRowValidator
             }
 
             if (!TryNormalizeCharacteristicValue(
-                characteristic.Value,
-                definition,
-                out var normalizedValue))
+                    characteristic.Value,
+                    definition,
+                    manufacturerName,
+                    out var normalizedValue))
             {
                 issues.Add(
                     CreateIssue(
@@ -283,14 +290,17 @@ public sealed class CatalogImportRowValidator : ICatalogImportRowValidator
     private static bool TryNormalizeCharacteristicValue(
     string rawValue,
     CharacteristicDefinition definition,
+    string? manufacturerName,
     out string normalizedValue)
     {
         switch (definition.DataType)
         {
             case CharacteristicDataType.Text:
-                normalizedValue = rawValue.Trim();
-
-                return normalizedValue.Length > 0;
+                return CatalogCharacteristicTextValueNormalizer.TryNormalizeToString(
+                    definition.Code,
+                    rawValue,
+                    manufacturerName,
+                    out normalizedValue);
 
             case CharacteristicDataType.Number:
                 if (CatalogCharacteristicNumericValueNormalizer

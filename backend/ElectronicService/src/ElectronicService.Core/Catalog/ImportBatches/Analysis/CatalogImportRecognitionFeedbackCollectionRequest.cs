@@ -9,4 +9,5 @@ public sealed record CatalogImportRecognitionFeedbackCollectionRequest(
     ProductType ProductType,
     IReadOnlyCollection<CharacteristicDefinition> CharacteristicDefinitions,
     CatalogImportNormalizedRowData Before,
-    CatalogImportNormalizedRowData After);
+    CatalogImportNormalizedRowData After,
+    bool ConfirmRecognitionSuggestions = false);

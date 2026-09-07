@@ -17,13 +17,30 @@ public sealed class ManufacturerRepository : IManufacturerRepository
         _dbContext = dbContext;
     }
 
-    public Task<bool> ExistsByNormalizedNameAsync(string normalizedName, CancellationToken cancellationToken = default)
+    public Task<bool> ExistsByIdAsync(
+        Guid manufacturerId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Manufacturers
+            .AsNoTracking()
+            .AnyAsync(
+                manufacturer =>
+                    manufacturer.Id == manufacturerId,
+                cancellationToken);
+    }
+
+    public Task<bool> ExistsByNormalizedNameAsync(
+        string normalizedName,
+        CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(normalizedName);
 
         return _dbContext.Manufacturers
             .AsNoTracking()
-            .AnyAsync(manufacturer => manufacturer.NormalizedName == normalizedName, cancellationToken);
+            .AnyAsync(
+                manufacturer =>
+                    manufacturer.NormalizedName == normalizedName,
+                cancellationToken);
     }
 
     public void Add(Manufacturer manufacturer)

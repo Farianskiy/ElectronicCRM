@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using CSharpFunctionalExtensions;
 using ElectronicService.Core.Catalog.Recognition.Abstractions;
 using ElectronicService.Core.Catalog.Recognition.Normalization;
@@ -9,6 +10,8 @@ namespace ElectronicService.Core.Catalog.ImportBatches.Analysis;
 
 public sealed class CatalogImportRecognitionFeedbackCollector : ICatalogImportRecognitionFeedbackCollector
 {
+    private static readonly Regex ProductSeriesPrefixRegex = new(@"^(?<series>.+?)\s+\d+\s*(?:П|P|Р)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.NonBacktracking, TimeSpan.FromMilliseconds(100));
+
     private readonly ICatalogRecognitionFeedbackRepository _feedbackRepository;
 
     public CatalogImportRecognitionFeedbackCollector(ICatalogRecognitionFeedbackRepository feedbackRepository)
@@ -39,11 +42,15 @@ public sealed class CatalogImportRecognitionFeedbackCollector : ICatalogImportRe
         var beforeValues = GetCharacteristicValuesByDefinitionId(request.Before.Characteristics);
         var afterValues = GetCharacteristicValuesByDefinitionId(request.After.Characteristics);
         var beforeOrigins = GetCharacteristicOriginsByDefinitionId(request.Before.CharacteristicOrigins);
+        var beforeRecognitionSuggestions = GetRecognitionSuggestionsByDefinitionId(request.Before.CharacteristicRecognitionSuggestions);
         var mergedOrigins = BuildMergedOrigins(request.After.Characteristics, beforeValues, beforeOrigins);
+
+        var recognitionContextIsUnchanged = string.Equals(request.Before.Name, request.After.Name, StringComparison.Ordinal) && request.Before.ProductTypeId == request.After.ProductTypeId && request.Before.ManufacturerId == request.After.ManufacturerId;
 
         var dataWithPreservedOrigins = request.After with
         {
-            CharacteristicOrigins = mergedOrigins
+            CharacteristicOrigins = mergedOrigins,
+            CharacteristicRecognitionSuggestions = recognitionContextIsUnchanged ? request.Before.CharacteristicRecognitionSuggestions : null
         };
 
         var existingFeedback = await _feedbackRepository.GetByImportRowAsync(request.ImportRowId, cancellationToken).ConfigureAwait(false);
@@ -55,6 +62,11 @@ public sealed class CatalogImportRecognitionFeedbackCollector : ICatalogImportRe
         var characteristicDefinitionIds = new HashSet<Guid>(beforeValues.Keys);
         characteristicDefinitionIds.UnionWith(afterValues.Keys);
         characteristicDefinitionIds.UnionWith(existingFeedbackByDefinitionId.Keys);
+
+        if (request.ConfirmRecognitionSuggestions)
+        {
+            characteristicDefinitionIds.UnionWith(beforeRecognitionSuggestions.Keys);
+        }
 
         var createdFeedbackCount = 0;
         var updatedFeedbackCount = 0;
@@ -70,6 +82,7 @@ public sealed class CatalogImportRecognitionFeedbackCollector : ICatalogImportRe
             var hasBeforeValue = beforeValues.TryGetValue(characteristicDefinitionId, out var beforeValue);
             var hasAfterValue = afterValues.TryGetValue(characteristicDefinitionId, out var afterValue);
             beforeOrigins.TryGetValue(characteristicDefinitionId, out var beforeOrigin);
+            beforeRecognitionSuggestions.TryGetValue(characteristicDefinitionId, out var beforeRecognitionSuggestion);
             existingFeedbackByDefinitionId.TryGetValue(characteristicDefinitionId, out var currentFeedback);
 
             if (currentFeedback?.IsFinalized == true)
@@ -99,7 +112,7 @@ public sealed class CatalogImportRecognitionFeedbackCollector : ICatalogImportRe
                 continue;
             }
 
-            var newDecision = ClassifyNewFeedback(hasBeforeValue, beforeValue, beforeOrigin, hasAfterValue, afterValue);
+            var newDecision = ClassifyNewFeedback(hasBeforeValue, beforeValue, beforeOrigin, beforeRecognitionSuggestion, request.ConfirmRecognitionSuggestions, hasAfterValue, afterValue);
 
             if (newDecision is null)
             {
@@ -111,6 +124,7 @@ public sealed class CatalogImportRecognitionFeedbackCollector : ICatalogImportRe
                 characteristicDefinition,
                 beforeValue,
                 beforeOrigin,
+                beforeRecognitionSuggestion,
                 newDecision);
 
             if (createResult.IsFailure)
@@ -180,9 +194,26 @@ public sealed class CatalogImportRecognitionFeedbackCollector : ICatalogImportRe
         bool hasBeforeValue,
         string? beforeValue,
         CatalogImportCharacteristicValueOrigin? beforeOrigin,
+        CatalogImportCharacteristicRecognitionSuggestion? recognitionSuggestion,
+        bool confirmRecognitionSuggestion,
         bool hasAfterValue,
         string? afterValue)
     {
+        if (confirmRecognitionSuggestion && recognitionSuggestion is not null)
+        {
+            if (!hasAfterValue)
+            {
+                return new FeedbackDecision(CatalogRecognitionFeedbackType.Rejected, FinalNormalizedValue: null, HasRecognitionEvidence: true);
+            }
+
+            if (string.Equals(recognitionSuggestion.NormalizedValue, afterValue, StringComparison.Ordinal))
+            {
+                return new FeedbackDecision(CatalogRecognitionFeedbackType.Accepted, afterValue, HasRecognitionEvidence: true);
+            }
+
+            return new FeedbackDecision(CatalogRecognitionFeedbackType.Corrected, afterValue, HasRecognitionEvidence: true);
+        }
+
         if (hasBeforeValue && beforeOrigin?.Source == CatalogImportCharacteristicValueSource.Recognition)
         {
             if (!HasCompleteRecognitionEvidence(beforeOrigin))
@@ -216,6 +247,7 @@ public sealed class CatalogImportRecognitionFeedbackCollector : ICatalogImportRe
         CharacteristicDefinition characteristicDefinition,
         string? beforeValue,
         CatalogImportCharacteristicValueOrigin? beforeOrigin,
+        CatalogImportCharacteristicRecognitionSuggestion? recognitionSuggestion,
         FeedbackDecision decision)
     {
         var productName = decision.HasRecognitionEvidence
@@ -238,19 +270,52 @@ public sealed class CatalogImportRecognitionFeedbackCollector : ICatalogImportRe
 
         if (decision.HasRecognitionEvidence)
         {
-            if (beforeOrigin is null || string.IsNullOrWhiteSpace(beforeValue))
+            if (recognitionSuggestion is not null)
             {
-                return Result.Success<CatalogRecognitionFeedback?, DomainError>(null);
-            }
+                suggestedRawValue = recognitionSuggestion.RawValue;
+                suggestedNormalizedValue = recognitionSuggestion.NormalizedValue;
+                suggestedConfidence = recognitionSuggestion.Confidence;
+                suggestedSource = recognitionSuggestion.RecognitionSource;
+                spanStart = recognitionSuggestion.SpanStart;
+                spanLength = recognitionSuggestion.SpanLength;
+                dictionaryTermId = TryExtractGuidAfterToken(recognitionSuggestion.RecognizerKey, "dictionary");
+                recognitionProfileId = TryExtractGuidAfterToken(recognitionSuggestion.RecognizerKey, "profile");
 
-            suggestedRawValue = beforeOrigin.RawValue;
-            suggestedNormalizedValue = beforeValue;
-            suggestedConfidence = beforeOrigin.Confidence;
-            suggestedSource = beforeOrigin.RecognitionSource;
-            spanStart = beforeOrigin.SpanStart;
-            spanLength = beforeOrigin.SpanLength;
-            dictionaryTermId = TryExtractGuidAfterToken(beforeOrigin.RecognizerKey, "dictionary");
-            recognitionProfileId = TryExtractGuidAfterToken(beforeOrigin.RecognizerKey, "profile");
+                if (decision.FeedbackType == CatalogRecognitionFeedbackType.Corrected && string.Equals(CatalogRecognitionTextNormalizer.NormalizeCode(characteristicDefinition.Code), "PRODUCT_SERIES", StringComparison.Ordinal))
+                {
+                    var trainingPhrase = TryExtractProductSeriesTrainingPhrase(productName);
+
+                    if (trainingPhrase is not null)
+                    {
+                        suggestedRawValue = trainingPhrase.RawValue;
+                        spanStart = trainingPhrase.StartIndex;
+                        spanLength = trainingPhrase.Length;
+                    }
+                }
+            }
+            else
+            {
+                if (beforeOrigin is null || string.IsNullOrWhiteSpace(beforeValue))
+                {
+                    return Result.Success<CatalogRecognitionFeedback?, DomainError>(null);
+                }
+
+                suggestedRawValue = beforeOrigin.RawValue;
+                suggestedNormalizedValue = beforeValue;
+                suggestedConfidence = beforeOrigin.Confidence;
+                suggestedSource = beforeOrigin.RecognitionSource;
+                spanStart = beforeOrigin.SpanStart;
+                spanLength = beforeOrigin.SpanLength;
+                dictionaryTermId = TryExtractGuidAfterToken(beforeOrigin.RecognizerKey, "dictionary");
+                recognitionProfileId = TryExtractGuidAfterToken(beforeOrigin.RecognizerKey, "profile");
+            }
+        }
+
+        var manufacturerId = decision.HasRecognitionEvidence ? request.Before.ManufacturerId : request.After.ManufacturerId;
+
+        if (!manufacturerId.HasValue || manufacturerId.Value == Guid.Empty)
+        {
+            return Result.Success<CatalogRecognitionFeedback?, DomainError>(null);
         }
 
         var normalizedProductName = CatalogRecognitionTextNormalizer.NormalizeText(productName);
@@ -258,6 +323,7 @@ public sealed class CatalogImportRecognitionFeedbackCollector : ICatalogImportRe
         var createResult = CatalogRecognitionFeedback.Create(
             productName,
             normalizedProductName,
+            manufacturerId.Value,
             request.ProductType.Id,
             request.ProductType.Code,
             characteristicDefinition.Id,
@@ -301,6 +367,29 @@ public sealed class CatalogImportRecognitionFeedbackCollector : ICatalogImportRe
             }
 
             values[characteristicDefinitionId] = characteristic.Value.Trim();
+        }
+
+        return values;
+    }
+
+    private static Dictionary<Guid, CatalogImportCharacteristicRecognitionSuggestion> GetRecognitionSuggestionsByDefinitionId(
+    IReadOnlyDictionary<string, CatalogImportCharacteristicRecognitionSuggestion>? suggestions)
+    {
+        var values = new Dictionary<Guid, CatalogImportCharacteristicRecognitionSuggestion>();
+
+        if (suggestions is null)
+        {
+            return values;
+        }
+
+        foreach (var suggestion in suggestions)
+        {
+            if (!Guid.TryParse(suggestion.Key, out var characteristicDefinitionId))
+            {
+                continue;
+            }
+
+            values[characteristicDefinitionId] = suggestion.Value;
         }
 
         return values;
@@ -359,6 +448,37 @@ public sealed class CatalogImportRecognitionFeedbackCollector : ICatalogImportRe
         return mergedOrigins;
     }
 
+    private static ProductSeriesTrainingPhrase? TryExtractProductSeriesTrainingPhrase(string productName)
+    {
+        Match match;
+
+        try
+        {
+            match = ProductSeriesPrefixRegex.Match(productName);
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            return null;
+        }
+
+        if (!match.Success)
+        {
+            return null;
+        }
+
+        var seriesGroup = match.Groups["series"];
+
+        if (!seriesGroup.Success || string.IsNullOrWhiteSpace(seriesGroup.Value))
+        {
+            return null;
+        }
+
+        return new ProductSeriesTrainingPhrase(
+            seriesGroup.Value.Trim(),
+            seriesGroup.Index,
+            seriesGroup.Length);
+    }
+
     private static bool HasCompleteRecognitionEvidence(CatalogImportCharacteristicValueOrigin origin)
     {
         return !string.IsNullOrWhiteSpace(origin.RawValue) && !string.IsNullOrWhiteSpace(origin.RecognitionSource);
@@ -389,7 +509,12 @@ public sealed class CatalogImportRecognitionFeedbackCollector : ICatalogImportRe
     }
 
     private sealed record FeedbackDecision(
-        CatalogRecognitionFeedbackType FeedbackType,
-        string? FinalNormalizedValue,
-        bool HasRecognitionEvidence);
+    CatalogRecognitionFeedbackType FeedbackType,
+    string? FinalNormalizedValue,
+    bool HasRecognitionEvidence);
+
+    private sealed record ProductSeriesTrainingPhrase(
+        string RawValue,
+        int StartIndex,
+        int Length);
 }

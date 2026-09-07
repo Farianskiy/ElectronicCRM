@@ -73,4 +73,12 @@ internal sealed class FakeProductRepository : IProductRepository
 
         return Task.CompletedTask;
     }
+
+    public async Task<bool> TrySaveChangesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await SaveChangesAsync(cancellationToken);
+
+        return true;
+    }
 }

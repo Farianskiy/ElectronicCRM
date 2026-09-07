@@ -1,4 +1,5 @@
 using ElectronicService.Domain.Catalog.Dictionaries;
+using ElectronicService.Domain.Catalog.Manufacturers;
 using ElectronicService.Domain.Catalog.ProductTypes;
 using ElectronicService.Domain.Users;
 using Microsoft.EntityFrameworkCore;
@@ -74,6 +75,9 @@ internal sealed class CatalogDictionaryTermConfiguration : IEntityTypeConfigurat
         builder.Property(term => term.Id)
             .HasColumnName("id");
 
+        builder.Property(term => term.ManufacturerId)
+            .HasColumnName("manufacturer_id");
+
         builder.Property(term => term.ProductTypeId)
             .HasColumnName("product_type_id");
 
@@ -141,6 +145,12 @@ internal sealed class CatalogDictionaryTermConfiguration : IEntityTypeConfigurat
         builder.Property(term => term.ReactivatedByUserId)
             .HasColumnName("reactivated_by_user_id");
 
+        builder.HasOne<Manufacturer>()
+            .WithMany()
+            .HasForeignKey(term => term.ManufacturerId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_catalog_dictionary_terms_manufacturer");
+
         builder.HasOne<ProductType>()
             .WithMany()
             .HasForeignKey(term => term.ProductTypeId)
@@ -173,6 +183,7 @@ internal sealed class CatalogDictionaryTermConfiguration : IEntityTypeConfigurat
 
         builder.HasIndex(term => new
         {
+            term.ManufacturerId,
             term.ProductTypeId,
             term.Status
         })
@@ -180,6 +191,7 @@ internal sealed class CatalogDictionaryTermConfiguration : IEntityTypeConfigurat
 
         builder.HasIndex(term => new
         {
+            term.ManufacturerId,
             term.ProductTypeId,
             term.NormalizedPhrase,
             term.Kind,

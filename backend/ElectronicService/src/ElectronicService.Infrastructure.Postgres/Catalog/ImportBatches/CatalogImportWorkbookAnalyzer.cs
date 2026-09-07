@@ -1309,9 +1309,10 @@ public sealed class CatalogImportWorkbookAnalyzer
             }
 
             if (TryNormalizeCharacteristicValue(
-                rawValue,
-                definition,
-                out var normalizedValue))
+                    rawValue,
+                    definition,
+                    manufacturer,
+                    out var normalizedValue))
             {
                 var definitionKey = definitionId.ToString();
 
@@ -1581,14 +1582,17 @@ public sealed class CatalogImportWorkbookAnalyzer
     private static bool TryNormalizeCharacteristicValue(
     string rawValue,
     CharacteristicDefinition definition,
+    string? manufacturerName,
     out string normalizedValue)
     {
         switch (definition.DataType)
         {
             case CharacteristicDataType.Text:
-                normalizedValue = rawValue.Trim();
-
-                return normalizedValue.Length > 0;
+                return CatalogCharacteristicTextValueNormalizer.TryNormalizeToString(
+                    definition.Code,
+                    rawValue,
+                    manufacturerName,
+                    out normalizedValue);
 
             case CharacteristicDataType.Number:
                 if (CatalogCharacteristicNumericValueNormalizer.TryNormalizeToString(

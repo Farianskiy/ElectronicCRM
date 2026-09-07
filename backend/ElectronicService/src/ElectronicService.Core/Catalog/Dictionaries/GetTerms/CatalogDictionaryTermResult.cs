@@ -2,6 +2,7 @@ namespace ElectronicService.Core.Catalog.Dictionaries.GetTerms;
 
 public sealed record CatalogDictionaryTermResult(
     Guid Id,
+    Guid? ManufacturerId,
     Guid? ProductTypeId,
     string Phrase,
     string NormalizedPhrase,

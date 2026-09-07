@@ -50,6 +50,20 @@ internal sealed class FakeUserRepository : IUserRepository
         return Task.FromResult(user);
     }
 
+    public Task<IReadOnlyCollection<User>> GetByIdsAsync(
+        IReadOnlyCollection<Guid> ids,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(ids);
+
+        var requestedIds = ids.ToHashSet();
+        IReadOnlyCollection<User> users = _users
+            .Where(user => requestedIds.Contains(user.Id))
+            .ToArray();
+
+        return Task.FromResult(users);
+    }
+
     public Task<User?> GetByEmailAsync(
         Email email,
         CancellationToken cancellationToken = default)

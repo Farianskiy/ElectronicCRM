@@ -4,7 +4,13 @@ namespace ElectronicService.Core.Catalog.Manufacturers.Abstractions;
 
 public interface IManufacturerRepository
 {
-    Task<bool> ExistsByNormalizedNameAsync(string normalizedName, CancellationToken cancellationToken = default);
+    Task<bool> ExistsByIdAsync(
+        Guid manufacturerId,
+        CancellationToken cancellationToken = default);
+
+    Task<bool> ExistsByNormalizedNameAsync(
+        string normalizedName,
+        CancellationToken cancellationToken = default);
 
     void Add(Manufacturer manufacturer);
 }

@@ -256,7 +256,8 @@ public sealed class GetCatalogImportRowExplanationsQueryHandler(
                             new CatalogProductNameRecognitionRequest(
                                 name!,
                                 batch.ProductTypeId,
-                                allowedCodes),
+                                allowedCodes,
+                                data.ManufacturerId),
                             cancellationToken)
                         .ConfigureAwait(false);
 

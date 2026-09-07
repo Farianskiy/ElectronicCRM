@@ -4,7 +4,9 @@ using ElectronicService.Core.Catalog.ImportBatches.Abstractions;
 using ElectronicService.Core.Catalog.ImportBatches.Analysis;
 using ElectronicService.Core.Catalog.Products.Abstractions;
 using ElectronicService.Core.Users;
+using ElectronicService.Domain.Catalog.Characteristics;
 using ElectronicService.Domain.Catalog.ImportBatches;
+using ElectronicService.Domain.Catalog.ProductTypes;
 using ElectronicService.Domain.Common;
 
 namespace ElectronicService.Core.Catalog.ImportBatches.BulkUpdateCatalogImportRows;
@@ -137,12 +139,6 @@ public sealed class BulkUpdateCatalogImportRowsCommandHandler
                 CatalogImportErrors.BatchConcurrencyConflict());
         }
 
-        if (batch.ProductTypeId is not Guid productTypeId)
-        {
-            return Result.Failure<BulkUpdateCatalogImportRowsResult, DomainError>(
-                CatalogImportErrors.ProductTypeIsRequired());
-        }
-
         var rows = await _importBatchRepository
             .GetRowsByIdsAsync(command.BatchId, rowIds, cancellationToken)
             .ConfigureAwait(false);
@@ -158,6 +154,8 @@ public sealed class BulkUpdateCatalogImportRowsCommandHandler
         }
 
         var previousDataByRowId = new Dictionary<Guid, CatalogImportNormalizedRowData>();
+        var commandRowsById = command.Rows.ToDictionary(item => item.RowId);
+        var productTypeIdsByRowId = new Dictionary<Guid, Guid>();
 
         foreach (var row in rows)
         {
@@ -170,25 +168,53 @@ public sealed class BulkUpdateCatalogImportRowsCommandHandler
             }
 
             previousDataByRowId.Add(row.Id, previousData);
+
+            var productTypeId = commandRowsById[row.Id].ProductTypeId
+                ?? previousData.ProductTypeId
+                ?? batch.ProductTypeId;
+
+            if (productTypeId is not Guid effectiveProductTypeId
+                || effectiveProductTypeId == Guid.Empty)
+            {
+                return Result.Failure<BulkUpdateCatalogImportRowsResult, DomainError>(
+                    CatalogImportErrors.ProductTypeIsRequired());
+            }
+
+            productTypeIdsByRowId.Add(row.Id, effectiveProductTypeId);
         }
 
-        var productType = await _metadataRepository
-                    .GetProductTypeByIdAsync(productTypeId, cancellationToken)
-            .ConfigureAwait(false);
+        var productTypesById = new Dictionary<Guid, ProductType>();
+        var characteristicDefinitionsByProductTypeId =
+            new Dictionary<Guid, IReadOnlyCollection<CharacteristicDefinition>>();
 
-        if (productType is null)
+        foreach (var productTypeId in productTypeIdsByRowId.Values.Distinct())
         {
-            return Result.Failure<BulkUpdateCatalogImportRowsResult, DomainError>(
-                CatalogImportErrors.ProductTypeNotFound(productTypeId));
+            var productType = await _metadataRepository
+                .GetProductTypeByIdAsync(productTypeId, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (productType is null)
+            {
+                return Result.Failure<BulkUpdateCatalogImportRowsResult, DomainError>(
+                    CatalogImportErrors.ProductTypeNotFound(productTypeId));
+            }
+
+            var characteristicDefinitionIds = productType.Characteristics
+                .Select(characteristic => characteristic.CharacteristicDefinitionId)
+                .Distinct()
+                .ToArray();
+
+            var characteristicDefinitions = await _metadataRepository
+                .GetCharacteristicDefinitionsByIdsAsync(
+                    characteristicDefinitionIds,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            productTypesById.Add(productTypeId, productType);
+            characteristicDefinitionsByProductTypeId.Add(
+                productTypeId,
+                characteristicDefinitions);
         }
-
-        var characteristicDefinitionIds = productType.Characteristics
-            .Select(characteristic => characteristic.CharacteristicDefinitionId)
-            .ToArray();
-
-        var characteristicDefinitions = await _metadataRepository
-            .GetCharacteristicDefinitionsByIdsAsync(characteristicDefinitionIds, cancellationToken)
-            .ConfigureAwait(false);
 
         var manufacturers = await _metadataRepository
             .GetManufacturersAsync(cancellationToken)
@@ -213,6 +239,10 @@ public sealed class BulkUpdateCatalogImportRowsCommandHandler
         foreach (var item in command.Rows)
         {
             var row = rowsById[item.RowId];
+            var productTypeId = productTypeIdsByRowId[row.Id];
+            var productType = productTypesById[productTypeId];
+            var characteristicDefinitions =
+                characteristicDefinitionsByProductTypeId[productTypeId];
 
             string? manufacturerName = null;
 
@@ -228,7 +258,10 @@ public sealed class BulkUpdateCatalogImportRowsCommandHandler
                 item.Price,
                 item.StockQuantity,
                 item.Characteristics,
-                item.ManufacturerId);
+                item.ManufacturerId,
+                ProductTypeId: productTypeId,
+                ProductTypeResolutionSource: "Manual",
+                ProductTypeResolutionConfidence: 1.0000m);
 
             var validationResult = _rowValidator.Validate(
                 data,
@@ -241,7 +274,8 @@ public sealed class BulkUpdateCatalogImportRowsCommandHandler
                 productType,
                 characteristicDefinitions,
                 previousDataByRowId[row.Id],
-                validationResult.Data);
+                validationResult.Data,
+                command.ConfirmRecognitionSuggestions);
 
             var feedbackCollectionResult = await _recognitionFeedbackCollector
                 .CollectAsync(feedbackCollectionRequest, cancellationToken)

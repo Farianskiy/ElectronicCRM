@@ -24,6 +24,7 @@ public sealed class CatalogRecognitionFeedback : AggregateRoot
         Guid id,
         string productName,
         string normalizedProductName,
+        Guid? manufacturerId,
         Guid productTypeId,
         string productTypeCodeSnapshot,
         Guid characteristicDefinitionId,
@@ -52,6 +53,7 @@ public sealed class CatalogRecognitionFeedback : AggregateRoot
     {
         ProductName = productName;
         NormalizedProductName = normalizedProductName;
+        ManufacturerId = manufacturerId;
         ProductTypeId = productTypeId;
         ProductTypeCodeSnapshot = productTypeCodeSnapshot;
         CharacteristicDefinitionId = characteristicDefinitionId;
@@ -85,6 +87,8 @@ public sealed class CatalogRecognitionFeedback : AggregateRoot
     public string ProductName { get; private set; } = string.Empty;
 
     public string NormalizedProductName { get; private set; } = string.Empty;
+
+    public Guid? ManufacturerId { get; private set; }
 
     public Guid ProductTypeId { get; private set; }
 
@@ -141,6 +145,7 @@ public sealed class CatalogRecognitionFeedback : AggregateRoot
     public static Result<CatalogRecognitionFeedback, DomainError> Create(
         string productName,
         string normalizedProductName,
+        Guid manufacturerId,
         Guid productTypeId,
         string productTypeCodeSnapshot,
         Guid characteristicDefinitionId,
@@ -167,6 +172,11 @@ public sealed class CatalogRecognitionFeedback : AggregateRoot
         if (string.IsNullOrWhiteSpace(normalizedProductName))
         {
             return GeneralErrors.ValueIsRequired(nameof(normalizedProductName));
+        }
+
+        if (manufacturerId == Guid.Empty)
+        {
+            return GeneralErrors.ValueIsInvalid(nameof(manufacturerId));
         }
 
         if (productTypeId == Guid.Empty)
@@ -327,6 +337,7 @@ public sealed class CatalogRecognitionFeedback : AggregateRoot
             Guid.CreateVersion7(),
             trimmedProductName,
             trimmedNormalizedProductName,
+            manufacturerId,
             productTypeId,
             trimmedProductTypeCodeSnapshot,
             characteristicDefinitionId,

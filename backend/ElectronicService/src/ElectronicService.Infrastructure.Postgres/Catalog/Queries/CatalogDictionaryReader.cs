@@ -22,6 +22,7 @@ public sealed class CatalogDictionaryReader : ICatalogDictionaryReader
         var terms = await GetBaseQuery()
             .Select(term => new CatalogDictionaryTermData(
                 term.Id,
+                term.ManufacturerId,
                 term.ProductTypeId,
                 term.Phrase,
                 term.NormalizedPhrase,
@@ -52,6 +53,7 @@ public sealed class CatalogDictionaryReader : ICatalogDictionaryReader
             .Where(term => term.Status == CatalogDictionaryTermStatus.Approved)
             .Select(term => new CatalogDictionaryTermData(
                 term.Id,
+                term.ManufacturerId,
                 term.ProductTypeId,
                 term.Phrase,
                 term.NormalizedPhrase,
@@ -115,6 +117,7 @@ public sealed class CatalogDictionaryReader : ICatalogDictionaryReader
     {
         return new CatalogDictionaryTermResult(
             term.Id,
+            term.ManufacturerId,
             term.ProductTypeId,
             term.Phrase,
             term.NormalizedPhrase,
@@ -147,6 +150,7 @@ public sealed class CatalogDictionaryReader : ICatalogDictionaryReader
 
     private sealed record CatalogDictionaryTermData(
         Guid Id,
+        Guid? ManufacturerId,
         Guid? ProductTypeId,
         string Phrase,
         string NormalizedPhrase,

@@ -577,13 +577,6 @@ public sealed class CatalogImportBatch : AggregateRoot
                             .Submitted));
         }
 
-        if (ProductTypeId is null)
-        {
-            return UnitResult.Failure(
-                CatalogImportErrors
-                    .ProductTypeIsRequired());
-        }
-
         Status = CatalogImportBatchStatus.Submitted;
 
         SubmittedAtUtc = DateTime.UtcNow;
@@ -712,13 +705,6 @@ public sealed class CatalogImportBatch : AggregateRoot
                         Status,
                         CatalogImportBatchStatus
                             .Applying));
-        }
-
-        if (ProductTypeId is null)
-        {
-            return UnitResult.Failure(
-                CatalogImportErrors
-                    .ProductTypeIsRequired());
         }
 
         if (ErrorRowsCount > 0)

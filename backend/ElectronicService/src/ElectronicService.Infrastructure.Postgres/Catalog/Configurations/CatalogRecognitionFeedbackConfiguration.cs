@@ -1,6 +1,7 @@
 using ElectronicService.Domain.Catalog.Characteristics;
 using ElectronicService.Domain.Catalog.Dictionaries;
 using ElectronicService.Domain.Catalog.ImportBatches;
+using ElectronicService.Domain.Catalog.Manufacturers;
 using ElectronicService.Domain.Catalog.ProductTypes;
 using ElectronicService.Domain.Catalog.Recognition;
 using ElectronicService.Domain.Users;
@@ -142,6 +143,9 @@ internal sealed class CatalogRecognitionFeedbackConfiguration : IEntityTypeConfi
             .HasMaxLength(CatalogRecognitionFeedback.ProductNameMaxLength)
             .IsRequired();
 
+        builder.Property(feedback => feedback.ManufacturerId)
+            .HasColumnName("manufacturer_id");
+
         builder.Property(feedback => feedback.ProductTypeId)
             .HasColumnName("product_type_id")
             .IsRequired();
@@ -242,6 +246,11 @@ internal sealed class CatalogRecognitionFeedbackConfiguration : IEntityTypeConfi
 
         builder.Ignore(feedback => feedback.IsFinalized);
 
+        builder.HasOne<Manufacturer>()
+            .WithMany()
+            .HasForeignKey(feedback => feedback.ManufacturerId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasOne<ProductType>()
             .WithMany()
             .HasForeignKey(feedback => feedback.ProductTypeId)
@@ -288,6 +297,7 @@ internal sealed class CatalogRecognitionFeedbackConfiguration : IEntityTypeConfi
 
         builder.HasIndex(feedback => new
         {
+            feedback.ManufacturerId,
             feedback.ProductTypeId,
             feedback.CharacteristicDefinitionId,
             feedback.FinalizedAtUtc

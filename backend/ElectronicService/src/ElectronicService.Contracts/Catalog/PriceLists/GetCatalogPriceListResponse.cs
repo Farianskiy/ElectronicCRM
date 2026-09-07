@@ -1,0 +1,26 @@
+namespace ElectronicService.Contracts.Catalog.PriceLists;
+
+public sealed record GetCatalogPriceListResponse(
+    Guid PriceListId,
+    Guid ManufacturerId,
+    string ManufacturerName,
+    Guid CreatedByUserId,
+    string OriginalFileName,
+    string ContentType,
+    long FileSizeBytes,
+    string Currency,
+    decimal VatRatePercent,
+    DateOnly? EffectiveDate,
+    string Status,
+    int RowsCount,
+    int ValidRowsCount,
+    int ErrorRowsCount,
+    int EstimatedRowsCount,
+    int ReadRowsCount,
+    int SavedRowsCount,
+    DateTime CreatedAtUtc,
+    DateTime? UpdatedAtUtc,
+    DateTime? ProcessedAtUtc,
+    DateTime? ActivatedAtUtc,
+    DateTime? ArchivedAtUtc,
+    string? FailureReason);
