@@ -494,6 +494,12 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
             return new Dictionary<Guid, ActiveCatalogPrice>();
         }
 
+        var nullableProductIds =
+            productIds
+                .Select(productId =>
+                    (Guid?)productId)
+                .ToArray();
+
         var storedPrices =
             await (
                     from row in
@@ -509,15 +515,15 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
                               == CatalogPriceListRowStatus.Valid
                           && row.ProductId.HasValue
                           && row.BasePriceAmount.HasValue
-                          && productIds.Contains(
-                              row.ProductId.GetValueOrDefault())
+                          && nullableProductIds.Contains(
+                              row.ProductId)
                     orderby row.RowNumber
                     select new
                     {
                         ProductId =
-                            row.ProductId.GetValueOrDefault(),
+                            row.ProductId,
                         Amount =
-                            row.BasePriceAmount.GetValueOrDefault(),
+                            row.BasePriceAmount,
                         priceList.Currency,
                         row.RowNumber
                     })
@@ -525,7 +531,8 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
                 .ConfigureAwait(false);
 
         return storedPrices
-            .GroupBy(price => price.ProductId)
+            .GroupBy(price =>
+                price.ProductId.GetValueOrDefault())
             .ToDictionary(
                 group => group.Key,
                 group =>
@@ -533,8 +540,8 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
                     var price = group.First();
 
                     return new ActiveCatalogPrice(
-                        price.ProductId,
-                        price.Amount,
+                        price.ProductId.GetValueOrDefault(),
+                        price.Amount.GetValueOrDefault(),
                         price.Currency,
                         price.RowNumber);
                 });
