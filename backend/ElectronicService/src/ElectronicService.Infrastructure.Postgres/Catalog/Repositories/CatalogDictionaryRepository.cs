@@ -29,6 +29,7 @@ public sealed class CatalogDictionaryRepository : ICatalogDictionaryRepository
             .AsNoTracking()
             .AnyAsync(
                 existingTerm =>
+                    existingTerm.ManufacturerId == term.ManufacturerId &&
                     existingTerm.ProductTypeId == term.ProductTypeId &&
                     existingTerm.NormalizedPhrase == term.NormalizedPhrase &&
                     existingTerm.Kind == term.Kind &&

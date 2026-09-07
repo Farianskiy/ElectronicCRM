@@ -27,7 +27,8 @@ public sealed class CatalogRecognitionCandidateRepository : ICatalogRecognitionC
 
         return await _dbContext.CatalogRecognitionCandidates
             .Where(candidate =>
-                candidate.Status == CatalogRecognitionCandidateStatus.Accumulating
+                candidate.ManufacturerId.HasValue
+                && candidate.Status == CatalogRecognitionCandidateStatus.Accumulating
                 && candidate.SuggestionId == null)
             .OrderByDescending(candidate => candidate.CorrectedCount)
             .ThenByDescending(candidate => candidate.DistinctProductCount)
@@ -54,7 +55,8 @@ public sealed class CatalogRecognitionCandidateRepository : ICatalogRecognitionC
         return await _dbContext.CatalogRecognitionFeedbackEntries
             .AsNoTracking()
             .Where(feedback =>
-                feedback.Status == CatalogRecognitionFeedbackStatus.Finalized
+                feedback.ManufacturerId.HasValue
+                && feedback.Status == CatalogRecognitionFeedbackStatus.Finalized
                 && feedback.IsTrainingEligible
                 && feedback.FeedbackType == feedbackType
                 && !_dbContext.CatalogRecognitionCandidateEvidenceEntries.Any(evidence => evidence.FeedbackId == feedback.Id))

@@ -1,4 +1,5 @@
 using ElectronicService.Domain.Catalog.Characteristics;
+using ElectronicService.Domain.Catalog.Manufacturers;
 using ElectronicService.Domain.Catalog.ProductTypes;
 using ElectronicService.Infrastructure.Postgres.Data;
 using ElectronicService.Domain.Catalog.Dictionaries;
@@ -64,17 +65,35 @@ public sealed partial class CatalogDataSeeder
 
         new("АВТОМАТ", CatalogDictionaryTermKind.ProductType, null, "MODULAR_CIRCUIT_BREAKER", 50),
         new("АВТОМАТИЧЕСКИЙ ВЫКЛЮЧАТЕЛЬ", CatalogDictionaryTermKind.ProductType, null, "MODULAR_CIRCUIT_BREAKER", 100),
+        new("NB1", CatalogDictionaryTermKind.ProductType, null, "MODULAR_CIRCUIT_BREAKER", 100),
 
         new("РУБИЛЬНИК", CatalogDictionaryTermKind.ProductType, null, "SWITCH_DISCONNECTOR", 100),
         new("ВЫКЛЮЧАТЕЛЬ НАГРУЗКИ", CatalogDictionaryTermKind.ProductType, null, "LOAD_SWITCH", 100),
 
+        new("NB1 63", CatalogDictionaryTermKind.Characteristic, "PRODUCT_SERIES", "NB1", 100),
+        new("NB1 63H", CatalogDictionaryTermKind.Characteristic, "PRODUCT_SERIES", "NXB-63", 100),
+        new("NB1-63H", CatalogDictionaryTermKind.Characteristic, "PRODUCT_SERIES", "NXB-63", 100),
+        new("NXB 63S", CatalogDictionaryTermKind.Characteristic, "PRODUCT_SERIES", "NXB-63", 100),
+        new("NXB-63S", CatalogDictionaryTermKind.Characteristic, "PRODUCT_SERIES", "NXB-63", 100),
+        new("NXB 63", CatalogDictionaryTermKind.Characteristic, "PRODUCT_SERIES", "NXB-63", 100),
+        new("NXB-63", CatalogDictionaryTermKind.Characteristic, "PRODUCT_SERIES", "NXB-63", 100),
+        new("NXB 125", CatalogDictionaryTermKind.Characteristic, "PRODUCT_SERIES", "NXB-125", 100),
+        new("NXB-125", CatalogDictionaryTermKind.Characteristic, "PRODUCT_SERIES", "NXB-125", 100),
         new("NB1", CatalogDictionaryTermKind.Characteristic, "PRODUCT_SERIES", "NB1", 100),
 
-        new("АРМАТ", CatalogDictionaryTermKind.Characteristic, "PRODUCT_SERIES", "ARMAT", 100),
-        new("ARMAT", CatalogDictionaryTermKind.Characteristic, "PRODUCT_SERIES", "ARMAT", 100),
+        new("АРМАТ", CatalogDictionaryTermKind.Characteristic, "PRODUCT_SERIES", "ARMAT", 100, "IEK"),
+        new("ARMAT", CatalogDictionaryTermKind.Characteristic, "PRODUCT_SERIES", "ARMAT", 100, "IEK"),
 
-        new("ПРОКСИМА", CatalogDictionaryTermKind.Characteristic, "PRODUCT_SERIES", "PROXIMA", 100),
-        new("PROXIMA", CatalogDictionaryTermKind.Characteristic, "PRODUCT_SERIES", "PROXIMA", 100),
+        new("ПРОКСИМА", CatalogDictionaryTermKind.Characteristic, "PRODUCT_SERIES", "PROXIMA", 100, "EKF"),
+        new("PROXIMA", CatalogDictionaryTermKind.Characteristic, "PRODUCT_SERIES", "PROXIMA", 100, "EKF"),
+
+        new("B06S", CatalogDictionaryTermKind.Characteristic, "PRODUCT_SERIES", "ARMAT B06S", 200, "IEK", "DIFFERENTIAL_CIRCUIT_BREAKER"),
+        new("АД 32", CatalogDictionaryTermKind.Characteristic, "PRODUCT_SERIES", "АД 32", 200, "EKF", "DIFFERENTIAL_CIRCUIT_BREAKER"),
+        new("АВДТ 63", CatalogDictionaryTermKind.Characteristic, "PRODUCT_SERIES", "АВДТ 63", 200, "EKF", "DIFFERENTIAL_CIRCUIT_BREAKER"),
+        new("АВДТ 63М", CatalogDictionaryTermKind.Characteristic, "PRODUCT_SERIES", "АВДТ 63М", 200, "EKF", "DIFFERENTIAL_CIRCUIT_BREAKER"),
+        new("АД 4", CatalogDictionaryTermKind.Characteristic, "PRODUCT_SERIES", "АД 4", 200, "EKF", "DIFFERENTIAL_CIRCUIT_BREAKER"),
+        new("АД 2", CatalogDictionaryTermKind.Characteristic, "PRODUCT_SERIES", "АД 2", 200, "EKF", "DIFFERENTIAL_CIRCUIT_BREAKER"),
+        new("АД 2 S", CatalogDictionaryTermKind.Characteristic, "PRODUCT_SERIES", "АД 2 S", 200, "EKF", "DIFFERENTIAL_CIRCUIT_BREAKER"),
 
         new("ОДНОПОЛЮСНЫЙ", CatalogDictionaryTermKind.Characteristic, "POLES", "1", 100),
         new("ДВУХПОЛЮСНЫЙ", CatalogDictionaryTermKind.Characteristic, "POLES", "2", 100),
@@ -838,6 +857,8 @@ public sealed partial class CatalogDataSeeder
         var existingTerms = await _dbContext.CatalogDictionaryTerms
             .Select(term => new
             {
+                term.ManufacturerId,
+                term.ProductTypeId,
                 term.NormalizedPhrase,
                 term.Kind,
                 term.TargetCode,
@@ -846,8 +867,48 @@ public sealed partial class CatalogDataSeeder
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
+        var manufacturers = await _dbContext.Manufacturers
+            .AsNoTracking()
+            .Select(manufacturer => new
+            {
+                manufacturer.Id,
+                manufacturer.NormalizedName
+            })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var productTypes = await _dbContext.ProductTypes
+            .AsNoTracking()
+            .Select(productType => new
+            {
+                productType.Id,
+                productType.Code
+            })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var manufacturersByNormalizedName = manufacturers
+            .GroupBy(
+                manufacturer => manufacturer.NormalizedName,
+                StringComparer.Ordinal)
+            .ToDictionary(
+                group => group.Key,
+                group => group.First().Id,
+                StringComparer.Ordinal);
+
+        var productTypesByCode = productTypes
+            .GroupBy(
+                productType => productType.Code,
+                StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.First().Id,
+                StringComparer.OrdinalIgnoreCase);
+
         var existingKeys = existingTerms
             .Select(term => CreateDictionaryTermKey(
+                term.ManufacturerId,
+                term.ProductTypeId,
                 term.NormalizedPhrase,
                 term.Kind,
                 term.TargetCode,
@@ -856,6 +917,40 @@ public sealed partial class CatalogDataSeeder
 
         foreach (var seed in DictionaryTerms)
         {
+            Guid? manufacturerId = null;
+
+            if (!string.IsNullOrWhiteSpace(seed.ManufacturerName))
+            {
+                var normalizedManufacturerName =
+                    ManufacturerNameNormalizer.Normalize(
+                        seed.ManufacturerName);
+
+                if (!manufacturersByNormalizedName.TryGetValue(
+                        normalizedManufacturerName,
+                        out var resolvedManufacturerId))
+                {
+                    throw new InvalidOperationException(
+                        $"Manufacturer '{seed.ManufacturerName}' was not found while seeding dictionary term '{seed.Phrase}'.");
+                }
+
+                manufacturerId = resolvedManufacturerId;
+            }
+
+            Guid? productTypeId = null;
+
+            if (!string.IsNullOrWhiteSpace(seed.ProductTypeCode))
+            {
+                if (!productTypesByCode.TryGetValue(
+                        seed.ProductTypeCode,
+                        out var resolvedProductTypeId))
+                {
+                    throw new InvalidOperationException(
+                        $"Product type '{seed.ProductTypeCode}' was not found while seeding dictionary term '{seed.Phrase}'.");
+                }
+
+                productTypeId = resolvedProductTypeId;
+            }
+
             var termResult = CatalogDictionaryTerm.Create(
                 seed.Phrase,
                 seed.Kind,
@@ -864,16 +959,20 @@ public sealed partial class CatalogDataSeeder
                 seed.Priority,
                 CatalogDictionaryTermStatus.Approved,
                 CatalogDictionaryTermSource.Seed,
-                productTypeId: null);
+                manufacturerId,
+                productTypeId);
 
             if (termResult.IsFailure)
             {
-                continue;
+                throw new InvalidOperationException(
+                    termResult.Error.Message);
             }
 
             var term = termResult.Value;
 
             var key = CreateDictionaryTermKey(
+                term.ManufacturerId,
+                term.ProductTypeId,
                 term.NormalizedPhrase,
                 term.Kind,
                 term.TargetCode,
@@ -889,6 +988,8 @@ public sealed partial class CatalogDataSeeder
     }
 
     private static string CreateDictionaryTermKey(
+        Guid? manufacturerId,
+        Guid? productTypeId,
         string normalizedPhrase,
         CatalogDictionaryTermKind kind,
         string? targetCode,
@@ -896,6 +997,8 @@ public sealed partial class CatalogDataSeeder
     {
         return string.Join(
             "|",
+            manufacturerId?.ToString() ?? string.Empty,
+            productTypeId?.ToString() ?? string.Empty,
             normalizedPhrase,
             kind.ToString(),
             targetCode ?? string.Empty,

@@ -1,5 +1,6 @@
 using ElectronicService.Domain.Catalog.Characteristics;
 using ElectronicService.Domain.Catalog.Dictionaries;
+using ElectronicService.Domain.Catalog.Manufacturers;
 using ElectronicService.Domain.Catalog.ProductTypes;
 using ElectronicService.Domain.Catalog.Recognition;
 using Microsoft.EntityFrameworkCore;
@@ -79,6 +80,9 @@ internal sealed class CatalogRecognitionCandidateConfiguration : IEntityTypeConf
             .HasMaxLength(CatalogRecognitionCandidate.PhraseMaxLength)
             .IsRequired();
 
+        builder.Property(candidate => candidate.ManufacturerId)
+            .HasColumnName("manufacturer_id");
+
         builder.Property(candidate => candidate.ProductTypeId)
             .HasColumnName("product_type_id")
             .IsRequired();
@@ -151,6 +155,12 @@ internal sealed class CatalogRecognitionCandidateConfiguration : IEntityTypeConf
 
         builder.Ignore(candidate => candidate.HasSuggestion);
 
+        builder.HasOne<Manufacturer>()
+            .WithMany()
+            .HasForeignKey(candidate => candidate.ManufacturerId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_recognition_candidates_manufacturer");
+
         builder.HasOne<ProductType>()
             .WithMany()
             .HasForeignKey(candidate => candidate.ProductTypeId)
@@ -175,6 +185,7 @@ internal sealed class CatalogRecognitionCandidateConfiguration : IEntityTypeConf
 
         builder.HasIndex(candidate => new
         {
+            candidate.ManufacturerId,
             candidate.ProductTypeId,
             candidate.CharacteristicDefinitionId,
             candidate.Status

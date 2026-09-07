@@ -112,7 +112,8 @@ public sealed class CatalogImportRecognitionShadowService
                         new CatalogProductNameRecognitionRequest(
                             data.Name,
                             productType.Id,
-                            allowedCharacteristicCodes),
+                            allowedCharacteristicCodes,
+                            data.ManufacturerId),
                         cancellationToken)
                     .ConfigureAwait(false);
             }

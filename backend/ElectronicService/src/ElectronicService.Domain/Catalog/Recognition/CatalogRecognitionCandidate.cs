@@ -22,6 +22,7 @@ public sealed class CatalogRecognitionCandidate : AggregateRoot
         Guid id,
         string phrase,
         string normalizedPhrase,
+        Guid? manufacturerId,
         Guid productTypeId,
         string productTypeCodeSnapshot,
         Guid characteristicDefinitionId,
@@ -41,6 +42,7 @@ public sealed class CatalogRecognitionCandidate : AggregateRoot
     {
         Phrase = phrase;
         NormalizedPhrase = normalizedPhrase;
+        ManufacturerId = manufacturerId;
         ProductTypeId = productTypeId;
         ProductTypeCodeSnapshot = productTypeCodeSnapshot;
         CharacteristicDefinitionId = characteristicDefinitionId;
@@ -65,6 +67,8 @@ public sealed class CatalogRecognitionCandidate : AggregateRoot
     public string Phrase { get; private set; } = string.Empty;
 
     public string NormalizedPhrase { get; private set; } = string.Empty;
+
+    public Guid? ManufacturerId { get; private set; }
 
     public Guid ProductTypeId { get; private set; }
 
@@ -105,6 +109,7 @@ public sealed class CatalogRecognitionCandidate : AggregateRoot
     public static Result<CatalogRecognitionCandidate, DomainError> Create(
         string phrase,
         string normalizedPhrase,
+        Guid manufacturerId,
         Guid productTypeId,
         string productTypeCodeSnapshot,
         Guid characteristicDefinitionId,
@@ -121,6 +126,11 @@ public sealed class CatalogRecognitionCandidate : AggregateRoot
         if (string.IsNullOrWhiteSpace(normalizedPhrase))
         {
             return GeneralErrors.ValueIsRequired(nameof(normalizedPhrase));
+        }
+
+        if (manufacturerId == Guid.Empty)
+        {
+            return GeneralErrors.ValueIsInvalid(nameof(manufacturerId));
         }
 
         if (productTypeId == Guid.Empty)
@@ -193,12 +203,13 @@ public sealed class CatalogRecognitionCandidate : AggregateRoot
         var correctedCount = firstEvidenceType == CatalogRecognitionFeedbackType.Corrected ? 1 : 0;
         var rejectedCount = firstEvidenceType == CatalogRecognitionFeedbackType.Rejected ? 1 : 0;
 
-        var candidateKey = BuildCandidateKey(trimmedNormalizedPhrase, productTypeId, characteristicDefinitionId, trimmedProposedValue);
+        var candidateKey = BuildCandidateKey(trimmedNormalizedPhrase, manufacturerId, productTypeId, characteristicDefinitionId, trimmedProposedValue);
 
         return new CatalogRecognitionCandidate(
             Guid.CreateVersion7(),
             trimmedPhrase,
             trimmedNormalizedPhrase,
+            manufacturerId,
             productTypeId,
             trimmedProductTypeCodeSnapshot,
             characteristicDefinitionId,
@@ -330,7 +341,7 @@ public sealed class CatalogRecognitionCandidate : AggregateRoot
         return UnitResult.Success<DomainError>();
     }
 
-    public static string BuildCandidateKey(string normalizedPhrase, Guid productTypeId, Guid characteristicDefinitionId, string proposedValue)
+    public static string BuildCandidateKey(string normalizedPhrase, Guid manufacturerId, Guid productTypeId, Guid characteristicDefinitionId, string proposedValue)
     {
         var normalizedPhraseBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(normalizedPhrase));
         var proposedValueBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(proposedValue));
@@ -338,6 +349,7 @@ public sealed class CatalogRecognitionCandidate : AggregateRoot
         var keySource = string.Join(
             "|",
             normalizedPhraseBase64,
+            manufacturerId.ToString("N"),
             productTypeId.ToString("N"),
             characteristicDefinitionId.ToString("N"),
             proposedValueBase64);

@@ -14,6 +14,7 @@ public sealed class CatalogDictionarySuggestionApprovalDecision
         CatalogDictionaryTermKind kind,
         string? targetCode,
         string targetValue,
+        Guid? manufacturerId,
         Guid? productTypeId,
         Guid? characteristicDefinitionId,
         int priority)
@@ -22,6 +23,7 @@ public sealed class CatalogDictionarySuggestionApprovalDecision
         Kind = kind;
         TargetCode = targetCode;
         TargetValue = targetValue;
+        ManufacturerId = manufacturerId;
         ProductTypeId = productTypeId;
         CharacteristicDefinitionId = characteristicDefinitionId;
         Priority = priority;
@@ -35,6 +37,8 @@ public sealed class CatalogDictionarySuggestionApprovalDecision
 
     public string TargetValue { get; }
 
+    public Guid? ManufacturerId { get; }
+
     public Guid? ProductTypeId { get; }
 
     public Guid? CharacteristicDefinitionId { get; }
@@ -46,6 +50,7 @@ public sealed class CatalogDictionarySuggestionApprovalDecision
         CatalogDictionaryTermKind kind,
         string? targetCode,
         string targetValue,
+        Guid? manufacturerId,
         Guid? productTypeId,
         Guid? characteristicDefinitionId,
         int priority)
@@ -68,6 +73,11 @@ public sealed class CatalogDictionarySuggestionApprovalDecision
         if (string.IsNullOrWhiteSpace(targetValue))
         {
             return GeneralErrors.ValueIsInvalid(nameof(targetValue));
+        }
+
+        if (manufacturerId.HasValue && manufacturerId.Value == Guid.Empty)
+        {
+            return GeneralErrors.ValueIsInvalid(nameof(manufacturerId));
         }
 
         if (productTypeId.HasValue && productTypeId.Value == Guid.Empty)
@@ -130,6 +140,7 @@ public sealed class CatalogDictionarySuggestionApprovalDecision
             kind,
             normalizedTargetCode,
             normalizedTargetValue,
+            manufacturerId,
             productTypeId,
             characteristicDefinitionId,
             priority);

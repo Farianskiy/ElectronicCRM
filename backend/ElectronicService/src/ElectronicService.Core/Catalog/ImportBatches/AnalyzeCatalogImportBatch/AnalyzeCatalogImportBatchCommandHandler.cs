@@ -8,12 +8,19 @@ using ElectronicService.Domain.Catalog.ImportBatches;
 using ElectronicService.Domain.Catalog.ProductTypes;
 using ElectronicService.Domain.Common;
 using ElectronicService.Core.Catalog.Manufacturers.Resolution;
+using System.Text.Json;
 
 namespace ElectronicService.Core.Catalog
     .ImportBatches.AnalyzeCatalogImportBatch;
 
 public sealed class AnalyzeCatalogImportBatchCommandHandler
 {
+    private static readonly JsonSerializerOptions JsonOptions =
+        new(JsonSerializerDefaults.Web)
+        {
+            PropertyNameCaseInsensitive = true
+        };
+
     private readonly ICatalogImportBatchRepository _importBatchRepository;
 
     private readonly IUserRepository _userRepository;
@@ -344,6 +351,22 @@ public sealed class AnalyzeCatalogImportBatchCommandHandler
             effectiveAnalysis = enrichmentResult.Value.Analysis;
             recognitionEnrichment = enrichmentResult.Value.Summary;
         }
+        else if (productType is null && !analysis.MappingRequired)
+        {
+            var enrichmentResult = await EnrichRowsByProductTypeAsync(
+                    analysis,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            if (enrichmentResult.IsFailure)
+            {
+                return Result.Failure<AnalyzeCatalogImportBatchResult, DomainError>(
+                    enrichmentResult.Error);
+            }
+
+            effectiveAnalysis = enrichmentResult.Value.Analysis;
+            recognitionEnrichment = enrichmentResult.Value.Summary;
+        }
 
         var productNameExplanation =
             _productNameExplanationService.Analyze(
@@ -404,5 +427,140 @@ public sealed class AnalyzeCatalogImportBatchCommandHandler
                 recognitionShadow,
                 productNameExplanation,
                 recognitionEnrichment));
+    }
+
+    private async Task<Result<CatalogImportRecognitionEnrichmentResult, DomainError>>
+        EnrichRowsByProductTypeAsync(
+            CatalogImportWorkbookAnalysis analysis,
+            CancellationToken cancellationToken)
+    {
+        var typedRows = new List<(CatalogImportRow Row, Guid ProductTypeId)>();
+
+        foreach (var row in analysis.Rows)
+        {
+            CatalogImportNormalizedRowData? data;
+
+            try
+            {
+                data = JsonSerializer.Deserialize<CatalogImportNormalizedRowData>(
+                    row.NormalizedDataJson,
+                    JsonOptions);
+            }
+            catch (JsonException)
+            {
+                return Result.Failure<CatalogImportRecognitionEnrichmentResult, DomainError>(
+                    CatalogImportErrors.InvalidNormalizedRow(row.RowNumber));
+            }
+            catch (NotSupportedException)
+            {
+                return Result.Failure<CatalogImportRecognitionEnrichmentResult, DomainError>(
+                    CatalogImportErrors.InvalidNormalizedRow(row.RowNumber));
+            }
+
+            if (data?.ProductTypeId is Guid productTypeId
+                && productTypeId != Guid.Empty)
+            {
+                typedRows.Add((row, productTypeId));
+            }
+        }
+
+        var summaries = new List<CatalogImportRecognitionEnrichmentSummary>();
+
+        foreach (var group in typedRows.GroupBy(item => item.ProductTypeId))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var rowProductType = await _metadataRepository
+                .GetProductTypeByIdAsync(group.Key, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (rowProductType is null)
+            {
+                return Result.Failure<CatalogImportRecognitionEnrichmentResult, DomainError>(
+                    CatalogImportErrors.ProductTypeNotFound(group.Key));
+            }
+
+            var definitionIds = rowProductType.Characteristics
+                .Select(characteristic =>
+                    characteristic.CharacteristicDefinitionId)
+                .Distinct()
+                .ToArray();
+
+            var rowDefinitions = await _metadataRepository
+                .GetCharacteristicDefinitionsByIdsAsync(
+                    definitionIds,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            var rows = group.Select(item => item.Row).ToArray();
+            var groupAnalysis = analysis with
+            {
+                Rows = rows,
+                ValidRowsCount = rows.Count(row =>
+                    row.Status == CatalogImportRowStatus.Valid),
+                ErrorRowsCount = rows.Count(row =>
+                    row.Status == CatalogImportRowStatus.Error)
+            };
+
+            var enrichmentResult = await _recognitionEnrichmentService
+                .EnrichAsync(
+                    groupAnalysis,
+                    rowProductType,
+                    rowDefinitions,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            if (enrichmentResult.IsFailure)
+            {
+                return Result.Failure<CatalogImportRecognitionEnrichmentResult, DomainError>(
+                    enrichmentResult.Error);
+            }
+
+            summaries.Add(enrichmentResult.Value.Summary);
+        }
+
+        var effectiveAnalysis = analysis with
+        {
+            ValidRowsCount = analysis.Rows.Count(row =>
+                row.Status == CatalogImportRowStatus.Valid),
+            ErrorRowsCount = analysis.Rows.Count(row =>
+                row.Status == CatalogImportRowStatus.Error)
+        };
+
+        return Result.Success<CatalogImportRecognitionEnrichmentResult, DomainError>(
+            new CatalogImportRecognitionEnrichmentResult(
+                effectiveAnalysis,
+                MergeEnrichmentSummaries(summaries)));
+    }
+
+    private static CatalogImportRecognitionEnrichmentSummary MergeEnrichmentSummaries(
+        List<CatalogImportRecognitionEnrichmentSummary> summaries)
+    {
+        if (summaries.Count == 0)
+        {
+            return CatalogImportRecognitionEnrichmentSummary.Empty;
+        }
+
+        var appliedValues = summaries
+            .SelectMany(summary => summary.AppliedValues)
+            .Take(CatalogImportRecognitionEnrichmentService.MaximumAppliedValueDetails)
+            .ToArray();
+
+        var totalAppliedValueDetails = summaries.Sum(summary =>
+            summary.AppliedValues.Count);
+
+        return new CatalogImportRecognitionEnrichmentSummary(
+            summaries.Sum(summary => summary.RowsAnalyzedCount),
+            summaries.Sum(summary => summary.FilledRowsCount),
+            summaries.Sum(summary => summary.FilledValuesCount),
+            summaries.Sum(summary => summary.BlockedByRecognitionConflictCount),
+            summaries.Sum(summary => summary.BlockedByLowConfidenceCount),
+            summaries.Sum(summary => summary.BlockedByUnsupportedSourceCount),
+            summaries.Sum(summary => summary.BlockedByInvalidExcelValueCount),
+            summaries.Sum(summary => summary.BlockedByInvalidRecognizedValueCount),
+            summaries.Sum(summary => summary.FailedRecognitionRowsCount),
+            summaries.Any(summary => summary.AppliedValuesDetailsTruncated)
+                || totalAppliedValueDetails > appliedValues.Length,
+            appliedValues);
     }
 }

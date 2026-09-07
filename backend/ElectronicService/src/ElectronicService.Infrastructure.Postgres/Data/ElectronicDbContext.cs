@@ -3,6 +3,8 @@ using ElectronicService.Domain.Catalog.Characteristics;
 using ElectronicService.Domain.Catalog.Dictionaries;
 using ElectronicService.Domain.Catalog.ImportBatches;
 using ElectronicService.Domain.Catalog.Manufacturers;
+using ElectronicService.Domain.Catalog.PriceCalculations;
+using ElectronicService.Domain.Catalog.PriceLists;
 using ElectronicService.Domain.Catalog.Products;
 using ElectronicService.Domain.Catalog.ProductTypes;
 using ElectronicService.Domain.Catalog.Recognition;
@@ -49,6 +51,18 @@ public sealed class ElectronicDbContext : DbContext
     public DbSet<CatalogImportColumn> CatalogImportColumns => Set<CatalogImportColumn>();
 
     public DbSet<CatalogImportRow> CatalogImportRows => Set<CatalogImportRow>();
+
+    public DbSet<CatalogPriceList> CatalogPriceLists => Set<CatalogPriceList>();
+
+    public DbSet<CatalogPriceListFile> CatalogPriceListFiles => Set<CatalogPriceListFile>();
+
+    public DbSet<CatalogPriceListRow> CatalogPriceListRows => Set<CatalogPriceListRow>();
+
+    public DbSet<CatalogPriceCalculation> CatalogPriceCalculations => Set<CatalogPriceCalculation>();
+
+    public DbSet<CatalogPriceCalculationLine> CatalogPriceCalculationLines => Set<CatalogPriceCalculationLine>();
+
+    public DbSet<CatalogPriceCalculationManufacturerDiscount> CatalogPriceCalculationManufacturerDiscounts => Set<CatalogPriceCalculationManufacturerDiscount>();
 
     public DbSet<CatalogCharacteristicRecognitionProfile> CatalogCharacteristicRecognitionProfiles => Set<CatalogCharacteristicRecognitionProfile>();
 

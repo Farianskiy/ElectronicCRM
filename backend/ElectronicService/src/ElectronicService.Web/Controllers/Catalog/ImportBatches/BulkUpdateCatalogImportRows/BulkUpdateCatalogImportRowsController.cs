@@ -37,6 +37,7 @@ public sealed class BulkUpdateCatalogImportRowsController : ControllerBase
                     row.RowId,
                     row.Name,
                     row.Article,
+                    row.ProductTypeId,
                     row.ManufacturerId,
                     row.Price,
                     row.StockQuantity,
@@ -47,7 +48,8 @@ public sealed class BulkUpdateCatalogImportRowsController : ControllerBase
             batchId,
             currentUserId,
             request.ExpectedVersion,
-            commandRows);
+            commandRows,
+            request.ConfirmRecognitionSuggestions);
 
         var result = await handler
             .Handle(command, cancellationToken)

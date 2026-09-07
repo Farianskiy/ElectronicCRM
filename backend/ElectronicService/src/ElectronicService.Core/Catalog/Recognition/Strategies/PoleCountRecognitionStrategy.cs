@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 using ElectronicService.Core.Catalog.Recognition.Abstractions;
 using ElectronicService.Core.Catalog.Recognition.Models;
@@ -26,7 +27,7 @@ public sealed partial class PoleCountRecognitionStrategy : ICatalogCharacteristi
             .Select(match => new CatalogRecognizedCharacteristic(
                 CharacteristicCode,
                 match.Value.Trim(),
-                CatalogRecognitionTextNormalizer.NormalizeValue(match.Groups["value"].Value),
+                NormalizePoleCount(match),
                 0.9900m,
                 CatalogRecognitionSource.Rule,
                 match.Index,
@@ -36,8 +37,25 @@ public sealed partial class PoleCountRecognitionStrategy : ICatalogCharacteristi
             .ToArray();
     }
 
+    private static string NormalizePoleCount(Match match)
+    {
+        var normalizedValue = CatalogRecognitionTextNormalizer.NormalizeValue(match.Groups["value"].Value);
+
+        if (!match.Groups["neutral"].Success)
+        {
+            return normalizedValue;
+        }
+
+        if (!int.TryParse(normalizedValue, NumberStyles.None, CultureInfo.InvariantCulture, out var poleCount))
+        {
+            return normalizedValue;
+        }
+
+        return (poleCount + 1).ToString(CultureInfo.InvariantCulture);
+    }
+
     [GeneratedRegex(
-        @"(?<value>\d+)\s*(?:П|P|Р)\b",
+        @"(?<value>\d+)\s*(?:П|P|Р)(?<neutral>\s*\+\s*(?:Н|N))?\b",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
         RegexTimeoutMilliseconds)]
     private static partial Regex PoleCountRegex();

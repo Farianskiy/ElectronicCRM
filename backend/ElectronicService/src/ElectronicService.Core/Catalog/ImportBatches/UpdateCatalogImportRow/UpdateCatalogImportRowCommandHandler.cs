@@ -101,12 +101,6 @@ public sealed class UpdateCatalogImportRowCommandHandler
                 CatalogImportErrors.BatchRowsCannotBeEdited(batch.Status));
         }
 
-        if (batch.ProductTypeId is not Guid productTypeId)
-        {
-            return Result.Failure<UpdateCatalogImportRowResult, DomainError>(
-                CatalogImportErrors.ProductTypeIsRequired());
-        }
-
         var row = await _importBatchRepository
             .GetRowByIdAsync(command.BatchId, command.RowId, cancellationToken)
             .ConfigureAwait(false);
@@ -125,14 +119,25 @@ public sealed class UpdateCatalogImportRowCommandHandler
                 CatalogImportErrors.InvalidImportJson(nameof(CatalogImportRow.NormalizedDataJson)));
         }
 
+        var productTypeId = command.ProductTypeId
+            ?? previousData.ProductTypeId
+            ?? batch.ProductTypeId;
+
+        if (productTypeId is not Guid effectiveProductTypeId
+            || effectiveProductTypeId == Guid.Empty)
+        {
+            return Result.Failure<UpdateCatalogImportRowResult, DomainError>(
+                CatalogImportErrors.ProductTypeIsRequired());
+        }
+
         var productType = await _metadataRepository
-                    .GetProductTypeByIdAsync(productTypeId, cancellationToken)
+                    .GetProductTypeByIdAsync(effectiveProductTypeId, cancellationToken)
             .ConfigureAwait(false);
 
         if (productType is null)
         {
             return Result.Failure<UpdateCatalogImportRowResult, DomainError>(
-                CatalogImportErrors.ProductTypeNotFound(productTypeId));
+                CatalogImportErrors.ProductTypeNotFound(effectiveProductTypeId));
         }
 
         var characteristicDefinitionIds = productType.Characteristics
@@ -169,7 +174,10 @@ public sealed class UpdateCatalogImportRowCommandHandler
             command.Price,
             command.StockQuantity,
             command.Characteristics,
-            command.ManufacturerId);
+            command.ManufacturerId,
+            ProductTypeId: effectiveProductTypeId,
+            ProductTypeResolutionSource: "Manual",
+            ProductTypeResolutionConfidence: 1.0000m);
 
         var validationResult = _rowValidator.Validate(
             data,

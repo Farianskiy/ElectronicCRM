@@ -65,12 +65,32 @@ public sealed class User : AggregateRoot
         return IsActive;
     }
 
+    public bool CanCreatePriceCalculation()
+    {
+        return IsActive;
+    }
+
+    public bool CanModifyOwnPriceCalculation()
+    {
+        return IsActive;
+    }
+
+    public bool CanViewOwnPriceCalculations()
+    {
+        return IsActive;
+    }
+
     public bool CanFindProductAlternatives()
     {
         return IsActive;
     }
 
     public bool CanUpdateProductPrice()
+    {
+        return IsActive && IsTechnical;
+    }
+
+    public bool CanManageCatalogPriceLists()
     {
         return IsActive && IsTechnical;
     }

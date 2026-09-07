@@ -309,7 +309,9 @@ public sealed class CatalogImportBatchApplier : ICatalogImportBatchApplier
                 CatalogImportErrors.InvalidRowsStatistics());
         }
 
-        var preparedRowsResult = PrepareRows(rows);
+        var preparedRowsResult = PrepareRows(
+            rows,
+            batch.ProductTypeId);
 
         if (preparedRowsResult.IsFailure)
         {
@@ -341,26 +343,32 @@ public sealed class CatalogImportBatchApplier : ICatalogImportBatchApplier
             }
         }
 
-        if (batch.ProductTypeId is not Guid productTypeId)
-        {
-            return Result.Failure<CatalogImportApplyExecutionResult, DomainError>(
-                CatalogImportErrors.ProductTypeIsRequired());
-        }
+        var productTypeIds = preparedRows
+            .Select(row => row.Data.ProductTypeId!.Value)
+            .Distinct()
+            .ToArray();
 
-        var productType = await _dbContext.ProductTypes
+        var productTypes = await _dbContext.ProductTypes
             .Include(type => type.Characteristics)
-            .FirstOrDefaultAsync(
-                type => type.Id == productTypeId,
-                cancellationToken)
+            .Where(type => productTypeIds.Contains(type.Id))
+            .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        if (productType is null)
+        var productTypesById = productTypes.ToDictionary(type => type.Id);
+
+        var missingProductTypeId = productTypeIds
+            .Where(productTypeId => !productTypesById.ContainsKey(productTypeId))
+            .Select(productTypeId => (Guid?)productTypeId)
+            .FirstOrDefault();
+
+        if (missingProductTypeId.HasValue)
         {
             return Result.Failure<CatalogImportApplyExecutionResult, DomainError>(
-                CatalogImportErrors.ProductTypeNotFound(productTypeId));
+                CatalogImportErrors.ProductTypeNotFound(missingProductTypeId.Value));
         }
 
-        var allowedDefinitionIds = productType.Characteristics
+        var allowedDefinitionIds = productTypes
+            .SelectMany(type => type.Characteristics)
             .Select(characteristic => characteristic.CharacteristicDefinitionId)
             .Distinct()
             .ToArray();
@@ -420,6 +428,7 @@ public sealed class CatalogImportBatchApplier : ICatalogImportBatchApplier
 
             var data = preparedRow.Data;
             var manufacturerId = data.ManufacturerId!.Value;
+            var productType = productTypesById[data.ProductTypeId!.Value];
 
             var moneyResult = Money.Create(data.Price ?? 0m);
 
@@ -561,7 +570,8 @@ public sealed class CatalogImportBatchApplier : ICatalogImportBatchApplier
     }
 
     private static Result<List<PreparedImportRow>, DomainError> PrepareRows(
-        List<CatalogImportRow> rows)
+        List<CatalogImportRow> rows,
+        Guid? batchProductTypeId)
     {
         var preparedRows = new List<PreparedImportRow>(rows.Count);
 
@@ -591,11 +601,27 @@ public sealed class CatalogImportBatchApplier : ICatalogImportBatchApplier
                         row.RowNumber));
             }
 
+            if (data is not null
+                && (data.ProductTypeId is null
+                    || data.ProductTypeId == Guid.Empty)
+                && batchProductTypeId is Guid defaultProductTypeId
+                && defaultProductTypeId != Guid.Empty)
+            {
+                data = data with
+                {
+                    ProductTypeId = defaultProductTypeId,
+                    ProductTypeResolutionSource = "BatchDefault",
+                    ProductTypeResolutionConfidence = 1.0000m
+                };
+            }
+
             if (data is null
                 || string.IsNullOrWhiteSpace(data.Name)
                 || string.IsNullOrWhiteSpace(data.Article)
                 || data.ManufacturerId is null
                 || data.ManufacturerId == Guid.Empty
+                || data.ProductTypeId is null
+                || data.ProductTypeId == Guid.Empty
                 || data.Characteristics is null)
             {
                 return Result.Failure<List<PreparedImportRow>, DomainError>(

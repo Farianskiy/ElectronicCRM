@@ -34,6 +34,7 @@ public sealed class CatalogAssistantDictionarySuggestionRepository : ICatalogAss
                 && existingSuggestion.SuggestedKind == suggestion.SuggestedKind
                 && string.Equals(existingSuggestion.SuggestedTargetCode, suggestion.SuggestedTargetCode, StringComparison.Ordinal)
                 && string.Equals(existingSuggestion.SuggestedTargetValue, suggestion.SuggestedTargetValue, StringComparison.Ordinal)
+                && existingSuggestion.ManufacturerId == suggestion.ManufacturerId
                 && existingSuggestion.ProductTypeId == suggestion.ProductTypeId
                 && existingSuggestion.CharacteristicDefinitionId == suggestion.CharacteristicDefinitionId);
 
@@ -49,6 +50,7 @@ public sealed class CatalogAssistantDictionarySuggestionRepository : ICatalogAss
                 && existingSuggestion.SuggestedKind == suggestion.SuggestedKind
                 && existingSuggestion.SuggestedTargetCode == suggestion.SuggestedTargetCode
                 && existingSuggestion.SuggestedTargetValue == suggestion.SuggestedTargetValue
+                && existingSuggestion.ManufacturerId == suggestion.ManufacturerId
                 && existingSuggestion.ProductTypeId == suggestion.ProductTypeId
                 && existingSuggestion.CharacteristicDefinitionId == suggestion.CharacteristicDefinitionId,
             cancellationToken).ConfigureAwait(false);

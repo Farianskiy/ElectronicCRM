@@ -61,14 +61,6 @@ public sealed class CatalogImportRecognitionEnrichmentService : ICatalogImportRe
                 group => group.Single(),
                 StringComparer.Ordinal);
 
-        if (definitionsByCode.Count == 0)
-        {
-            return Result.Success<CatalogImportRecognitionEnrichmentResult, DomainError>(
-                new CatalogImportRecognitionEnrichmentResult(
-                    analysis,
-                    CatalogImportRecognitionEnrichmentSummary.Empty));
-        }
-
         var allowedCharacteristicCodes = definitionsByCode.Keys.ToArray();
 
         var rowsAnalyzedCount = 0;
@@ -113,7 +105,8 @@ public sealed class CatalogImportRecognitionEnrichmentService : ICatalogImportRe
                         new CatalogProductNameRecognitionRequest(
                             data.Name,
                             productType.Id,
-                            allowedCharacteristicCodes),
+                            allowedCharacteristicCodes,
+                            data.ManufacturerId),
                         cancellationToken)
                     .ConfigureAwait(false);
             }
@@ -135,9 +128,14 @@ public sealed class CatalogImportRecognitionEnrichmentService : ICatalogImportRe
                     item => item.Value,
                     StringComparer.Ordinal);
 
+            var characteristicRecognitionSuggestions = new Dictionary<string, CatalogImportCharacteristicRecognitionSuggestion>(StringComparer.Ordinal);
+
             var conflictCodes = recognitionResult.Conflicts
                 .Select(conflict => CatalogRecognitionTextNormalizer.NormalizeCode(conflict.CharacteristicCode))
                 .ToHashSet(StringComparer.Ordinal);
+
+            var recognitionIssues = new List<CatalogImportRowIssue>();
+            var recognitionWarnings = new List<CatalogImportRowIssue>();
 
             foreach (var conflictCode in conflictCodes)
             {
@@ -161,6 +159,13 @@ public sealed class CatalogImportRecognitionEnrichmentService : ICatalogImportRe
                 }
 
                 blockedByRecognitionConflictCount++;
+
+                recognitionIssues.Add(
+                    new CatalogImportRowIssue(
+                        "characteristic.recognition_conflict",
+                        $"В наименовании найдено несколько значений характеристики '{definition.Name}'. Укажите значение вручную.",
+                        definitionKey,
+                        null));
             }
 
             var appliedValuesInCurrentRow = new List<CatalogImportRecognitionAppliedValue>();
@@ -179,6 +184,42 @@ public sealed class CatalogImportRecognitionEnrichmentService : ICatalogImportRe
 
                 if (HasCharacteristicValue(characteristics, definitionKey))
                 {
+                    if (recognizedCharacteristic.Confidence >= MinimumAutomaticFillConfidence
+                        && IsAutomaticFillSourceAllowed(recognizedCharacteristic)
+                        && TryNormalizeRecognizedValue(
+                            definition,
+                            recognizedCharacteristic.NormalizedValue,
+                            data.Manufacturer,
+                            out var recognizedValue))
+                    {
+                        characteristicRecognitionSuggestions[definitionKey] = CatalogImportCharacteristicRecognitionSuggestion.FromRecognition(recognizedCharacteristic, recognizedValue);
+
+                        var explicitValue = characteristics[definitionKey];
+
+                        if (TryNormalizeRecognizedValue(
+                                definition,
+                                explicitValue,
+                                data.Manufacturer,
+                                out var normalizedExplicitValue))
+                        {
+                            explicitValue = normalizedExplicitValue;
+                            characteristics[definitionKey] = normalizedExplicitValue;
+                        }
+
+                        if (!string.Equals(
+                                explicitValue,
+                                recognizedValue,
+                                StringComparison.OrdinalIgnoreCase))
+                        {
+                            recognitionIssues.Add(
+                                new CatalogImportRowIssue(
+                                    "characteristic.value_conflict",
+                                    $"Значение характеристики '{definition.Name}' в Excel ('{explicitValue}') не совпадает со значением из наименования ('{recognizedValue}').",
+                                    definitionKey,
+                                    null));
+                        }
+                    }
+
                     continue;
                 }
 
@@ -198,6 +239,13 @@ public sealed class CatalogImportRecognitionEnrichmentService : ICatalogImportRe
                 {
                     blockedByLowConfidenceCount++;
 
+                    recognitionWarnings.Add(
+                        new CatalogImportRowIssue(
+                            "characteristic.low_confidence",
+                            $"Характеристика '{definition.Name}' распознана с недостаточной уверенностью ({recognizedCharacteristic.Confidence:P0}) и не заполнена автоматически.",
+                            definitionKey,
+                            null));
+
                     continue;
                 }
 
@@ -211,6 +259,7 @@ public sealed class CatalogImportRecognitionEnrichmentService : ICatalogImportRe
                 if (!TryNormalizeRecognizedValue(
                         definition,
                         recognizedCharacteristic.NormalizedValue,
+                        data.Manufacturer,
                         out var normalizedValue))
                 {
                     blockedByInvalidRecognizedValueCount++;
@@ -238,15 +287,11 @@ public sealed class CatalogImportRecognitionEnrichmentService : ICatalogImportRe
                         recognizedCharacteristic.RecognizerKey));
             }
 
-            if (appliedValuesInCurrentRow.Count == 0)
-            {
-                continue;
-            }
-
             var enrichedData = data with
             {
                 Characteristics = characteristics,
-                CharacteristicOrigins = characteristicOrigins
+                CharacteristicOrigins = characteristicOrigins,
+                CharacteristicRecognitionSuggestions = characteristicRecognitionSuggestions
             };
 
             var validationResult = _rowValidator.Validate(
@@ -254,8 +299,20 @@ public sealed class CatalogImportRecognitionEnrichmentService : ICatalogImportRe
                 productType,
                 characteristicDefinitions);
 
+            var combinedIssues = validationResult.Issues
+                .Concat(
+                    existingIssues.Where(issue =>
+                        string.Equals(
+                            issue.Code,
+                            "characteristic.invalid",
+                            StringComparison.Ordinal)))
+                .Concat(recognitionIssues)
+                .Distinct()
+                .ToArray();
+
             var combinedWarnings = existingWarnings
                 .Concat(validationResult.Warnings)
+                .Concat(recognitionWarnings)
                 .Distinct()
                 .ToArray();
 
@@ -264,7 +321,7 @@ public sealed class CatalogImportRecognitionEnrichmentService : ICatalogImportRe
                 JsonOptions);
 
             var issuesJson = JsonSerializer.Serialize(
-                validationResult.Issues,
+                combinedIssues,
                 JsonOptions);
 
             var warningsJson = JsonSerializer.Serialize(
@@ -272,7 +329,9 @@ public sealed class CatalogImportRecognitionEnrichmentService : ICatalogImportRe
                 JsonOptions);
 
             var replaceResult = row.ReplaceValidationResult(
-                validationResult.Status,
+                combinedIssues.Length == 0
+                    ? CatalogImportRowStatus.Valid
+                    : CatalogImportRowStatus.Error,
                 normalizedDataJson,
                 issuesJson,
                 warningsJson);
@@ -283,8 +342,11 @@ public sealed class CatalogImportRecognitionEnrichmentService : ICatalogImportRe
                     replaceResult.Error);
             }
 
-            filledRowsCount++;
-            filledValuesCount += appliedValuesInCurrentRow.Count;
+            if (appliedValuesInCurrentRow.Count > 0)
+            {
+                filledRowsCount++;
+                filledValuesCount += appliedValuesInCurrentRow.Count;
+            }
 
             var remainingAppliedValueDetailsCapacity = MaximumAppliedValueDetails - appliedValues.Count;
 
@@ -374,16 +436,19 @@ public sealed class CatalogImportRecognitionEnrichmentService : ICatalogImportRe
     }
 
     private static bool TryNormalizeRecognizedValue(
-        CharacteristicDefinition definition,
-        string rawValue,
-        out string normalizedValue)
+    CharacteristicDefinition definition,
+    string rawValue,
+    string? manufacturerName,
+    out string normalizedValue)
     {
         switch (definition.DataType)
         {
             case CharacteristicDataType.Text:
-                normalizedValue = rawValue.Trim();
-
-                return normalizedValue.Length > 0;
+                return CatalogCharacteristicTextValueNormalizer.TryNormalizeToString(
+                    definition.Code,
+                    rawValue,
+                    manufacturerName,
+                    out normalizedValue);
 
             case CharacteristicDataType.Number:
                 return CatalogCharacteristicNumericValueNormalizer.TryNormalizeToString(

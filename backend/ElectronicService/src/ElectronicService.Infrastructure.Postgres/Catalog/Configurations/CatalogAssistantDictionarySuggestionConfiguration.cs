@@ -1,5 +1,6 @@
 using ElectronicService.Domain.Catalog.Characteristics;
 using ElectronicService.Domain.Catalog.Dictionaries;
+using ElectronicService.Domain.Catalog.Manufacturers;
 using ElectronicService.Domain.Catalog.ProductTypes;
 using ElectronicService.Domain.Users;
 using Microsoft.EntityFrameworkCore;
@@ -35,7 +36,7 @@ internal sealed class CatalogAssistantDictionarySuggestionConfiguration : IEntit
 
             table.HasCheckConstraint(
                 "ck_dictionary_suggestions_recognition_learning",
-                "\"source\" <> 'RecognitionLearning' OR (\"generated_automatically\" = TRUE AND \"product_type_id\" IS NOT NULL AND \"characteristic_definition_id\" IS NOT NULL AND \"suggested_kind\" = 'Characteristic')");
+                "\"source\" <> 'RecognitionLearning' OR (\"generated_automatically\" = TRUE AND \"manufacturer_id\" IS NOT NULL AND \"product_type_id\" IS NOT NULL AND \"characteristic_definition_id\" IS NOT NULL AND \"suggested_kind\" = 'Characteristic')");
 
             table.HasCheckConstraint(
                 "ck_dictionary_suggestions_approved_kind",
@@ -55,6 +56,7 @@ internal sealed class CatalogAssistantDictionarySuggestionConfiguration : IEntit
                 "\"approved_kind\" IS NULL AND " +
                 "\"approved_target_code\" IS NULL AND " +
                 "\"approved_target_value\" IS NULL AND " +
+                "\"approved_manufacturer_id\" IS NULL AND " +
                 "\"approved_product_type_id\" IS NULL AND " +
                 "\"approved_characteristic_definition_id\" IS NULL AND " +
                 "\"approved_priority\" IS NULL AND " +
@@ -114,6 +116,9 @@ internal sealed class CatalogAssistantDictionarySuggestionConfiguration : IEntit
             .HasDefaultValue(CatalogDictionarySuggestionSource.Assistant)
             .IsRequired();
 
+        builder.Property(suggestion => suggestion.ManufacturerId)
+            .HasColumnName("manufacturer_id");
+
         builder.Property(suggestion => suggestion.ProductTypeId)
             .HasColumnName("product_type_id");
 
@@ -162,6 +167,9 @@ internal sealed class CatalogAssistantDictionarySuggestionConfiguration : IEntit
             .HasColumnName("approved_target_value")
             .HasMaxLength(CatalogAssistantDictionarySuggestion.SuggestedTargetValueMaxLength);
 
+        builder.Property(suggestion => suggestion.ApprovedManufacturerId)
+            .HasColumnName("approved_manufacturer_id");
+
         builder.Property(suggestion => suggestion.ApprovedProductTypeId)
             .HasColumnName("approved_product_type_id");
 
@@ -208,6 +216,12 @@ internal sealed class CatalogAssistantDictionarySuggestionConfiguration : IEntit
 
         builder.Ignore(suggestion => suggestion.IsGeneratedFromRecognitionLearning);
 
+        builder.HasOne<Manufacturer>()
+            .WithMany()
+            .HasForeignKey(suggestion => suggestion.ManufacturerId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_dictionary_suggestions_manufacturer");
+
         builder.HasOne<ProductType>()
             .WithMany()
             .HasForeignKey(suggestion => suggestion.ProductTypeId)
@@ -219,6 +233,12 @@ internal sealed class CatalogAssistantDictionarySuggestionConfiguration : IEntit
             .HasForeignKey(suggestion => suggestion.CharacteristicDefinitionId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_dictionary_suggestions_characteristic");
+
+        builder.HasOne<Manufacturer>()
+            .WithMany()
+            .HasForeignKey(suggestion => suggestion.ApprovedManufacturerId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_dictionary_suggestions_approved_manufacturer");
 
         builder.HasOne<ProductType>()
             .WithMany()
@@ -276,6 +296,7 @@ internal sealed class CatalogAssistantDictionarySuggestionConfiguration : IEntit
 
         builder.HasIndex(suggestion => new
         {
+            suggestion.ManufacturerId,
             suggestion.ProductTypeId,
             suggestion.CharacteristicDefinitionId,
             suggestion.Status
@@ -289,6 +310,7 @@ internal sealed class CatalogAssistantDictionarySuggestionConfiguration : IEntit
 
         builder.HasIndex(suggestion => new
         {
+            suggestion.ApprovedManufacturerId,
             suggestion.ApprovedProductTypeId,
             suggestion.ApprovedCharacteristicDefinitionId
         })

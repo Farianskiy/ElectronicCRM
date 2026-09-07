@@ -5,6 +5,7 @@ namespace ElectronicService.Core.Catalog.Characteristics.Normalization;
 public static class CatalogCharacteristicBooleanValueNormalizer
 {
     private const string HasThermalReleaseCharacteristicCode = "HAS_THERMAL_RELEASE";
+    private const string ReversibleCharacteristicCode = "REVERSIBLE";
 
     public static bool TryNormalize(string characteristicCode, string rawValue, out bool normalizedValue)
     {
@@ -42,6 +43,23 @@ public static class CatalogCharacteristicBooleanValueNormalizer
             case "НЕИМЕЕТСЯ":
                 normalizedValue = false;
                 return true;
+        }
+
+        if (string.Equals(normalizedCharacteristicCode, ReversibleCharacteristicCode, StringComparison.Ordinal))
+        {
+            switch (normalizedSource)
+            {
+                case "РЕВЕРСИВНЫЙ":
+                    normalizedValue = true;
+                    return true;
+
+                case "НЕРЕВЕРСИВНЫЙ":
+                    normalizedValue = false;
+                    return true;
+
+                default:
+                    return false;
+            }
         }
 
         if (!string.Equals(normalizedCharacteristicCode, HasThermalReleaseCharacteristicCode, StringComparison.Ordinal))

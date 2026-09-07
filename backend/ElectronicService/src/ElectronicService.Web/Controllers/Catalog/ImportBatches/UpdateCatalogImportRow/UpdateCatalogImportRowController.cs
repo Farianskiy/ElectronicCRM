@@ -38,6 +38,7 @@ public sealed class UpdateCatalogImportRowController : ControllerBase
             currentUserId,
             request.Name,
             request.Article,
+            request.ProductTypeId,
             request.ManufacturerId,
             request.Price,
             request.StockQuantity,

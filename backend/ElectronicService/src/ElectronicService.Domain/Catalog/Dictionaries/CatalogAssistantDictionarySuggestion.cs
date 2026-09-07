@@ -27,6 +27,7 @@ public sealed class CatalogAssistantDictionarySuggestion : AggregateRoot
         string suggestedTargetValue,
         decimal confidence,
         CatalogDictionarySuggestionSource source,
+        Guid? manufacturerId,
         Guid? productTypeId,
         Guid? characteristicDefinitionId,
         int occurrenceCount,
@@ -45,6 +46,7 @@ public sealed class CatalogAssistantDictionarySuggestion : AggregateRoot
         SuggestedTargetValue = suggestedTargetValue;
         Confidence = confidence;
         Source = source;
+        ManufacturerId = manufacturerId;
         ProductTypeId = productTypeId;
         CharacteristicDefinitionId = characteristicDefinitionId;
         OccurrenceCount = occurrenceCount;
@@ -77,6 +79,8 @@ public sealed class CatalogAssistantDictionarySuggestion : AggregateRoot
 
     public CatalogDictionarySuggestionSource Source { get; private set; }
 
+    public Guid? ManufacturerId { get; private set; }
+
     public Guid? ProductTypeId { get; private set; }
 
     public Guid? CharacteristicDefinitionId { get; private set; }
@@ -98,6 +102,8 @@ public sealed class CatalogAssistantDictionarySuggestion : AggregateRoot
     public string? ApprovedTargetCode { get; private set; }
 
     public string? ApprovedTargetValue { get; private set; }
+
+    public Guid? ApprovedManufacturerId { get; private set; }
 
     public Guid? ApprovedProductTypeId { get; private set; }
 
@@ -147,6 +153,7 @@ public sealed class CatalogAssistantDictionarySuggestion : AggregateRoot
             suggestedTargetValue,
             confidence,
             CatalogDictionarySuggestionSource.Assistant,
+            manufacturerId: null,
             productTypeId: null,
             characteristicDefinitionId: null,
             occurrenceCount: 1,
@@ -174,6 +181,11 @@ public sealed class CatalogAssistantDictionarySuggestion : AggregateRoot
             return GeneralErrors.ValueIsInvalid(nameof(candidate.CorrectedCount));
         }
 
+        if (!candidate.ManufacturerId.HasValue || candidate.ManufacturerId.Value == Guid.Empty)
+        {
+            return GeneralErrors.ValueIsInvalid(nameof(candidate.ManufacturerId));
+        }
+
         var originalMessage = $"Автоматическое предложение на основе Recognition Candidate {candidate.Id}. Тип товара: {candidate.ProductTypeCodeSnapshot}. Характеристика: {candidate.CharacteristicCodeSnapshot}. Всего наблюдений: {candidate.OccurrenceCount}. Подтверждений: {candidate.AcceptedCount}. Исправлений: {candidate.CorrectedCount}. Отклонений: {candidate.RejectedCount}.";
 
         return CreateInternal(
@@ -185,6 +197,7 @@ public sealed class CatalogAssistantDictionarySuggestion : AggregateRoot
             candidate.ProposedValue,
             confidence,
             CatalogDictionarySuggestionSource.RecognitionLearning,
+            candidate.ManufacturerId,
             candidate.ProductTypeId,
             candidate.CharacteristicDefinitionId,
             candidate.OccurrenceCount,
@@ -229,6 +242,7 @@ public sealed class CatalogAssistantDictionarySuggestion : AggregateRoot
         ApprovedKind = decision.Kind;
         ApprovedTargetCode = decision.TargetCode;
         ApprovedTargetValue = decision.TargetValue;
+        ApprovedManufacturerId = decision.ManufacturerId;
         ApprovedProductTypeId = decision.ProductTypeId;
         ApprovedCharacteristicDefinitionId = decision.CharacteristicDefinitionId;
         ApprovedPriority = decision.Priority;
@@ -304,6 +318,7 @@ public sealed class CatalogAssistantDictionarySuggestion : AggregateRoot
         string suggestedTargetValue,
         decimal confidence,
         CatalogDictionarySuggestionSource source,
+        Guid? manufacturerId,
         Guid? productTypeId,
         Guid? characteristicDefinitionId,
         int occurrenceCount,
@@ -351,6 +366,11 @@ public sealed class CatalogAssistantDictionarySuggestion : AggregateRoot
         if (source == CatalogDictionarySuggestionSource.None)
         {
             return GeneralErrors.ValueIsInvalid(nameof(source));
+        }
+
+        if (manufacturerId.HasValue && manufacturerId.Value == Guid.Empty)
+        {
+            return GeneralErrors.ValueIsInvalid(nameof(manufacturerId));
         }
 
         if (productTypeId.HasValue && productTypeId.Value == Guid.Empty)
@@ -405,6 +425,11 @@ public sealed class CatalogAssistantDictionarySuggestion : AggregateRoot
             return GeneralErrors.ValueIsInvalid(nameof(generatedAutomatically));
         }
 
+        if (source == CatalogDictionarySuggestionSource.RecognitionLearning && !manufacturerId.HasValue)
+        {
+            return GeneralErrors.ValueIsInvalid(nameof(manufacturerId));
+        }
+
         if (source == CatalogDictionarySuggestionSource.RecognitionLearning && (!productTypeId.HasValue || !characteristicDefinitionId.HasValue))
         {
             return GeneralErrors.ValueIsInvalid(nameof(productTypeId));
@@ -456,6 +481,7 @@ public sealed class CatalogAssistantDictionarySuggestion : AggregateRoot
             normalizedSuggestedTargetValue,
             confidence,
             source,
+            manufacturerId,
             productTypeId,
             characteristicDefinitionId,
             occurrenceCount,

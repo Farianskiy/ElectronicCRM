@@ -7,4 +7,6 @@ internal sealed record CatalogDictionaryTermSeed(
         CatalogDictionaryTermKind Kind,
         string? TargetCode,
         string TargetValue,
-        int Priority);
+        int Priority,
+        string? ManufacturerName = null,
+        string? ProductTypeCode = null);

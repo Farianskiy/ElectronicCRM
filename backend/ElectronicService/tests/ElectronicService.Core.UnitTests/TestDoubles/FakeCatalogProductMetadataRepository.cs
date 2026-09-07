@@ -54,6 +54,12 @@ internal sealed class FakeCatalogProductMetadataRepository
         private set;
     }
 
+    public int GetManufacturersCallsCount
+    {
+        get;
+        private set;
+    }
+
     public Guid? LastProductTypeId
     {
         get;
@@ -264,6 +270,18 @@ internal sealed class FakeCatalogProductMetadataRepository
 
         return Task.FromResult<Manufacturer?>(
             manufacturer);
+    }
+
+    public Task<IReadOnlyCollection<Manufacturer>> GetManufacturersAsync(
+        CancellationToken cancellationToken = default)
+    {
+        GetManufacturersCallsCount++;
+        LastManufacturerCancellationToken = cancellationToken;
+
+        IReadOnlyCollection<Manufacturer> manufacturers =
+            _manufacturers.Values.ToArray();
+
+        return Task.FromResult(manufacturers);
     }
 
     private static string NormalizeCode(

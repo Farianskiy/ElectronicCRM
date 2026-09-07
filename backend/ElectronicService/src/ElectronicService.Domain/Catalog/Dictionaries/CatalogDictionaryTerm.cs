@@ -10,6 +10,7 @@ public sealed class CatalogDictionaryTerm : AggregateRoot
 
     private CatalogDictionaryTerm(
         Guid id,
+        Guid? manufacturerId,
         Guid? productTypeId,
         string phrase,
         string normalizedPhrase,
@@ -21,6 +22,7 @@ public sealed class CatalogDictionaryTerm : AggregateRoot
         CatalogDictionaryTermSource source)
         : base(id)
     {
+        ManufacturerId = manufacturerId;
         ProductTypeId = productTypeId;
         Phrase = phrase;
         NormalizedPhrase = normalizedPhrase;
@@ -44,6 +46,8 @@ public sealed class CatalogDictionaryTerm : AggregateRoot
     private CatalogDictionaryTerm()
     {
     }
+
+    public Guid? ManufacturerId { get; private set; }
 
     public Guid? ProductTypeId { get; private set; }
 
@@ -85,8 +89,14 @@ public sealed class CatalogDictionaryTerm : AggregateRoot
         int priority,
         CatalogDictionaryTermStatus status,
         CatalogDictionaryTermSource source,
+        Guid? manufacturerId,
         Guid? productTypeId)
     {
+        if (manufacturerId == Guid.Empty)
+        {
+            return GeneralErrors.ValueIsInvalid(nameof(manufacturerId));
+        }
+
         if (productTypeId == Guid.Empty)
         {
             return GeneralErrors.ValueIsInvalid(nameof(productTypeId));
@@ -129,6 +139,7 @@ public sealed class CatalogDictionaryTerm : AggregateRoot
 
         return new CatalogDictionaryTerm(
             Guid.CreateVersion7(),
+            manufacturerId,
             productTypeId,
             phrase.Trim(),
             NormalizeText(phrase),

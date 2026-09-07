@@ -95,6 +95,11 @@ public sealed class ApproveCatalogAssistantDictionarySuggestionCommandHandler
             {
                 return UnitResult.Failure<DomainError>(CatalogErrors.RecognitionCandidateForSuggestionNotFound(suggestion.Id));
             }
+
+            if (!candidate.ManufacturerId.HasValue || candidate.ManufacturerId.Value == Guid.Empty || suggestion.ManufacturerId != candidate.ManufacturerId)
+            {
+                return UnitResult.Failure<DomainError>(GeneralErrors.ValueIsInvalid(nameof(suggestion.ManufacturerId)));
+            }
         }
 
         CatalogProductTypeCharacteristicSchemaResult? productTypeSchema = null;
@@ -160,6 +165,7 @@ public sealed class ApproveCatalogAssistantDictionarySuggestionCommandHandler
             kind,
             finalTargetCode,
             command.TargetValue,
+            suggestion.ManufacturerId,
             productTypeSchema?.ProductTypeId,
             characteristicDefinitionId,
             command.Priority);
@@ -179,6 +185,7 @@ public sealed class ApproveCatalogAssistantDictionarySuggestionCommandHandler
             decision.Priority,
             CatalogDictionaryTermStatus.Approved,
             CatalogDictionaryTermSource.UserCorrection,
+            decision.ManufacturerId,
             decision.ProductTypeId);
 
         if (termResult.IsFailure)

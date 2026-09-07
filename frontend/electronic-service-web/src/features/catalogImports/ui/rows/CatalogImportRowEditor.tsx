@@ -23,7 +23,7 @@ import type {
 
 interface CatalogImportRowEditorProps {
   batchId: string;
-  productTypeId: string;
+  defaultProductTypeId?: string | null;
   row: CatalogImportRow;
   onCancel: () => void;
   onSaved: (result: UpdateCatalogImportRowResponse) => void;
@@ -123,7 +123,7 @@ function normalizeCharacteristicValue(
 
 export function CatalogImportRowEditor({
   batchId,
-  productTypeId,
+  defaultProductTypeId,
   row,
   onCancel,
   onSaved,
@@ -133,6 +133,10 @@ export function CatalogImportRowEditor({
   const [name, setName] = useState(row.data.name ?? "");
 
   const [article, setArticle] = useState(row.data.article ?? "");
+
+  const [productTypeId, setProductTypeId] = useState(
+    row.data.productTypeId ?? defaultProductTypeId ?? "",
+  );
 
   const [manufacturerId, setManufacturerId] = useState(
     row.data.manufacturerId ?? "",
@@ -253,6 +257,10 @@ export function CatalogImportRowEditor({
       errors.push(parsedStockQuantity.error);
     }
 
+    if (!productTypeId) {
+      errors.push("Выберите тип товара.");
+    }
+
     if (errors.length > 0) {
       setFormErrors(errors);
 
@@ -283,6 +291,7 @@ export function CatalogImportRowEditor({
     const request: UpdateCatalogImportRowRequest = {
       name: name.trim() || null,
       article: article.trim() || null,
+      productTypeId: productTypeId || null,
       manufacturerId: manufacturerId || null,
       price: parsedPrice.value,
       stockQuantity: parsedStockQuantity.value,
@@ -406,6 +415,31 @@ export function CatalogImportRowEditor({
           )}
         </div>
 
+        <div className="grid content-start gap-2">
+          <span className="text-sm font-medium text-[var(--app-text)]">
+            Тип товара
+          </span>
+
+          <AppSelect
+            ariaLabel={`Тип товара строки ${row.rowNumber}`}
+            value={productTypeId}
+            disabled={isBusy}
+            onChange={(value) => {
+              setProductTypeId(value);
+              setCharacteristicValues({});
+              setFormErrors([]);
+              saveMutation.reset();
+            }}
+            options={[
+              { value: "", label: "Тип товара не выбран" },
+              ...(productTypesQuery.data ?? []).map((productType) => ({
+                value: productType.id,
+                label: `${productType.name} · ${productType.code}`,
+              })),
+            ]}
+          />
+        </div>
+
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="grid content-start gap-2">
             <span className="text-sm font-medium text-[var(--app-text)]">
@@ -456,7 +490,7 @@ export function CatalogImportRowEditor({
           <p className="mt-1 text-sm text-[var(--app-muted)]">
             Тип товара:{" "}
             <span className="text-[var(--app-text)]">
-              {selectedProductType?.name ?? productTypeId}
+              {selectedProductType?.name ?? "не выбран"}
             </span>
           </p>
         </div>

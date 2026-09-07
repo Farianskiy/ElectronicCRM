@@ -6,6 +6,7 @@ public sealed record UpdateCatalogImportRowCommand(
     Guid CurrentUserId,
     string? Name,
     string? Article,
+    Guid? ProductTypeId,
     Guid? ManufacturerId,
     decimal? Price,
     int? StockQuantity,

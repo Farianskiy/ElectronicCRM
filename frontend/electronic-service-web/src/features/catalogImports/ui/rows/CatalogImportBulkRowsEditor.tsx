@@ -25,7 +25,7 @@ import type {
 
 interface CatalogImportBulkRowsEditorProps {
   batchId: string;
-  productTypeId: string;
+  defaultProductTypeId?: string | null;
   expectedVersion: number;
   rows: CatalogImportRow[];
   onCancel: () => void;
@@ -160,7 +160,7 @@ function getCharacteristicLabel(
 
 export function CatalogImportBulkRowsEditor({
   batchId,
-  productTypeId,
+  defaultProductTypeId,
   expectedVersion,
   rows,
   onCancel,
@@ -171,6 +171,24 @@ export function CatalogImportBulkRowsEditor({
   const [drafts, setDrafts] = useState<
     Record<string, BulkCatalogImportRowDraft>
   >(() => createInitialDrafts(rows));
+
+  const [productTypeId, setProductTypeId] = useState(() => {
+    const rowProductTypeIds = [
+      ...new Set(
+        rows
+          .map((row) => row.data.productTypeId)
+          .filter((value): value is string => Boolean(value)),
+      ),
+    ];
+
+    return rowProductTypeIds.length === 1
+      ? rowProductTypeIds[0]
+      : (defaultProductTypeId ?? "");
+  });
+
+  const [commonManufacturerId, setCommonManufacturerId] = useState("");
+  const [confirmRecognitionSuggestions, setConfirmRecognitionSuggestions] =
+    useState(false);
 
   const [rowErrors, setRowErrors] = useState<Record<string, string[]>>({});
   const [generalError, setGeneralError] = useState<string | null>(null);
@@ -306,6 +324,14 @@ export function CatalogImportBulkRowsEditor({
     const nextRowErrors: Record<string, string[]> = {};
     const requestRows: BulkUpdateCatalogImportRowRequest[] = [];
 
+    if (!productTypeId) {
+      setGeneralError(
+        "Выберите тип товара, который будет применён ко всем выбранным строкам.",
+      );
+
+      return;
+    }
+
     for (const row of rows) {
       const draft = drafts[row.rowId];
 
@@ -361,6 +387,7 @@ export function CatalogImportBulkRowsEditor({
         rowId: row.rowId,
         name: draft.name.trim() || null,
         article: draft.article.trim() || null,
+        productTypeId,
         manufacturerId: draft.manufacturerId || null,
         price: parsedPrice.value,
         stockQuantity: parsedStockQuantity.value,
@@ -389,6 +416,7 @@ export function CatalogImportBulkRowsEditor({
     saveMutation.mutate({
       expectedVersion,
       rows: requestRows,
+      confirmRecognitionSuggestions,
     });
   }
 
@@ -441,6 +469,110 @@ export function CatalogImportBulkRowsEditor({
           Загружаем производителей и характеристики выбранного типа товара...
         </div>
       )}
+
+      <label className="flex items-start gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4">
+        <input
+          type="checkbox"
+          checked={confirmRecognitionSuggestions}
+          disabled={isBusy}
+          onChange={(event) => {
+            setConfirmRecognitionSuggestions(event.target.checked);
+            setGeneralError(null);
+            saveMutation.reset();
+          }}
+          className="mt-1 h-4 w-4 shrink-0 accent-amber-500"
+        />
+
+        <span>
+          <span className="block text-sm font-semibold text-amber-100">
+            Подтвердить текущие значения как решение конфликтов
+          </span>
+
+          <span className="mt-1 block text-xs leading-5 text-amber-100/70">
+            Включайте только после проверки выбранных строк. При применении
+            импорта подтверждённые решения будут использованы для подготовки
+            предложений словаря. Правила не включаются автоматически.
+          </span>
+        </span>
+      </label>
+
+      <div className="grid gap-4 rounded-2xl border border-[var(--app-accent-border)] bg-[var(--app-accent-soft)] p-4 md:grid-cols-2">
+        <div className="grid content-start gap-2">
+          <span className="text-sm font-semibold text-[var(--app-text)]">
+            Общее исправление: тип товара
+          </span>
+
+          <p className="text-xs leading-5 text-[var(--app-muted)]">
+            Выбранный тип будет установлен для всех строк этой группы; набор
+            характеристик ниже обновится под него.
+          </p>
+
+          <AppSelect
+            ariaLabel="Тип товара для выбранных строк"
+            value={productTypeId}
+            disabled={isBusy}
+            onChange={(value) => {
+              setProductTypeId(value);
+              setGeneralError(null);
+              saveMutation.reset();
+            }}
+            options={[
+              { value: "", label: "Выберите тип товара" },
+              ...(productTypesQuery.data ?? []).map((productType) => ({
+                value: productType.id,
+                label: `${productType.name} · ${productType.code}`,
+              })),
+            ]}
+          />
+        </div>
+
+        <div className="grid content-start gap-2">
+          <span className="text-sm font-semibold text-[var(--app-text)]">
+            Общее исправление: производитель
+          </span>
+
+          <p className="text-xs leading-5 text-[var(--app-muted)]">
+            При выборе производитель будет установлен сразу во всех строках
+            открытой группы.
+          </p>
+
+          <AppSelect
+            ariaLabel="Производитель для выбранных строк"
+            value={commonManufacturerId}
+            disabled={isBusy}
+            onChange={(value) => {
+              setCommonManufacturerId(value);
+
+              if (!value) {
+                return;
+              }
+
+              setDrafts((currentDrafts) =>
+                Object.fromEntries(
+                  Object.entries(currentDrafts).map(([rowId, draft]) => [
+                    rowId,
+                    {
+                      ...draft,
+                      manufacturerId: value,
+                    },
+                  ]),
+                ),
+              );
+
+              setRowErrors({});
+              setGeneralError(null);
+              saveMutation.reset();
+            }}
+            options={[
+              { value: "", label: "Не изменять совместно" },
+              ...manufacturers.map((manufacturer) => ({
+                value: manufacturer.id,
+                label: manufacturer.name,
+              })),
+            ]}
+          />
+        </div>
+      </div>
 
       <div className="grid gap-4">
         {rows.map((row) => {

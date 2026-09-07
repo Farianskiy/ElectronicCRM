@@ -649,6 +649,7 @@ export interface UpdateCatalogImportMappingResponse {
 export interface UpdateCatalogImportRowRequest {
   name?: string | null;
   article?: string | null;
+  productTypeId?: string | null;
   manufacturerId?: string | null;
   price?: number | null;
   stockQuantity?: number | null;
@@ -673,6 +674,7 @@ export interface BulkUpdateCatalogImportRowRequest {
   rowId: string;
   name: string | null;
   article: string | null;
+  productTypeId: string | null;
   manufacturerId: string | null;
   price: number | null;
   stockQuantity: number | null;
@@ -682,6 +684,7 @@ export interface BulkUpdateCatalogImportRowRequest {
 export interface BulkUpdateCatalogImportRowsRequest {
   expectedVersion: number;
   rows: BulkUpdateCatalogImportRowRequest[];
+  confirmRecognitionSuggestions: boolean;
 }
 
 export interface BulkUpdatedCatalogImportRowResponse {

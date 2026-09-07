@@ -105,6 +105,52 @@ public sealed class CatalogImportProductTypeAssignmentService
                     || candidate.Confidence
                         < MinimumAutomaticConfidence)
                 {
+                    var issueCode = "product_type.not_resolved";
+                    var issueMessage =
+                        "Тип товара не удалось определить по наименованию. Выберите тип вручную.";
+
+                    if (suggestion.IsConflict)
+                    {
+                        issueCode = "product_type.conflict";
+                        issueMessage =
+                            "По наименованию найдено несколько возможных типов товара. Выберите тип вручную.";
+                    }
+                    else if (candidate is not null
+                             && candidate.Confidence < MinimumAutomaticConfidence)
+                    {
+                        issueCode = "product_type.low_confidence";
+                        issueMessage =
+                            $"Тип товара '{candidate.ProductTypeName}' распознан с недостаточной уверенностью ({candidate.Confidence:P0}). Подтвердите тип вручную.";
+                    }
+
+                    var unresolvedIssues = issues
+                        .Where(issue =>
+                            !string.Equals(
+                                issue.Code,
+                                "product_type.required",
+                                StringComparison.Ordinal))
+                        .Append(
+                            new CatalogImportRowIssue(
+                                issueCode,
+                                issueMessage,
+                                "productTypeId",
+                                null))
+                        .Distinct()
+                        .ToArray();
+
+                    var unresolvedReplaceResult = row.ReplaceValidationResult(
+                        CatalogImportRowStatus.Error,
+                        row.NormalizedDataJson,
+                        JsonSerializer.Serialize(unresolvedIssues, JsonOptions),
+                        row.WarningsJson);
+
+                    if (unresolvedReplaceResult.IsFailure)
+                    {
+                        return Result.Failure<
+                            CatalogImportWorkbookAnalysis,
+                            DomainError>(unresolvedReplaceResult.Error);
+                    }
+
                     continue;
                 }
 

@@ -89,6 +89,7 @@ public sealed class CatalogRecognitionCandidateAggregator : ICatalogRecognitionC
                 var createCandidateResult = CatalogRecognitionCandidate.Create(
                     identity.Phrase,
                     identity.NormalizedPhrase,
+                    feedback.ManufacturerId!.Value,
                     feedback.ProductTypeId,
                     feedback.ProductTypeCodeSnapshot,
                     feedback.CharacteristicDefinitionId,
@@ -187,6 +188,11 @@ public sealed class CatalogRecognitionCandidateAggregator : ICatalogRecognitionC
             return null;
         }
 
+        if (!feedback.ManufacturerId.HasValue || feedback.ManufacturerId.Value == Guid.Empty)
+        {
+            return null;
+        }
+
         if (string.IsNullOrWhiteSpace(feedback.SuggestedRawValue))
         {
             return null;
@@ -211,6 +217,7 @@ public sealed class CatalogRecognitionCandidateAggregator : ICatalogRecognitionC
 
         var candidateKey = CatalogRecognitionCandidate.BuildCandidateKey(
             normalizedPhrase,
+            feedback.ManufacturerId.Value,
             feedback.ProductTypeId,
             feedback.CharacteristicDefinitionId,
             trimmedProposedValue);
@@ -225,7 +232,8 @@ public sealed class CatalogRecognitionCandidateAggregator : ICatalogRecognitionC
 
     private static bool CandidateMatchesIdentity(CatalogRecognitionCandidate candidate, CatalogRecognitionFeedback feedback, CandidateIdentity identity)
     {
-        return candidate.ProductTypeId == feedback.ProductTypeId
+        return candidate.ManufacturerId == feedback.ManufacturerId
+            && candidate.ProductTypeId == feedback.ProductTypeId
             && candidate.CharacteristicDefinitionId == feedback.CharacteristicDefinitionId
             && string.Equals(candidate.NormalizedPhrase, identity.NormalizedPhrase, StringComparison.Ordinal)
             && string.Equals(candidate.ProposedValue, identity.ProposedValue, StringComparison.Ordinal);
