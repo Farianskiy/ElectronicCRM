@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import Link from "next/link";
 import type { FormEvent } from "react";
@@ -19,6 +19,7 @@ import type {
 import { AppSelect } from "@/shared/ui/AppSelect";
 import { AppInput } from "@/shared/ui/AppInput";
 import { AppButton } from "@/shared/ui/AppButton";
+import { importCatalogStock } from "@/features/catalogStockImport/api/importCatalogStock";
 
 function getErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
@@ -190,10 +191,13 @@ function CharacteristicFilterField({
 }
 
 export default function CatalogProductsPage() {
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [productTypeCode, setProductTypeCode] = useState("");
   const [manufacturer, setManufacturer] = useState("");
   const [onlyInStock, setOnlyInStock] = useState(false);
+  const [stockManufacturerId, setStockManufacturerId] = useState("");
+  const [stockFile, setStockFile] = useState<File | null>(null);
 
   const [characteristicValues, setCharacteristicValues] = useState<
     Record<string, string>
@@ -238,6 +242,15 @@ export default function CatalogProductsPage() {
         page,
         pageSize,
       }),
+  });
+
+  const stockImportMutation = useMutation({
+    mutationFn: importCatalogStock,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["catalog-products"],
+      });
+    },
   });
 
   const products = productsQuery.data?.items ?? [];
@@ -291,6 +304,19 @@ export default function CatalogProductsPage() {
     setCharacteristicValues({});
   }
 
+  function handleStockImport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!stockManufacturerId || !stockFile) {
+      return;
+    }
+
+    stockImportMutation.mutate({
+      manufacturerId: stockManufacturerId,
+      file: stockFile,
+    });
+  }
+
   return (
     <PageWorkspace
       eyebrow="Работа с каталогом"
@@ -298,6 +324,130 @@ export default function CatalogProductsPage() {
       description="Поиск и просмотр товаров, цен, остатков и характеристик."
       contentClassName="grid min-w-0 gap-6"
     >
+      <section
+        aria-labelledby="catalog-stock-import-title"
+        className="min-w-0 rounded-3xl border border-[var(--app-border)] bg-[var(--app-panel)] p-5 shadow-sm shadow-[var(--app-shadow)] sm:p-6"
+      >
+        <div>
+          <h2
+            id="catalog-stock-import-title"
+            className="text-lg font-semibold text-[var(--app-text)]"
+          >
+            Загрузка остатков
+          </h2>
+
+          <p className="mt-1 text-sm leading-6 text-[var(--app-muted)]">
+            Выберите производителя и XLSX-файл с колонками «Артикул» и
+            «Остаток». Обновятся только найденные товары; остальные строки и
+            товары будут пропущены.
+          </p>
+        </div>
+
+        <form
+          onSubmit={handleStockImport}
+          className="mt-5 grid min-w-0 gap-4 lg:grid-cols-[minmax(220px,1fr)_minmax(280px,2fr)_auto] lg:items-end"
+        >
+          <label className="grid min-w-0 content-start gap-2">
+            <span className="text-sm font-medium text-[var(--app-text)]">
+              Производитель
+            </span>
+
+            <AppSelect
+              ariaLabel="Производитель для загрузки остатков"
+              value={stockManufacturerId}
+              disabled={manufacturersQuery.isLoading}
+              onChange={setStockManufacturerId}
+              options={[
+                {
+                  value: "",
+                  label: manufacturersQuery.isLoading
+                    ? "Загружаем производителей..."
+                    : "Выберите производителя",
+                  disabled: manufacturersQuery.isLoading,
+                },
+                ...(manufacturersQuery.data ?? []).map(
+                  (manufacturerItem) => ({
+                    value: manufacturerItem.id,
+                    label: manufacturerItem.name,
+                  }),
+                ),
+              ]}
+            />
+          </label>
+
+          <label className="grid min-w-0 content-start gap-2">
+            <span className="text-sm font-medium text-[var(--app-text)]">
+              Файл остатков
+            </span>
+
+            <input
+              type="file"
+              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              onChange={(event) => {
+                setStockFile(event.target.files?.[0] ?? null);
+                stockImportMutation.reset();
+              }}
+              className="min-h-11 w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] px-3 py-2 text-sm text-[var(--app-text)] file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--app-accent-soft)] file:px-3 file:py-1.5 file:font-semibold file:text-[var(--app-accent)]"
+            />
+          </label>
+
+          <AppButton
+            type="submit"
+            variant="primary"
+            loading={stockImportMutation.isPending}
+            disabled={!stockManufacturerId || !stockFile}
+          >
+            Загрузить остатки
+          </AppButton>
+        </form>
+
+        {stockImportMutation.isError && (
+          <div
+            role="alert"
+            className="mt-4 rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-4 text-sm text-[var(--app-danger)]"
+          >
+            {getErrorMessage(stockImportMutation.error)}
+          </div>
+        )}
+
+        {stockImportMutation.data && (
+          <div
+            role="status"
+            className="mt-4 rounded-2xl border border-[var(--app-success-border)] bg-[var(--app-success-soft)] p-4"
+          >
+            <p className="font-semibold text-[var(--app-success)]">
+              Остатки загружены
+            </p>
+
+            <p className="mt-2 text-sm leading-6 text-[var(--app-text)]">
+              Прочитано строк: {stockImportMutation.data.readRowsCount}.
+              Совпало по артикулу:{" "}
+              {stockImportMutation.data.matchedRowsCount}. Изменено товаров:{" "}
+              {stockImportMutation.data.updatedProductsCount}. Пропущено:{" "}
+              {stockImportMutation.data.skippedRowsCount}.
+            </p>
+
+            {stockImportMutation.data.issues.length > 0 && (
+              <details className="mt-3 text-sm text-[var(--app-muted)]">
+                <summary className="cursor-pointer font-medium text-[var(--app-text)]">
+                  Показать примеры пропущенных строк
+                </summary>
+
+                <ul className="mt-2 grid gap-1 pl-5">
+                  {stockImportMutation.data.issues.map((issue) => (
+                    <li key={`${issue.rowNumber}-${issue.article}-${issue.message}`}>
+                      Строка {issue.rowNumber}
+                      {issue.article ? `, артикул ${issue.article}` : ""}:{" "}
+                      {issue.message}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
+        )}
+      </section>
+
       <section
         aria-labelledby="catalog-filters-title"
         className="min-w-0 rounded-3xl border border-[var(--app-border)] bg-[var(--app-panel)] p-5 shadow-sm shadow-[var(--app-shadow)] sm:p-6"
