@@ -43,6 +43,7 @@ public sealed class UsersController : ControllerBase
 
     // Создаёт технического пользователя
     [HttpPost("technical")]
+    [Authorize(Roles = "Technical")]
     public async Task<IActionResult> CreateTechnicalUser(
         [FromBody] CreateTechnicalUserRequest request,
         [FromServices] CreateTechnicalUserCommandHandler handler,
