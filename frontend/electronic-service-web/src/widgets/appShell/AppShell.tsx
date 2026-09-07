@@ -29,8 +29,10 @@ type NavigationIconName =
   | "home"
   | "assistant"
   | "products"
+  | "priceCalculations"
   | "imports"
   | "review"
+  | "priceLists"
   | "types"
   | "characteristics"
   | "quality"
@@ -82,6 +84,12 @@ const navigationGroups: NavigationGroup[] = [
         icon: "products",
       },
       {
+        href: "/catalog/price-calculations",
+        label: "Расчёт цен",
+        description: "Проектные скидки и расчёты",
+        icon: "priceCalculations",
+      },
+      {
         href: "/catalog/imports",
         label: "Импорт",
         description: "Загрузка и обработка Excel",
@@ -98,6 +106,13 @@ const navigationGroups: NavigationGroup[] = [
         label: "Очередь проверки",
         description: "Импорты, ожидающие решения",
         icon: "review",
+        technicalOnly: true,
+      },
+      {
+        href: "/catalog/price-lists",
+        label: "Прайс-листы",
+        description: "Загрузка, проверка и активация цен",
+        icon: "priceLists",
         technicalOnly: true,
       },
     ],
@@ -1059,6 +1074,14 @@ function NavigationIcon({ name }: { name: NavigationIconName }) {
     );
   }
 
+  if (name === "priceCalculations") {
+    return (
+      <NavigationIconContainer>
+        <path d="M4 5h16v14H4V5zM8 9h8M8 13h3M15 13h1M8 16h3M15 16h1" />
+      </NavigationIconContainer>
+    );
+  }
+
   if (name === "imports") {
     return (
       <NavigationIconContainer>
@@ -1071,6 +1094,14 @@ function NavigationIcon({ name }: { name: NavigationIconName }) {
     return (
       <NavigationIconContainer>
         <path d="M9 5H5a2 2 0 00-2 2v12a2 2 0 002 2h14a2 2 0 002-2V7a2 2 0 00-2-2h-4M9 3h6v4H9V3zM7 12l3 3 6-6" />
+      </NavigationIconContainer>
+    );
+  }
+
+  if (name === "priceLists") {
+    return (
+      <NavigationIconContainer>
+        <path d="M5 3h14v18H5V3zM8 7h8M8 11h8M8 15h4M15 15h1" />
       </NavigationIconContainer>
     );
   }

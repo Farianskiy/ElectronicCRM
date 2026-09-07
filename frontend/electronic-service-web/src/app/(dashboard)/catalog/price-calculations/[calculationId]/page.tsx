@@ -1,0 +1,833 @@
+"use client";
+
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { useMemo, useState, type FormEvent } from "react";
+import {
+  addCatalogPriceCalculationLine,
+  changeCatalogPriceCalculationLineQuantity,
+  completeCatalogPriceCalculation,
+  getCatalogPriceCalculation,
+  removeCatalogPriceCalculationLine,
+  removeCatalogPriceCalculationManufacturerDiscount,
+  searchCatalogPriceCalculationProducts,
+  setCatalogPriceCalculationManufacturerDiscount,
+} from "@/features/catalogPriceCalculations/api/catalogPriceCalculationEditorApi";
+import { catalogPriceCalculationQueryKeys } from "@/features/catalogPriceCalculations/model/queryKeys";
+import type {
+  CatalogPriceCalculationLine,
+  CatalogPriceCalculationManufacturerDiscount,
+  CatalogPriceCalculationProductSearchItem,
+  CatalogPriceCalculationStatus,
+} from "@/features/catalogPriceCalculations/model/types";
+import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
+import { formatDate, formatPrice } from "@/shared/lib/formatters";
+import { AppButton } from "@/shared/ui/AppButton";
+import { AppInput } from "@/shared/ui/AppInput";
+import { PageWorkspace } from "@/shared/ui/PageWorkspace";
+
+const productSearchPageSize = 20;
+
+function getStatusLabel(status: CatalogPriceCalculationStatus): string {
+  switch (status) {
+    case "Draft":
+      return "Черновик";
+    case "Completed":
+      return "Завершён";
+    case "Archived":
+      return "В архиве";
+  }
+}
+
+function formatQuantity(value: number): string {
+  return new Intl.NumberFormat("ru-RU", {
+    maximumFractionDigits: 3,
+  }).format(value);
+}
+
+function StatusBadge({ status }: { status: CatalogPriceCalculationStatus }) {
+  const className =
+    status === "Draft"
+      ? "border-[var(--app-warning-border)] bg-[var(--app-warning-soft)] text-[var(--app-warning)]"
+      : status === "Completed"
+        ? "border-[var(--app-success-border)] bg-[var(--app-success-soft)] text-[var(--app-success)]"
+        : "border-[var(--app-border)] bg-[var(--app-surface)] text-[var(--app-muted)]";
+
+  return (
+    <span
+      className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${className}`}
+    >
+      {getStatusLabel(status)}
+    </span>
+  );
+}
+
+function ProductSearchRow({
+  product,
+  currency,
+  isAdding,
+  onAdd,
+}: {
+  product: CatalogPriceCalculationProductSearchItem;
+  currency: string;
+  isAdding: boolean;
+  onAdd: (productId: string) => void;
+}) {
+  return (
+    <tr className="bg-[var(--app-panel)] align-top">
+      <td className="px-4 py-4">
+        <p className="font-medium text-[var(--app-text)]">{product.name}</p>
+
+        <p className="mt-1 text-xs text-[var(--app-muted)]">
+          {product.article}
+        </p>
+      </td>
+
+      <td className="px-4 py-4 text-[var(--app-muted)]">
+        {product.manufacturerName}
+      </td>
+
+      <td className="whitespace-nowrap px-4 py-4 tabular-nums text-[var(--app-text)]">
+        {formatPrice(product.basePriceAmount, currency)}
+      </td>
+
+      <td className="whitespace-nowrap px-4 py-4 tabular-nums text-[var(--app-muted)]">
+        {product.mrcPriceAmount === null || product.mrcPriceAmount === undefined
+          ? "—"
+          : formatPrice(product.mrcPriceAmount, currency)}
+      </td>
+
+      <td className="px-4 py-4">
+        <AppButton
+          type="button"
+          variant="primary"
+          size="sm"
+          loading={isAdding}
+          onClick={() => onAdd(product.productId)}
+        >
+          Добавить
+        </AppButton>
+      </td>
+    </tr>
+  );
+}
+
+function CalculationLineRow({
+  line,
+  currency,
+  editable,
+  isChanging,
+  isRemoving,
+  onChangeQuantity,
+  onRemove,
+}: {
+  line: CatalogPriceCalculationLine;
+  currency: string;
+  editable: boolean;
+  isChanging: boolean;
+  isRemoving: boolean;
+  onChangeQuantity: (lineId: string, quantity: number) => void;
+  onRemove: (line: CatalogPriceCalculationLine) => void;
+}) {
+  const [quantity, setQuantity] = useState(line.quantity.toString());
+
+  function handleSave(): void {
+    const parsedQuantity = Number(quantity.replace(",", "."));
+
+    if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
+      return;
+    }
+
+    onChangeQuantity(line.lineId, parsedQuantity);
+  }
+
+  return (
+    <tr className="bg-[var(--app-panel)] align-top">
+      <td className="px-4 py-4">
+        <p className="font-medium text-[var(--app-text)]">{line.name}</p>
+
+        <p className="mt-1 text-xs text-[var(--app-muted)]">{line.article}</p>
+      </td>
+
+      <td className="px-4 py-4 text-[var(--app-muted)]">
+        {line.manufacturerName}
+      </td>
+
+      <td className="px-4 py-4">
+        {editable ? (
+          <div className="flex min-w-[170px] items-center gap-2">
+            <AppInput
+              type="number"
+              min="0.001"
+              step="0.001"
+              value={quantity}
+              disabled={isChanging || isRemoving}
+              onChange={(event) => setQuantity(event.target.value)}
+              className="max-w-24"
+            />
+
+            <AppButton
+              type="button"
+              variant="secondary"
+              size="sm"
+              loading={isChanging}
+              disabled={Number(quantity.replace(",", ".")) === line.quantity}
+              onClick={handleSave}
+            >
+              Сохранить
+            </AppButton>
+          </div>
+        ) : (
+          <span className="tabular-nums text-[var(--app-text)]">
+            {formatQuantity(line.quantity)}
+          </span>
+        )}
+
+        {line.unit && (
+          <p className="mt-1 text-xs text-[var(--app-muted)]">
+            Единица: {line.unit}
+          </p>
+        )}
+      </td>
+
+      <td className="whitespace-nowrap px-4 py-4 tabular-nums text-[var(--app-text)]">
+        {formatPrice(line.basePriceAmount, currency)}
+      </td>
+
+      <td className="whitespace-nowrap px-4 py-4 tabular-nums text-[var(--app-muted)]">
+        {line.mrcPriceAmount === null || line.mrcPriceAmount === undefined
+          ? "—"
+          : formatPrice(line.mrcPriceAmount, currency)}
+      </td>
+
+      <td className="whitespace-nowrap px-4 py-4 tabular-nums text-[var(--app-text)]">
+        {line.discountPercent.toFixed(2)}%
+      </td>
+
+      <td className="whitespace-nowrap px-4 py-4 tabular-nums text-[var(--app-text)]">
+        {formatPrice(line.projectPriceAmount, currency)}
+      </td>
+
+      <td className="whitespace-nowrap px-4 py-4 font-semibold tabular-nums text-[var(--app-text)]">
+        {formatPrice(line.totalAmount, currency)}
+      </td>
+
+      {editable && (
+        <td className="px-4 py-4">
+          <AppButton
+            type="button"
+            variant="danger"
+            size="sm"
+            loading={isRemoving}
+            disabled={isChanging}
+            onClick={() => onRemove(line)}
+          >
+            Удалить
+          </AppButton>
+        </td>
+      )}
+    </tr>
+  );
+}
+
+function ManufacturerDiscountEditor({
+  manufacturerId,
+  manufacturerName,
+  discount,
+  disabled,
+  isSaving,
+  isRemoving,
+  onSave,
+  onRemove,
+}: {
+  manufacturerId: string;
+  manufacturerName: string;
+  discount?: CatalogPriceCalculationManufacturerDiscount;
+  disabled: boolean;
+  isSaving: boolean;
+  isRemoving: boolean;
+  onSave: (manufacturerId: string, discountPercent: number) => void;
+  onRemove: (manufacturerId: string) => void;
+}) {
+  const [value, setValue] = useState(
+    discount?.discountPercent.toString() ?? "0",
+  );
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>): void {
+    event.preventDefault();
+
+    const discountPercent = Number(value.replace(",", "."));
+
+    if (
+      !Number.isFinite(discountPercent) ||
+      discountPercent < 0 ||
+      discountPercent > 100
+    ) {
+      return;
+    }
+
+    onSave(manufacturerId, discountPercent);
+  }
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4"
+    >
+      <p className="font-semibold text-[var(--app-text)]">{manufacturerName}</p>
+
+      <p className="mt-1 text-xs text-[var(--app-muted)]">
+        Значение 60% означает оплату 40% базовой цены.
+      </p>
+
+      <div className="mt-4 flex items-end gap-2">
+        <label className="grid min-w-0 flex-1 gap-2">
+          <span className="text-sm text-[var(--app-muted)]">Скидка, %</span>
+
+          <AppInput
+            type="number"
+            min="0"
+            max="100"
+            step="0.01"
+            value={value}
+            disabled={disabled || isSaving || isRemoving}
+            onChange={(event) => setValue(event.target.value)}
+          />
+        </label>
+
+        <AppButton
+          type="submit"
+          variant="primary"
+          size="sm"
+          loading={isSaving}
+          disabled={disabled || isRemoving}
+        >
+          Применить
+        </AppButton>
+
+        {discount && (
+          <AppButton
+            type="button"
+            variant="danger"
+            size="sm"
+            loading={isRemoving}
+            disabled={disabled || isSaving}
+            onClick={() => onRemove(manufacturerId)}
+          >
+            Сбросить
+          </AppButton>
+        )}
+      </div>
+    </form>
+  );
+}
+
+export default function CatalogPriceCalculationPage() {
+  const params = useParams<{ calculationId: string }>();
+  const queryClient = useQueryClient();
+
+  const calculationId = params.calculationId ?? "";
+
+  const [search, setSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
+  const [searchPage, setSearchPage] = useState(1);
+
+  const calculationQuery = useQuery({
+    queryKey: catalogPriceCalculationQueryKeys.details(calculationId),
+    queryFn: () => getCatalogPriceCalculation(calculationId),
+    enabled: calculationId.length > 0,
+  });
+
+  const calculation = calculationQuery.data;
+  const editable = calculation?.status === "Draft";
+
+  const productsQuery = useQuery({
+    queryKey: catalogPriceCalculationQueryKeys.products(
+      calculationId,
+      appliedSearch,
+      searchPage,
+      productSearchPageSize,
+    ),
+    queryFn: () =>
+      searchCatalogPriceCalculationProducts({
+        calculationId,
+        search: appliedSearch,
+        page: searchPage,
+        pageSize: productSearchPageSize,
+      }),
+    enabled: calculationId.length > 0 && editable && appliedSearch.length > 0,
+    placeholderData: (previousData) => previousData,
+  });
+
+  async function refreshCalculation(): Promise<void> {
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: catalogPriceCalculationQueryKeys.details(calculationId),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: catalogPriceCalculationQueryKeys.listRoot,
+      }),
+    ]);
+  }
+
+  const addLineMutation = useMutation({
+    mutationFn: addCatalogPriceCalculationLine,
+    onSuccess: refreshCalculation,
+  });
+
+  const quantityMutation = useMutation({
+    mutationFn: changeCatalogPriceCalculationLineQuantity,
+    onSuccess: refreshCalculation,
+  });
+
+  const removeLineMutation = useMutation({
+    mutationFn: removeCatalogPriceCalculationLine,
+    onSuccess: refreshCalculation,
+  });
+
+  const setDiscountMutation = useMutation({
+    mutationFn: setCatalogPriceCalculationManufacturerDiscount,
+    onSuccess: refreshCalculation,
+  });
+
+  const removeDiscountMutation = useMutation({
+    mutationFn: removeCatalogPriceCalculationManufacturerDiscount,
+    onSuccess: refreshCalculation,
+  });
+
+  const completeMutation = useMutation({
+    mutationFn: completeCatalogPriceCalculation,
+    onSuccess: refreshCalculation,
+  });
+
+  const manufacturers = useMemo(() => {
+    const result = new Map<string, string>();
+
+    for (const line of calculation?.lines ?? []) {
+      result.set(line.manufacturerId, line.manufacturerName);
+    }
+
+    return Array.from(result, ([manufacturerId, manufacturerName]) => ({
+      manufacturerId,
+      manufacturerName,
+    }));
+  }, [calculation?.lines]);
+
+  const mutationError =
+    addLineMutation.error ??
+    quantityMutation.error ??
+    removeLineMutation.error ??
+    setDiscountMutation.error ??
+    removeDiscountMutation.error ??
+    completeMutation.error;
+
+  const searchTotalPages = Math.max(1, productsQuery.data?.totalPages ?? 0);
+
+  function handleSearch(event: FormEvent<HTMLFormElement>): void {
+    event.preventDefault();
+
+    setAppliedSearch(search.trim());
+    setSearchPage(1);
+  }
+
+  function handleAdd(productId: string): void {
+    addLineMutation.mutate({
+      calculationId,
+      productId,
+      quantity: 1,
+    });
+  }
+
+  function handleChangeQuantity(lineId: string, quantity: number): void {
+    quantityMutation.mutate({
+      calculationId,
+      lineId,
+      quantity,
+    });
+  }
+
+  function handleRemoveLine(line: CatalogPriceCalculationLine): void {
+    const confirmed = window.confirm(
+      `Удалить позицию «${line.name}» из расчёта?`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    removeLineMutation.mutate({
+      calculationId,
+      lineId: line.lineId,
+    });
+  }
+
+  function handleSetDiscount(
+    manufacturerId: string,
+    discountPercent: number,
+  ): void {
+    setDiscountMutation.mutate({
+      calculationId,
+      manufacturerId,
+      discountPercent,
+    });
+  }
+
+  function handleRemoveDiscount(manufacturerId: string): void {
+    removeDiscountMutation.mutate({
+      calculationId,
+      manufacturerId,
+    });
+  }
+
+  function handleComplete(): void {
+    if (!calculation || calculation.lines.length === 0) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Завершить расчёт? После завершения изменять товары, количество и скидки будет нельзя.",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    completeMutation.mutate(calculationId);
+  }
+
+  if (calculationQuery.isLoading) {
+    return (
+      <div
+        role="status"
+        className="flex min-h-64 items-center justify-center rounded-3xl border border-[var(--app-border)] bg-[var(--app-panel)] text-sm text-[var(--app-muted)]"
+      >
+        Загружаем расчёт...
+      </div>
+    );
+  }
+
+  if (calculationQuery.isError || !calculation) {
+    return (
+      <PageWorkspace
+        eyebrow="Работа с каталогом"
+        title="Расчёт не найден"
+        description={getApiErrorMessage(
+          calculationQuery.error,
+          "Не удалось загрузить расчёт цен.",
+        )}
+      >
+        <Link
+          href="/catalog/price-calculations"
+          className="inline-flex min-h-11 w-fit items-center justify-center rounded-xl border border-[var(--app-button-secondary-border)] bg-[var(--app-button-secondary-bg)] px-4 py-2.5 text-sm font-semibold text-[var(--app-text)]"
+        >
+          Назад к расчётам
+        </Link>
+      </PageWorkspace>
+    );
+  }
+
+  return (
+    <PageWorkspace
+      eyebrow="Расчёт цен"
+      title={calculation.title}
+      description={`Создан ${formatDate(calculation.createdAtUtc)}. Цены получены из активных прайс-листов и изменяются только backend.`}
+      status={<StatusBadge status={calculation.status} />}
+      contentClassName="grid min-w-0 gap-6"
+      actions={
+        <>
+          <Link
+            href="/catalog/price-calculations"
+            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[var(--app-button-secondary-border)] bg-[var(--app-button-secondary-bg)] px-4 py-2.5 text-sm font-semibold text-[var(--app-text)]"
+          >
+            Назад
+          </Link>
+
+          {editable && (
+            <AppButton
+              type="button"
+              variant="primary"
+              loading={completeMutation.isPending}
+              disabled={calculation.lines.length === 0}
+              onClick={handleComplete}
+            >
+              Завершить расчёт
+            </AppButton>
+          )}
+        </>
+      }
+    >
+      {mutationError && (
+        <section
+          role="alert"
+          className="rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-4 text-sm text-[var(--app-danger)]"
+        >
+          {getApiErrorMessage(
+            mutationError,
+            "Не удалось выполнить действие с расчётом.",
+          )}
+        </section>
+      )}
+
+      <section className="grid gap-4 sm:grid-cols-3">
+        <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-panel)] p-5">
+          <p className="text-sm text-[var(--app-muted)]">Позиций</p>
+
+          <p className="mt-2 text-2xl font-bold tabular-nums text-[var(--app-text)]">
+            {calculation.lines.length}
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-panel)] p-5">
+          <p className="text-sm text-[var(--app-muted)]">Производителей</p>
+
+          <p className="mt-2 text-2xl font-bold tabular-nums text-[var(--app-text)]">
+            {manufacturers.length}
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-[var(--app-accent-border)] bg-[var(--app-accent-soft)] p-5">
+          <p className="text-sm text-[var(--app-muted)]">Итоговая сумма</p>
+
+          <p className="mt-2 text-2xl font-bold tabular-nums text-[var(--app-accent)]">
+            {formatPrice(calculation.totalAmount, calculation.currency)}
+          </p>
+        </div>
+      </section>
+
+      {editable && (
+        <section
+          aria-labelledby="product-search-title"
+          className="rounded-3xl border border-[var(--app-border)] bg-[var(--app-panel)] p-5 sm:p-6"
+        >
+          <h2
+            id="product-search-title"
+            className="text-xl font-semibold text-[var(--app-text)]"
+          >
+            Добавить товар
+          </h2>
+
+          <p className="mt-2 text-sm text-[var(--app-muted)]">
+            Поиск показывает только товары с корректной строкой в активном
+            прайсе производителя.
+          </p>
+
+          <form
+            onSubmit={handleSearch}
+            className="mt-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]"
+          >
+            <AppInput
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Артикул или наименование товара"
+            />
+
+            <AppButton
+              type="submit"
+              variant="primary"
+              disabled={search.trim().length === 0}
+            >
+              Найти
+            </AppButton>
+          </form>
+
+          {productsQuery.isError && (
+            <div
+              role="alert"
+              className="mt-4 rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-4 text-sm text-[var(--app-danger)]"
+            >
+              {getApiErrorMessage(
+                productsQuery.error,
+                "Не удалось выполнить поиск товаров.",
+              )}
+            </div>
+          )}
+
+          {productsQuery.isLoading ? (
+            <p role="status" className="mt-5 text-sm text-[var(--app-muted)]">
+              Ищем товары...
+            </p>
+          ) : productsQuery.data && productsQuery.data.items.length > 0 ? (
+            <>
+              <div className="mt-5 overflow-x-auto rounded-2xl border border-[var(--app-border)]">
+                <table className="w-full min-w-[850px] border-collapse text-left text-sm">
+                  <thead className="bg-[var(--app-surface)] text-[var(--app-muted)]">
+                    <tr>
+                      <th className="px-4 py-3 font-medium">Товар</th>
+                      <th className="px-4 py-3 font-medium">Производитель</th>
+                      <th className="px-4 py-3 font-medium">Прайс 100%</th>
+                      <th className="px-4 py-3 font-medium">МРЦ</th>
+                      <th className="px-4 py-3 font-medium">Действие</th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-[var(--app-border)]">
+                    {productsQuery.data.items.map((product) => (
+                      <ProductSearchRow
+                        key={product.productId}
+                        product={product}
+                        currency={calculation.currency}
+                        isAdding={
+                          addLineMutation.isPending &&
+                          addLineMutation.variables?.productId ===
+                            product.productId
+                        }
+                        onAdd={handleAdd}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <nav className="mt-4 flex items-center justify-between">
+                <AppButton
+                  type="button"
+                  variant="secondary"
+                  disabled={searchPage <= 1 || productsQuery.isFetching}
+                  onClick={() =>
+                    setSearchPage((current) => Math.max(1, current - 1))
+                  }
+                >
+                  Назад
+                </AppButton>
+
+                <p className="text-sm text-[var(--app-muted)]">
+                  Страница {searchPage} из {searchTotalPages}
+                </p>
+
+                <AppButton
+                  type="button"
+                  variant="secondary"
+                  disabled={
+                    searchPage >= searchTotalPages || productsQuery.isFetching
+                  }
+                  onClick={() =>
+                    setSearchPage((current) =>
+                      Math.min(searchTotalPages, current + 1),
+                    )
+                  }
+                >
+                  Вперёд
+                </AppButton>
+              </nav>
+            </>
+          ) : appliedSearch.length > 0 && productsQuery.isSuccess ? (
+            <p className="mt-5 rounded-2xl border border-dashed border-[var(--app-border-strong)] p-5 text-sm text-[var(--app-muted)]">
+              В активных прайсах подходящие товары не найдены.
+            </p>
+          ) : null}
+        </section>
+      )}
+
+      {editable && manufacturers.length > 0 && (
+        <section
+          aria-labelledby="discounts-title"
+          className="rounded-3xl border border-[var(--app-border)] bg-[var(--app-panel)] p-5 sm:p-6"
+        >
+          <h2
+            id="discounts-title"
+            className="text-xl font-semibold text-[var(--app-text)]"
+          >
+            Проектные скидки
+          </h2>
+
+          <p className="mt-2 text-sm text-[var(--app-muted)]">
+            Скидка применяется ко всем строкам соответствующего производителя.
+          </p>
+
+          <div className="mt-5 grid gap-4 lg:grid-cols-2">
+            {manufacturers.map((manufacturer) => (
+              <ManufacturerDiscountEditor
+                key={`${manufacturer.manufacturerId}-${calculation.manufacturerDiscounts.find((item) => item.manufacturerId === manufacturer.manufacturerId)?.discountPercent ?? "none"}`}
+                manufacturerId={manufacturer.manufacturerId}
+                manufacturerName={manufacturer.manufacturerName}
+                discount={calculation.manufacturerDiscounts.find(
+                  (item) => item.manufacturerId === manufacturer.manufacturerId,
+                )}
+                disabled={!editable}
+                isSaving={
+                  setDiscountMutation.isPending &&
+                  setDiscountMutation.variables?.manufacturerId ===
+                    manufacturer.manufacturerId
+                }
+                isRemoving={
+                  removeDiscountMutation.isPending &&
+                  removeDiscountMutation.variables?.manufacturerId ===
+                    manufacturer.manufacturerId
+                }
+                onSave={handleSetDiscount}
+                onRemove={handleRemoveDiscount}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section
+        aria-labelledby="calculation-lines-title"
+        className="rounded-3xl border border-[var(--app-border)] bg-[var(--app-panel)] p-5 sm:p-6"
+      >
+        <h2
+          id="calculation-lines-title"
+          className="text-xl font-semibold text-[var(--app-text)]"
+        >
+          Позиции расчёта
+        </h2>
+
+        {calculation.lines.length > 0 ? (
+          <div className="mt-5 overflow-x-auto rounded-2xl border border-[var(--app-border)]">
+            <table className="w-full min-w-[1500px] border-collapse text-left text-sm">
+              <thead className="bg-[var(--app-surface)] text-[var(--app-muted)]">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Товар</th>
+                  <th className="px-4 py-3 font-medium">Производитель</th>
+                  <th className="px-4 py-3 font-medium">Количество</th>
+                  <th className="px-4 py-3 font-medium">Прайс 100%</th>
+                  <th className="px-4 py-3 font-medium">МРЦ</th>
+                  <th className="px-4 py-3 font-medium">Скидка</th>
+                  <th className="px-4 py-3 font-medium">Проектная цена</th>
+                  <th className="px-4 py-3 font-medium">Сумма</th>
+                  {editable && (
+                    <th className="px-4 py-3 font-medium">Действие</th>
+                  )}
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-[var(--app-border)]">
+                {calculation.lines.map((line) => (
+                  <CalculationLineRow
+                    key={`${line.lineId}-${line.quantity}`}
+                    line={line}
+                    currency={calculation.currency}
+                    editable={editable}
+                    isChanging={
+                      quantityMutation.isPending &&
+                      quantityMutation.variables?.lineId === line.lineId
+                    }
+                    isRemoving={
+                      removeLineMutation.isPending &&
+                      removeLineMutation.variables?.lineId === line.lineId
+                    }
+                    onChangeQuantity={handleChangeQuantity}
+                    onRemove={handleRemoveLine}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="mt-5 rounded-2xl border border-dashed border-[var(--app-border-strong)] bg-[var(--app-surface)] p-6">
+            <h3 className="font-semibold text-[var(--app-text)]">
+              В расчёте пока нет позиций
+            </h3>
+
+            <p className="mt-2 text-sm text-[var(--app-muted)]">
+              Найдите товар по артикулу или наименованию и добавьте его в
+              расчёт.
+            </p>
+          </div>
+        )}
+      </section>
+    </PageWorkspace>
+  );
+}

@@ -25,7 +25,6 @@ import {
   type CatalogImportRowProblemCode,
   type CatalogImportRowProblemKind,
   type CatalogImportManufacturerGroup,
-  type CatalogImportManufacturerResolutionSource,
 } from "../../model/types";
 import { CatalogImportRowStatusBadge } from "../CatalogImportRowStatusBadge";
 import { CatalogImportBulkRowsEditor } from "./CatalogImportBulkRowsEditor";
@@ -87,22 +86,63 @@ function formatProblemCodeOption(item: CatalogImportRowProblemCode): string {
   );
 
   if (item.errorRowsCount > 0 && item.warningRowsCount === 0) {
-    return `${item.code} · ${errors}`;
+    return `${getProblemCodeTitle(item.code)} · ${errors}`;
   }
 
   if (item.warningRowsCount > 0 && item.errorRowsCount === 0) {
-    return `${item.code} · ${warnings}`;
+    return `${getProblemCodeTitle(item.code)} · ${warnings}`;
   }
 
   const rows = formatCount(item.rowsCount, "строка", "строки", "строк");
 
-  return `${item.code} · ${rows} · ${errors} + ${warnings}`;
+  return `${getProblemCodeTitle(item.code)} · ${rows} · ${errors} + ${warnings}`;
 }
 
 function getProblemCodeTitle(code: string): string {
   switch (code) {
     case "article.required":
       return "Не указан артикул";
+
+    case "name.required":
+      return "Не указано наименование";
+
+    case "product_type.required":
+    case "product_type.not_resolved":
+      return "Не определён тип товара";
+
+    case "product_type.conflict":
+      return "Найдено несколько типов товара";
+
+    case "product_type.low_confidence":
+      return "Тип товара требует подтверждения";
+
+    case "manufacturer.required":
+    case "manufacturer.not_resolved":
+      return "Не определён производитель";
+
+    case "manufacturer.name_conflict":
+      return "Найдено несколько производителей";
+
+    case "characteristic.required":
+      return "Не заполнена обязательная характеристика";
+
+    case "characteristic.invalid":
+      return "Некорректное значение характеристики";
+
+    case "characteristic.recognition_conflict":
+      return "В наименовании несколько значений характеристики";
+
+    case "characteristic.value_conflict":
+      return "Excel и наименование содержат разные значения";
+
+    case "characteristic.low_confidence":
+      return "Характеристика требует подтверждения";
+
+    case "price.invalid":
+      return "Некорректная цена";
+
+    case "stock.invalid":
+      return "Некорректный остаток";
 
     case "manufacturer.resolved_by_alias":
       return "Производитель определён через alias";
@@ -515,7 +555,7 @@ export function CatalogImportRowsPreview({
     emptyFilteredRowsMessage = "Строк с выбранным статусом больше нет.";
   }
 
-  const canUseBulkEditing = canEditRows && Boolean(productTypeId);
+  const canUseBulkEditing = canEditRows;
 
   const selectedRows = items.filter((row) => selectedRowIds.has(row.rowId));
 
@@ -561,6 +601,17 @@ export function CatalogImportRowsPreview({
       return;
     }
 
+    setExpandedRowId(null);
+    setEditingRowId(null);
+    setIsBulkEditorOpen(true);
+  }
+
+  function openVisibleProblemGroup(): void {
+    if (!canUseBulkEditing || issueCode === null || items.length === 0) {
+      return;
+    }
+
+    setSelectedRowIds(new Set(items.map((row) => row.rowId)));
     setExpandedRowId(null);
     setEditingRowId(null);
     setIsBulkEditorOpen(true);
@@ -1187,6 +1238,22 @@ export function CatalogImportRowsPreview({
         </AppButton>
       </div>
 
+      {canUseBulkEditing && issueCode !== null && items.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--app-accent-border)] bg-[var(--app-accent-soft)] p-3">
+          <p className="text-sm text-[var(--app-text)]">
+            Группа «{getProblemCodeTitle(issueCode)}»: {totalCount.toLocaleString("ru-RU")} строк
+          </p>
+
+          <AppButton
+            size="sm"
+            variant="primary"
+            onClick={openVisibleProblemGroup}
+          >
+            Редактировать группу на странице ({items.length})
+          </AppButton>
+        </div>
+      )}
+
       {canUseBulkEditing && selectedRows.length > 0 && (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--app-accent-border)] bg-[var(--app-accent-soft)] p-3">
           <p className="text-sm text-[var(--app-text)]">
@@ -1213,12 +1280,12 @@ export function CatalogImportRowsPreview({
         </div>
       )}
 
-      {isBulkEditorOpen && productTypeId && selectedRows.length > 0 && (
+      {isBulkEditorOpen && selectedRows.length > 0 && (
         <div className="mt-4 min-w-0">
           <CatalogImportBulkRowsEditor
             key={selectedRows.map((row) => row.rowId).join("-")}
             batchId={batchId}
-            productTypeId={productTypeId}
+            defaultProductTypeId={productTypeId}
             expectedVersion={expectedVersion}
             rows={selectedRows}
             onCancel={() => {
@@ -1355,7 +1422,7 @@ export function CatalogImportRowsPreview({
                   (item) => item.id === row.data.productTypeId,
                 );
 
-                const rowCanBeEdited = canEditRows && Boolean(productTypeId);
+                const rowCanBeEdited = canEditRows;
 
                 return (
                   <Fragment key={row.rowId}>
@@ -1473,11 +1540,11 @@ export function CatalogImportRowsPreview({
                     {(isExpanded || isEditing) && (
                       <tr className="bg-[var(--app-surface)]">
                         <td colSpan={11} className="px-5 py-5">
-                          {isEditing && productTypeId ? (
+                          {isEditing ? (
                             <CatalogImportRowEditor
                               key={`${row.rowId}-${row.status}`}
                               batchId={batchId}
-                              productTypeId={productTypeId}
+                              defaultProductTypeId={productTypeId}
                               row={row}
                               onCancel={() => {
                                 setEditingRowId(null);
