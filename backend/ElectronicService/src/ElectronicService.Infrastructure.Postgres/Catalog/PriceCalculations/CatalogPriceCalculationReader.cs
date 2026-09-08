@@ -73,35 +73,37 @@ public sealed class CatalogPriceCalculationReader
         }
 
         var lines =
-            await _dbContext.CatalogPriceCalculationLines
-                .AsNoTracking()
-                .Where(
-                    line =>
-                        line.CalculationId == calculationId)
-                .OrderBy(line =>
-                    line.CreatedAtUtc)
-                .ThenBy(line =>
-                    line.Id)
-                .Select(
-                    line =>
-                        new CatalogPriceCalculationLineDetails(
-                            line.Id,
-                            line.ProductId,
-                            line.ManufacturerId,
-                            line.ManufacturerName,
-                            line.PriceListId,
-                            line.PriceListRowId,
-                            line.Article,
-                            line.Name,
-                            line.Unit,
-                            line.Quantity,
-                            line.BasePriceAmount,
-                            line.MrcPriceAmount,
-                            line.DiscountPercent,
-                            line.ProjectPriceAmount,
-                            line.TotalAmount,
-                            line.CreatedAtUtc,
-                            line.UpdatedAtUtc))
+            await (
+                from line in
+                    _dbContext.CatalogPriceCalculationLines
+                        .AsNoTracking()
+                join product in
+                    _dbContext.Products.AsNoTracking()
+                    on line.ProductId equals product.Id
+                where line.CalculationId == calculationId
+                orderby line.CreatedAtUtc, line.Id
+                select new CatalogPriceCalculationLineDetails(
+                    line.Id,
+                    line.ProductId,
+                    line.ManufacturerId,
+                    line.ManufacturerName,
+                    line.PriceListId,
+                    line.PriceListRowId,
+                    line.Article,
+                    line.Name,
+                    line.Unit,
+                    line.Quantity,
+                    product.StockQuantity.Value,
+                    line.Quantity > product.StockQuantity.Value
+                        ? line.Quantity - product.StockQuantity.Value
+                        : 0m,
+                    line.BasePriceAmount,
+                    line.MrcPriceAmount,
+                    line.DiscountPercent,
+                    line.ProjectPriceAmount,
+                    line.TotalAmount,
+                    line.CreatedAtUtc,
+                    line.UpdatedAtUtc))
                 .ToArrayAsync(cancellationToken)
                 .ConfigureAwait(false);
 

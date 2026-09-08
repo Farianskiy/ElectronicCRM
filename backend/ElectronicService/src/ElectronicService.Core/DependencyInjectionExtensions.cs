@@ -45,6 +45,7 @@ using ElectronicService.Core.Catalog.Metadata.GetManufacturers;
 using ElectronicService.Core.Catalog.Metadata.GetProductTypeCharacteristics;
 using ElectronicService.Core.Catalog.Metadata.GetProductTypes;
 using ElectronicService.Core.Catalog.PriceCalculations.AddCatalogPriceCalculationLine;
+using ElectronicService.Core.Catalog.PriceCalculations.ApplyCatalogPriceCalculationImport;
 using ElectronicService.Core.Catalog.PriceCalculations.ChangeCatalogPriceCalculationLineQuantity;
 using ElectronicService.Core.Catalog.PriceCalculations.CompleteCatalogPriceCalculation;
 using ElectronicService.Core.Catalog.PriceCalculations.CreateCatalogPriceCalculation;
@@ -184,6 +185,7 @@ public static class DependencyInjectionExtensions
         services.AddScoped<CreateCatalogImportBatchCommandHandler>();
         services.AddScoped<CreateCatalogPriceCalculationCommandHandler>();
         services.AddScoped<AddCatalogPriceCalculationLineCommandHandler>();
+        services.AddScoped<ApplyCatalogPriceCalculationImportCommandHandler>();
         services.AddScoped<CompleteCatalogPriceCalculationCommandHandler>();
         services.AddScoped<ChangeCatalogPriceCalculationLineQuantityCommandHandler>();
         services.AddScoped<RemoveCatalogPriceCalculationLineCommandHandler>();

@@ -51,6 +51,8 @@ public sealed record CatalogPriceCalculationLineDetails(
     string Name,
     string? Unit,
     decimal Quantity,
+    decimal StockQuantity,
+    decimal ShortageQuantity,
     decimal BasePriceAmount,
     decimal? MrcPriceAmount,
     decimal DiscountPercent,

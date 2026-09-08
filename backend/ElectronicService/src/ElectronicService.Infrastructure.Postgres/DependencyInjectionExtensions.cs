@@ -11,6 +11,7 @@ using ElectronicService.Core.Catalog.ImportBatches.ExportCatalogImportErrorRepor
 using ElectronicService.Core.Catalog.ImportBatches.GetCatalogImportAppliedProducts;
 using ElectronicService.Core.Catalog.Metadata.Abstractions;
 using ElectronicService.Core.Catalog.PriceCalculations.Abstractions;
+using ElectronicService.Core.Catalog.PriceCalculations.Import;
 using ElectronicService.Core.Catalog.PriceLists.Abstractions;
 using ElectronicService.Core.Catalog.PriceLists.Import;
 using ElectronicService.Core.Catalog.Products.Abstractions;
@@ -123,6 +124,7 @@ public static class DependencyInjectionExtensions
         services.AddScoped<ICatalogPriceCalculationReader, CatalogPriceCalculationReader>();
         services.AddScoped<ICatalogPriceCalculationProductSearchReader, CatalogPriceCalculationProductSearchReader>();
         services.AddScoped<ICatalogActiveProductPriceReader, CatalogActiveProductPriceReader>();
+        services.AddScoped<ICatalogPriceCalculationWorkbookPreviewer, CatalogPriceCalculationWorkbookPreviewer>();
         services.AddScoped<ICatalogPriceListRepository, CatalogPriceListRepository>();
         services.AddScoped<ICatalogPriceListReader, CatalogPriceListReader>();
         services.AddSingleton<ICatalogPriceListWorkbookReader, CatalogPriceListWorkbookReader>();

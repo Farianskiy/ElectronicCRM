@@ -1,6 +1,10 @@
 import { httpClient } from "@/shared/api/httpClient";
 import type {
+  ApplyCatalogPriceCalculationImportRequest,
+  ApplyCatalogPriceCalculationImportResponse,
   CatalogPriceCalculationDetails,
+  PreviewCatalogPriceCalculationImportRequest,
+  PreviewCatalogPriceCalculationImportResponse,
   SearchCatalogPriceCalculationProductsParams,
   SearchCatalogPriceCalculationProductsResponse,
 } from "../model/types";
@@ -99,4 +103,34 @@ export async function completeCatalogPriceCalculation(
   await httpClient.post(
     `/api/catalog/price-calculations/${calculationId}/complete`,
   );
+}
+
+export async function previewCatalogPriceCalculationImport(
+  request: PreviewCatalogPriceCalculationImportRequest,
+): Promise<PreviewCatalogPriceCalculationImportResponse> {
+  const formData = new FormData();
+
+  formData.append("file", request.file);
+
+  const response =
+    await httpClient.post<PreviewCatalogPriceCalculationImportResponse>(
+      `/api/catalog/price-calculations/${request.calculationId}/import-preview`,
+      formData,
+    );
+
+  return response.data;
+}
+
+export async function applyCatalogPriceCalculationImport(
+  request: ApplyCatalogPriceCalculationImportRequest,
+): Promise<ApplyCatalogPriceCalculationImportResponse> {
+  const response =
+    await httpClient.post<ApplyCatalogPriceCalculationImportResponse>(
+      `/api/catalog/price-calculations/${request.calculationId}/import-apply`,
+      {
+        rows: request.rows,
+      },
+    );
+
+  return response.data;
 }

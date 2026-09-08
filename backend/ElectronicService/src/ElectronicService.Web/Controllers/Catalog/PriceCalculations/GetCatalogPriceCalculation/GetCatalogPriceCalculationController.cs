@@ -84,6 +84,8 @@ public sealed class GetCatalogPriceCalculationController
                             line.Name,
                             line.Unit,
                             line.Quantity,
+                            line.StockQuantity,
+                            line.ShortageQuantity,
                             line.BasePriceAmount,
                             line.MrcPriceAmount,
                             line.DiscountPercent,

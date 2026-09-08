@@ -6,9 +6,11 @@ import { useParams } from "next/navigation";
 import { useMemo, useState, type FormEvent } from "react";
 import {
   addCatalogPriceCalculationLine,
+  applyCatalogPriceCalculationImport,
   changeCatalogPriceCalculationLineQuantity,
   completeCatalogPriceCalculation,
   getCatalogPriceCalculation,
+  previewCatalogPriceCalculationImport,
   removeCatalogPriceCalculationLine,
   removeCatalogPriceCalculationManufacturerDiscount,
   searchCatalogPriceCalculationProducts,
@@ -16,6 +18,7 @@ import {
 } from "@/features/catalogPriceCalculations/api/catalogPriceCalculationEditorApi";
 import { catalogPriceCalculationQueryKeys } from "@/features/catalogPriceCalculations/model/queryKeys";
 import type {
+  CatalogPriceCalculationImportRowStatus,
   CatalogPriceCalculationLine,
   CatalogPriceCalculationManufacturerDiscount,
   CatalogPriceCalculationProductSearchItem,
@@ -44,6 +47,33 @@ function formatQuantity(value: number): string {
   return new Intl.NumberFormat("ru-RU", {
     maximumFractionDigits: 3,
   }).format(value);
+}
+
+function getImportStatusLabel(
+  status: CatalogPriceCalculationImportRowStatus,
+): string {
+  switch (status) {
+    case "Matched":
+      return "Сопоставлена";
+    case "Invalid":
+      return "Некорректная";
+    case "ProductNotFound":
+      return "Товар не найден";
+    case "ProductAmbiguous":
+      return "Несколько товаров";
+    case "ActivePriceNotFound":
+      return "Нет активной цены";
+    case "ActivePriceAmbiguous":
+      return "Несколько цен";
+  }
+}
+
+function getImportStatusClassName(
+  status: CatalogPriceCalculationImportRowStatus,
+): string {
+  return status === "Matched"
+    ? "border-[var(--app-success-border)] bg-[var(--app-success-soft)] text-[var(--app-success)]"
+    : "border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] text-[var(--app-danger)]";
 }
 
 function StatusBadge({ status }: { status: CatalogPriceCalculationStatus }) {
@@ -192,6 +222,22 @@ function CalculationLineRow({
       </td>
 
       <td className="whitespace-nowrap px-4 py-4 tabular-nums text-[var(--app-text)]">
+        {formatQuantity(line.stockQuantity)}
+      </td>
+
+      <td
+        className={`whitespace-nowrap px-4 py-4 font-semibold tabular-nums ${
+          line.shortageQuantity > 0
+            ? "text-[var(--app-danger)]"
+            : "text-[var(--app-success)]"
+        }`}
+      >
+        {line.shortageQuantity > 0
+          ? formatQuantity(line.shortageQuantity)
+          : "Достаточно"}
+      </td>
+
+      <td className="whitespace-nowrap px-4 py-4 tabular-nums text-[var(--app-text)]">
         {formatPrice(line.basePriceAmount, currency)}
       </td>
 
@@ -332,6 +378,7 @@ export default function CatalogPriceCalculationPage() {
   const [search, setSearch] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
   const [searchPage, setSearchPage] = useState(1);
+  const [projectImportFile, setProjectImportFile] = useState<File | null>(null);
 
   const calculationQuery = useQuery({
     queryKey: catalogPriceCalculationQueryKeys.details(calculationId),
@@ -401,6 +448,26 @@ export default function CatalogPriceCalculationPage() {
     onSuccess: refreshCalculation,
   });
 
+  const importPreviewMutation = useMutation({
+    mutationFn: previewCatalogPriceCalculationImport,
+  });
+
+  const importApplyMutation = useMutation({
+    mutationFn: applyCatalogPriceCalculationImport,
+    onSuccess: refreshCalculation,
+  });
+
+  const matchedImportRows = useMemo(
+    () =>
+      (importPreviewMutation.data?.rows ?? []).filter(
+        (row) =>
+          row.status === "Matched" &&
+          row.productId !== null &&
+          row.quantity !== null,
+      ),
+    [importPreviewMutation.data?.rows],
+  );
+
   const manufacturers = useMemo(() => {
     const result = new Map<string, string>();
 
@@ -429,6 +496,36 @@ export default function CatalogPriceCalculationPage() {
 
     setAppliedSearch(search.trim());
     setSearchPage(1);
+  }
+
+  function handleImportPreview(event: FormEvent<HTMLFormElement>): void {
+    event.preventDefault();
+
+    if (!projectImportFile) {
+      return;
+    }
+
+    importApplyMutation.reset();
+    importPreviewMutation.mutate({
+      calculationId,
+      file: projectImportFile,
+    });
+  }
+
+  function handleApplyImport(): void {
+    const rows = matchedImportRows.map((row) => ({
+      productId: row.productId as string,
+      quantity: row.quantity as number,
+    }));
+
+    if (rows.length === 0) {
+      return;
+    }
+
+    importApplyMutation.mutate({
+      calculationId,
+      rows,
+    });
   }
 
   function handleAdd(productId: string): void {
@@ -594,6 +691,262 @@ export default function CatalogPriceCalculationPage() {
           </p>
         </div>
       </section>
+
+      {editable && (
+        <section
+          aria-labelledby="project-import-title"
+          className="rounded-3xl border border-[var(--app-border)] bg-[var(--app-panel)] p-5 sm:p-6"
+        >
+          <h2
+            id="project-import-title"
+            className="text-xl font-semibold text-[var(--app-text)]"
+          >
+            Загрузить позиции из Excel
+          </h2>
+
+          <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">
+            Обязательные колонки: «Артикул» и «Количество». Производитель
+            рекомендуется, а наименование используется для проверки.
+          </p>
+
+          <form
+            onSubmit={handleImportPreview}
+            className="mt-5 grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end"
+          >
+            <label className="grid min-w-0 gap-2">
+              <span className="text-sm font-medium text-[var(--app-text)]">
+                Файл проекта
+              </span>
+
+              <input
+                type="file"
+                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                disabled={importPreviewMutation.isPending}
+                onChange={(event) => {
+                  setProjectImportFile(event.target.files?.[0] ?? null);
+                  importPreviewMutation.reset();
+                  importApplyMutation.reset();
+                }}
+                className="min-h-11 w-full rounded-xl border border-[var(--app-input-border)] bg-[var(--app-input-bg)] px-3 py-2 text-sm text-[var(--app-text)] file:mr-4 file:rounded-lg file:border-0 file:bg-[var(--app-accent-soft)] file:px-3 file:py-2 file:font-semibold file:text-[var(--app-accent)]"
+              />
+            </label>
+
+            <AppButton
+              type="submit"
+              variant="primary"
+              loading={importPreviewMutation.isPending}
+              disabled={!projectImportFile}
+            >
+              Проверить файл
+            </AppButton>
+          </form>
+
+          {importPreviewMutation.isError && (
+            <div
+              role="alert"
+              className="mt-5 rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-4 text-sm text-[var(--app-danger)]"
+            >
+              {getApiErrorMessage(
+                importPreviewMutation.error,
+                "Не удалось проверить файл проекта.",
+              )}
+            </div>
+          )}
+
+          {importPreviewMutation.data && (
+            <div className="mt-6 grid gap-5">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
+                  <p className="text-sm text-[var(--app-muted)]">
+                    Прочитано строк
+                  </p>
+
+                  <p className="mt-2 text-2xl font-bold tabular-nums text-[var(--app-text)]">
+                    {importPreviewMutation.data.readRowsCount}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-[var(--app-success-border)] bg-[var(--app-success-soft)] p-4">
+                  <p className="text-sm text-[var(--app-success)]">
+                    Сопоставлено
+                  </p>
+
+                  <p className="mt-2 text-2xl font-bold tabular-nums text-[var(--app-success)]">
+                    {importPreviewMutation.data.matchedRowsCount}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-4">
+                  <p className="text-sm text-[var(--app-danger)]">Пропущено</p>
+
+                  <p className="mt-2 text-2xl font-bold tabular-nums text-[var(--app-danger)]">
+                    {importPreviewMutation.data.skippedRowsCount}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm leading-6 text-[var(--app-muted)]">
+                  В проект попадут только сопоставленные позиции. Строки с
+                  ошибками будут пропущены.
+                </p>
+
+                <AppButton
+                  type="button"
+                  variant="primary"
+                  loading={importApplyMutation.isPending}
+                  disabled={
+                    matchedImportRows.length === 0 ||
+                    importApplyMutation.isSuccess
+                  }
+                  onClick={handleApplyImport}
+                >
+                  Добавить сопоставленные позиции в проект
+                </AppButton>
+              </div>
+
+              {importApplyMutation.isError && (
+                <div
+                  role="alert"
+                  className="rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-4 text-sm text-[var(--app-danger)]"
+                >
+                  {getApiErrorMessage(
+                    importApplyMutation.error,
+                    "Не удалось добавить позиции из файла в проект.",
+                  )}
+                </div>
+              )}
+
+              {importApplyMutation.data && (
+                <div
+                  role="status"
+                  className="rounded-2xl border border-[var(--app-success-border)] bg-[var(--app-success-soft)] p-4 text-sm text-[var(--app-success)]"
+                >
+                  Добавлено позиций: {importApplyMutation.data.addedLinesCount}.
+                  Строки с ошибками не добавлялись.
+                </div>
+              )}
+
+              <div className="overflow-x-auto rounded-2xl border border-[var(--app-border)]">
+                <table className="w-full min-w-[1450px] border-collapse text-left text-sm">
+                  <thead className="bg-[var(--app-surface)] text-[var(--app-muted)]">
+                    <tr>
+                      <th className="px-4 py-3 font-medium">Строка</th>
+                      <th className="px-4 py-3 font-medium">Исходные данные</th>
+                      <th className="px-4 py-3 font-medium">
+                        Товар в каталоге
+                      </th>
+                      <th className="px-4 py-3 font-medium">Количество</th>
+                      <th className="px-4 py-3 font-medium">На складе</th>
+                      <th className="px-4 py-3 font-medium">Дефицит</th>
+                      <th className="px-4 py-3 font-medium">Цена</th>
+                      <th className="px-4 py-3 font-medium">Результат</th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-[var(--app-border)]">
+                    {importPreviewMutation.data.rows
+                      .slice(0, 100)
+                      .map((row) => (
+                        <tr
+                          key={`${row.rowNumber}-${row.article}`}
+                          className="bg-[var(--app-panel)] align-top"
+                        >
+                          <td className="px-4 py-4 tabular-nums text-[var(--app-muted)]">
+                            {row.rowNumber}
+                          </td>
+
+                          <td className="px-4 py-4">
+                            <p className="font-medium text-[var(--app-text)]">
+                              {row.sourceName ?? "Без наименования"}
+                            </p>
+
+                            <p className="mt-1 text-xs text-[var(--app-muted)]">
+                              Артикул: {row.article || "—"}
+                            </p>
+
+                            <p className="mt-1 text-xs text-[var(--app-muted)]">
+                              Производитель: {row.sourceManufacturer ?? "—"}
+                            </p>
+                          </td>
+
+                          <td className="px-4 py-4">
+                            <p className="font-medium text-[var(--app-text)]">
+                              {row.productName ?? "—"}
+                            </p>
+
+                            {row.productArticle && (
+                              <p className="mt-1 text-xs text-[var(--app-muted)]">
+                                {row.manufacturerName} · {row.productArticle}
+                              </p>
+                            )}
+                          </td>
+
+                          <td className="px-4 py-4 tabular-nums text-[var(--app-text)]">
+                            {row.quantity === null
+                              ? "—"
+                              : formatQuantity(row.quantity)}
+                          </td>
+
+                          <td className="px-4 py-4 tabular-nums text-[var(--app-text)]">
+                            {row.stockQuantity === null
+                              ? "—"
+                              : formatQuantity(row.stockQuantity)}
+                          </td>
+
+                          <td
+                            className={`px-4 py-4 font-semibold tabular-nums ${
+                              (row.shortageQuantity ?? 0) > 0
+                                ? "text-[var(--app-danger)]"
+                                : "text-[var(--app-success)]"
+                            }`}
+                          >
+                            {row.shortageQuantity === null
+                              ? "—"
+                              : row.shortageQuantity > 0
+                                ? formatQuantity(row.shortageQuantity)
+                                : "Достаточно"}
+                          </td>
+
+                          <td className="whitespace-nowrap px-4 py-4 tabular-nums text-[var(--app-text)]">
+                            {row.basePriceAmount === null
+                              ? "—"
+                              : formatPrice(
+                                  row.basePriceAmount,
+                                  calculation.currency,
+                                )}
+                          </td>
+
+                          <td className="px-4 py-4">
+                            <span
+                              className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getImportStatusClassName(row.status)}`}
+                            >
+                              {getImportStatusLabel(row.status)}
+                            </span>
+
+                            {row.message && (
+                              <p className="mt-2 max-w-80 text-xs leading-5 text-[var(--app-muted)]">
+                                {row.message}
+                              </p>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {importPreviewMutation.data.rows.length > 100 && (
+                <p className="text-sm text-[var(--app-muted)]">
+                  Показаны первые 100 строк из{" "}
+                  {importPreviewMutation.data.rows.length}. Все строки файла
+                  были проверены.
+                </p>
+              )}
+            </div>
+          )}
+        </section>
+      )}
 
       {editable && (
         <section
@@ -776,12 +1129,14 @@ export default function CatalogPriceCalculationPage() {
 
         {calculation.lines.length > 0 ? (
           <div className="mt-5 overflow-x-auto rounded-2xl border border-[var(--app-border)]">
-            <table className="w-full min-w-[1500px] border-collapse text-left text-sm">
+            <table className="w-full min-w-[1750px] border-collapse text-left text-sm">
               <thead className="bg-[var(--app-surface)] text-[var(--app-muted)]">
                 <tr>
                   <th className="px-4 py-3 font-medium">Товар</th>
                   <th className="px-4 py-3 font-medium">Производитель</th>
                   <th className="px-4 py-3 font-medium">Количество</th>
+                  <th className="px-4 py-3 font-medium">На складе</th>
+                  <th className="px-4 py-3 font-medium">Дефицит</th>
                   <th className="px-4 py-3 font-medium">Прайс 100%</th>
                   <th className="px-4 py-3 font-medium">МРЦ</th>
                   <th className="px-4 py-3 font-medium">Скидка</th>
