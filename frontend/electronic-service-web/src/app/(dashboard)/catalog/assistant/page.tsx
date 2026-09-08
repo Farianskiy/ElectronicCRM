@@ -17,6 +17,7 @@ import { useAuthSession } from "@/features/auth/model/useAuthSession";
 import { isTechnicalUser } from "@/shared/api/authToken";
 import { formatPercent, formatPrice } from "@/shared/lib/formatters";
 import { PageHeader } from "@/shared/ui/PageHeader";
+import { VoiceInputButton } from "@/shared/ui/VoiceInputButton";
 
 function getErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
@@ -260,7 +261,7 @@ export default function CatalogAssistantPage() {
   const session = useAuthSession();
   const technical = isTechnicalUser(session);
 
-  const [message, setMessage] = useState("найди автомат чент 1п 16а");
+  const [message, setMessage] = useState("");
   const [onlyInStock, setOnlyInStock] = useState(false);
   const [minimumScore, setMinimumScore] = useState(70);
   const [pageSize, setPageSize] = useState(20);
@@ -344,17 +345,31 @@ export default function CatalogAssistantPage() {
 
       <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
         <form onSubmit={handleSubmit} className="grid gap-4">
-          <label className="grid gap-2">
-            <span className="text-sm font-medium text-slate-300">
+          <div className="grid gap-2">
+            <label
+              htmlFor="assistant-message"
+              className="text-sm font-medium text-slate-300"
+            >
               Что нужно найти?
-            </span>
+            </label>
 
-            <textarea
-              value={message}
-              onChange={(event) => setMessage(event.target.value)}
-              className="min-h-28 rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-slate-100 outline-none placeholder:text-slate-600 focus:border-teal-400"
-            />
-          </label>
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+              <textarea
+                id="assistant-message"
+                value={message}
+                onChange={(event) => setMessage(event.target.value)}
+                placeholder="Напишите или произнесите запрос"
+                className="min-h-28 rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-slate-100 outline-none placeholder:text-slate-600 focus:border-teal-400"
+              />
+
+              <VoiceInputButton
+                disabled={assistantMutation.isPending}
+                onTranscript={(transcript) => {
+                  setMessage(transcript);
+                }}
+              />
+            </div>
+          </div>
 
           <div className="grid gap-4 md:grid-cols-3">
             <label className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
@@ -405,7 +420,9 @@ export default function CatalogAssistantPage() {
 
           <button
             type="submit"
-            disabled={assistantMutation.isPending}
+            disabled={
+              assistantMutation.isPending || message.trim().length === 0
+            }
             className="w-fit rounded-2xl bg-teal-500 px-5 py-3 text-sm font-medium text-white disabled:opacity-60"
           >
             {assistantMutation.isPending ? "Ищем..." : "Найти"}

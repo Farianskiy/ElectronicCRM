@@ -19,6 +19,7 @@ import type {
 import { AppSelect } from "@/shared/ui/AppSelect";
 import { AppInput } from "@/shared/ui/AppInput";
 import { AppButton } from "@/shared/ui/AppButton";
+import { VoiceInputButton } from "@/shared/ui/VoiceInputButton";
 import { importCatalogStock } from "@/features/catalogStockImport/api/importCatalogStock";
 
 function getErrorMessage(error: unknown): string {
@@ -365,12 +366,10 @@ export default function CatalogProductsPage() {
                     : "Выберите производителя",
                   disabled: manufacturersQuery.isLoading,
                 },
-                ...(manufacturersQuery.data ?? []).map(
-                  (manufacturerItem) => ({
-                    value: manufacturerItem.id,
-                    label: manufacturerItem.name,
-                  }),
-                ),
+                ...(manufacturersQuery.data ?? []).map((manufacturerItem) => ({
+                  value: manufacturerItem.id,
+                  label: manufacturerItem.name,
+                })),
               ]}
             />
           </label>
@@ -420,11 +419,10 @@ export default function CatalogProductsPage() {
             </p>
 
             <p className="mt-2 text-sm leading-6 text-[var(--app-text)]">
-              Прочитано строк: {stockImportMutation.data.readRowsCount}.
-              Совпало по артикулу:{" "}
-              {stockImportMutation.data.matchedRowsCount}. Изменено товаров:{" "}
-              {stockImportMutation.data.updatedProductsCount}. Пропущено:{" "}
-              {stockImportMutation.data.skippedRowsCount}.
+              Прочитано строк: {stockImportMutation.data.readRowsCount}. Совпало
+              по артикулу: {stockImportMutation.data.matchedRowsCount}. Изменено
+              товаров: {stockImportMutation.data.updatedProductsCount}.
+              Пропущено: {stockImportMutation.data.skippedRowsCount}.
             </p>
 
             {stockImportMutation.data.issues.length > 0 && (
@@ -435,7 +433,9 @@ export default function CatalogProductsPage() {
 
                 <ul className="mt-2 grid gap-1 pl-5">
                   {stockImportMutation.data.issues.map((issue) => (
-                    <li key={`${issue.rowNumber}-${issue.article}-${issue.message}`}>
+                    <li
+                      key={`${issue.rowNumber}-${issue.article}-${issue.message}`}
+                    >
                       Строка {issue.rowNumber}
                       {issue.article ? `, артикул ${issue.article}` : ""}:{" "}
                       {issue.message}
@@ -467,17 +467,30 @@ export default function CatalogProductsPage() {
 
         <form onSubmit={handleSearch} className="grid min-w-0 gap-5">
           <div className="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <label className="grid min-w-0 content-start gap-2 md:col-span-2">
-              <span className="text-sm font-medium text-[var(--app-text)]">
+            <div className="grid min-w-0 content-start gap-2 md:col-span-2">
+              <label
+                htmlFor="catalog-product-search"
+                className="text-sm font-medium text-[var(--app-text)]"
+              >
                 Поиск товара
-              </span>
+              </label>
 
-              <AppInput
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Название, артикул, тип или производитель"
-              />
-            </label>
+              <div className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+                <AppInput
+                  id="catalog-product-search"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Название, артикул, тип или производитель"
+                />
+
+                <VoiceInputButton
+                  disabled={productsQuery.isFetching}
+                  onTranscript={(transcript) => {
+                    setSearch(transcript);
+                  }}
+                />
+              </div>
+            </div>
 
             <label className="grid min-w-0 content-start gap-2">
               <span className="text-sm font-medium text-[var(--app-text)]">
