@@ -16,6 +16,8 @@ function getStatusLabel(status: CatalogAssistantBatchLine["status"]): string {
       return "Не найдено";
     case "NeedsClarification":
       return "Нужно уточнение";
+    case "MissingQuantity":
+      return "Укажите количество";
     default:
       return "Некорректно";
   }

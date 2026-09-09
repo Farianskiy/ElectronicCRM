@@ -20,7 +20,8 @@ public static partial class CatalogAssistantBatchMessageSplitter
 
         if (explicitSegments.Count > 1
             && !QuantityRegex().IsMatch(explicitSegments[0])
-            && explicitSegments.Skip(1).Any(QuantityRegex().IsMatch))
+            && (explicitSegments.Skip(1).Any(QuantityRegex().IsMatch)
+                || CommonTextPrefixRegex().IsMatch(explicitSegments[0])))
         {
             commonText = explicitSegments[0];
             explicitSegments.RemoveAt(0);
@@ -108,4 +109,7 @@ public static partial class CatalogAssistantBatchMessageSplitter
 
     [GeneratedRegex(@"(?<![\p{L}\p{N}])(?<quantity>\d+(?:[.,]\d+)?)\s*(?:ШТ(?:\.|УК(?:А|И)?)?|ЕД(?:\.|ИНИЦ(?:А|Ы)?)?|IN)(?![\p{L}\p{N}])", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, RegexTimeoutMilliseconds)]
     private static partial Regex QuantityRegex();
+
+    [GeneratedRegex(@"^\s*(?:НАЙДИ|НАЙТИ|ПОКАЖИ|ПОДБЕРИ|НУЖЕН|НУЖНА|НУЖНЫ|ИЩУ)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, RegexTimeoutMilliseconds)]
+    private static partial Regex CommonTextPrefixRegex();
 }

@@ -45,9 +45,16 @@ function getErrorMessage(error: unknown): string {
 }
 
 function isBatchRequest(message: string): boolean {
-  return /\d+(?:[.,]\d+)?\s*(?:шт(?:\.|ук(?:а|и)?)?|ед(?:\.|иниц(?:а|ы)?)?|in)(?![а-яa-z0-9])/iu.test(
-    message,
-  );
+  const hasQuantity =
+    /\d+(?:[.,]\d+)?\s*(?:шт(?:\.|ук(?:а|и)?)?|ед(?:\.|иниц(?:а|ы)?)?|in)(?![а-яa-z0-9])/iu.test(
+      message,
+    );
+  const explicitSegments = message
+    .split(/\r?\n|[;/]/u)
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+
+  return hasQuantity || explicitSegments.length >= 2;
 }
 
 function ProductCard({

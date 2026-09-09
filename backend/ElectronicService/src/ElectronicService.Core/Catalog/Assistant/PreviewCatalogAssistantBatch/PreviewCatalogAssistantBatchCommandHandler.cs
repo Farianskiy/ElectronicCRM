@@ -60,10 +60,6 @@ public sealed class PreviewCatalogAssistantBatchCommandHandler
 
     private async Task<CatalogAssistantBatchLineResult> PreviewLineAsync(CatalogAssistantBatchLineInput line, PreviewCatalogAssistantBatchCommand command, CancellationToken cancellationToken)
     {
-        if (line.Quantity is null or <= 0)
-        {
-            return new CatalogAssistantBatchLineResult(line.LineNumber, line.SourceText, line.SearchText, line.Quantity, "Invalid", "Не указано количество. Используйте, например, «4 шт».", null, []);
-        }
 
         var parsedRequest = await _messageParser.ParseAsync(line.SearchText, null, cancellationToken).ConfigureAwait(false);
 
@@ -73,6 +69,15 @@ public sealed class PreviewCatalogAssistantBatchCommandHandler
         }
 
         var products = await _catalogProductsReader.SearchProductsAsync(new SearchProductsQuery(parsedRequest.Search, parsedRequest.ProductTypeCode, parsedRequest.Manufacturer, parsedRequest.Characteristics, 1, command.MatchesPerLine, command.OnlyInStock ? true : null), cancellationToken).ConfigureAwait(false);
+
+        if (line.Quantity is null or <= 0)
+        {
+            var missingQuantityMessage = products.TotalCount == 0
+                ? "Подходящий товар не найден. Также укажите количество, например «4 шт»."
+                : $"Найдено вариантов: {products.TotalCount}. Укажите количество, например «4 шт», затем повторите поиск.";
+
+            return new CatalogAssistantBatchLineResult(line.LineNumber, line.SourceText, line.SearchText, line.Quantity, "MissingQuantity", missingQuantityMessage, parsedRequest, products.Items);
+        }
 
         var status = products.TotalCount switch
         {

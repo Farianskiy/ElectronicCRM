@@ -109,6 +109,7 @@ export interface CatalogAssistantBatchLine {
     | "MultipleMatches"
     | "NotFound"
     | "NeedsClarification"
+    | "MissingQuantity"
     | "Invalid";
   message: string;
   manufacturer: string | null;
