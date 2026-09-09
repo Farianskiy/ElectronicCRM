@@ -7,6 +7,8 @@ import type {
   PreviewCatalogPriceCalculationImportResponse,
   SearchCatalogPriceCalculationProductsParams,
   SearchCatalogPriceCalculationProductsResponse,
+  UpdateCatalogPriceCalculationCardRequest,
+  UpdateCatalogPriceCalculationCardResponse,
 } from "../model/types";
 
 export async function getCatalogPriceCalculation(
@@ -15,6 +17,25 @@ export async function getCatalogPriceCalculation(
   const response = await httpClient.get<CatalogPriceCalculationDetails>(
     `/api/catalog/price-calculations/${calculationId}`,
   );
+
+  return response.data;
+}
+
+export async function updateCatalogPriceCalculationCard(
+  request: UpdateCatalogPriceCalculationCardRequest,
+): Promise<UpdateCatalogPriceCalculationCardResponse> {
+  const response =
+    await httpClient.patch<UpdateCatalogPriceCalculationCardResponse>(
+      `/api/catalog/price-calculations/${request.calculationId}/card`,
+      {
+        customerName: request.customerName,
+        objectName: request.objectName,
+        projectNumber: request.projectNumber,
+        responsibleName: request.responsibleName,
+        comment: request.comment,
+        validUntil: request.validUntil,
+      },
+    );
 
   return response.data;
 }

@@ -85,6 +85,12 @@ export interface CatalogPriceCalculationDetails {
   createdByUserId: string;
   title: string;
   currency: string;
+  customerName?: string | null;
+  objectName?: string | null;
+  projectNumber?: string | null;
+  responsibleName?: string | null;
+  comment?: string | null;
+  validUntil?: string | null;
   status: CatalogPriceCalculationStatus;
   totalAmount: number;
   createdAtUtc: string;
@@ -93,6 +99,27 @@ export interface CatalogPriceCalculationDetails {
   archivedAtUtc?: string | null;
   lines: CatalogPriceCalculationLine[];
   manufacturerDiscounts: CatalogPriceCalculationManufacturerDiscount[];
+}
+
+export interface UpdateCatalogPriceCalculationCardRequest {
+  calculationId: string;
+  customerName: string | null;
+  objectName: string | null;
+  projectNumber: string | null;
+  responsibleName: string | null;
+  comment: string | null;
+  validUntil: string | null;
+}
+
+export interface UpdateCatalogPriceCalculationCardResponse {
+  calculationId: string;
+  customerName: string | null;
+  objectName: string | null;
+  projectNumber: string | null;
+  responsibleName: string | null;
+  comment: string | null;
+  validUntil: string | null;
+  updatedAtUtc: string | null;
 }
 
 export interface CatalogPriceCalculationProductSearchItem {

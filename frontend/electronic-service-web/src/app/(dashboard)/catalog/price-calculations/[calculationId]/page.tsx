@@ -15,9 +15,12 @@ import {
   removeCatalogPriceCalculationManufacturerDiscount,
   searchCatalogPriceCalculationProducts,
   setCatalogPriceCalculationManufacturerDiscount,
+  updateCatalogPriceCalculationCard,
 } from "@/features/catalogPriceCalculations/api/catalogPriceCalculationEditorApi";
+import { exportCatalogPriceCalculation } from "@/features/catalogPriceCalculations/api/exportCatalogPriceCalculation";
 import { catalogPriceCalculationQueryKeys } from "@/features/catalogPriceCalculations/model/queryKeys";
 import type {
+  CatalogPriceCalculationDetails,
   CatalogPriceCalculationImportRowStatus,
   CatalogPriceCalculationLine,
   CatalogPriceCalculationManufacturerDiscount,
@@ -369,6 +372,195 @@ function ManufacturerDiscountEditor({
   );
 }
 
+function ProjectCardEditor({
+  calculation,
+  editable,
+  isSaving,
+  isSaved,
+  onSave,
+}: {
+  calculation: CatalogPriceCalculationDetails;
+  editable: boolean;
+  isSaving: boolean;
+  isSaved: boolean;
+  onSave: (values: {
+    customerName: string | null;
+    objectName: string | null;
+    projectNumber: string | null;
+    responsibleName: string | null;
+    comment: string | null;
+    validUntil: string | null;
+  }) => void;
+}) {
+  const [customerName, setCustomerName] = useState(
+    calculation.customerName ?? "",
+  );
+  const [objectName, setObjectName] = useState(calculation.objectName ?? "");
+  const [projectNumber, setProjectNumber] = useState(
+    calculation.projectNumber ?? "",
+  );
+  const [responsibleName, setResponsibleName] = useState(
+    calculation.responsibleName ?? "",
+  );
+  const [comment, setComment] = useState(calculation.comment ?? "");
+  const [validUntil, setValidUntil] = useState(calculation.validUntil ?? "");
+  const [hasChanges, setHasChanges] = useState(false);
+
+  function normalize(value: string): string | null {
+    const normalizedValue = value.trim();
+
+    return normalizedValue.length > 0 ? normalizedValue : null;
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>): void {
+    event.preventDefault();
+
+    onSave({
+      customerName: normalize(customerName),
+      objectName: normalize(objectName),
+      projectNumber: normalize(projectNumber),
+      responsibleName: normalize(responsibleName),
+      comment: normalize(comment),
+      validUntil: normalize(validUntil),
+    });
+  }
+
+  return (
+    <section
+      aria-labelledby="project-card-title"
+      className="rounded-3xl border border-[var(--app-border)] bg-[var(--app-panel)] p-5 sm:p-6"
+    >
+      <h2
+        id="project-card-title"
+        className="text-xl font-semibold text-[var(--app-text)]"
+      >
+        Карточка проекта
+      </h2>
+
+      <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">
+        Реквизиты попадут в итоговый Excel и помогут идентифицировать
+        предложение.
+      </p>
+
+      <form
+        onSubmit={handleSubmit}
+        onChange={() => setHasChanges(true)}
+        className="mt-5 grid gap-4"
+      >
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <label className="grid gap-2">
+            <span className="text-sm font-medium text-[var(--app-text)]">
+              Заказчик
+            </span>
+
+            <AppInput
+              value={customerName}
+              maxLength={200}
+              disabled={!editable || isSaving}
+              onChange={(event) => setCustomerName(event.target.value)}
+              placeholder="Название организации или ФИО"
+            />
+          </label>
+
+          <label className="grid gap-2">
+            <span className="text-sm font-medium text-[var(--app-text)]">
+              Объект
+            </span>
+
+            <AppInput
+              value={objectName}
+              maxLength={300}
+              disabled={!editable || isSaving}
+              onChange={(event) => setObjectName(event.target.value)}
+              placeholder="Название или адрес объекта"
+            />
+          </label>
+
+          <label className="grid gap-2">
+            <span className="text-sm font-medium text-[var(--app-text)]">
+              Номер проекта
+            </span>
+
+            <AppInput
+              value={projectNumber}
+              maxLength={100}
+              disabled={!editable || isSaving}
+              onChange={(event) => setProjectNumber(event.target.value)}
+              placeholder="Например, ПР-2026-019"
+            />
+          </label>
+
+          <label className="grid gap-2">
+            <span className="text-sm font-medium text-[var(--app-text)]">
+              Ответственный
+            </span>
+
+            <AppInput
+              value={responsibleName}
+              maxLength={200}
+              disabled={!editable || isSaving}
+              onChange={(event) => setResponsibleName(event.target.value)}
+              placeholder="ФИО сотрудника"
+            />
+          </label>
+
+          <label className="grid gap-2">
+            <span className="text-sm font-medium text-[var(--app-text)]">
+              Предложение действительно до
+            </span>
+
+            <AppInput
+              type="date"
+              value={validUntil}
+              disabled={!editable || isSaving}
+              onChange={(event) => setValidUntil(event.target.value)}
+            />
+          </label>
+        </div>
+
+        <label className="grid gap-2">
+          <span className="text-sm font-medium text-[var(--app-text)]">
+            Комментарий
+          </span>
+
+          <textarea
+            value={comment}
+            maxLength={2000}
+            rows={4}
+            disabled={!editable || isSaving}
+            onChange={(event) => setComment(event.target.value)}
+            placeholder="Условия, примечания или дополнительная информация"
+            className="w-full rounded-xl border border-[var(--app-input-border)] bg-[var(--app-input-bg)] px-4 py-3 text-sm text-[var(--app-text)] outline-none transition placeholder:text-[var(--app-muted)] focus:border-[var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-60"
+          />
+        </label>
+
+        {editable && (
+          <div className="flex flex-wrap items-center gap-4">
+            <AppButton
+              type="submit"
+              variant="primary"
+              loading={isSaving}
+              disabled={!hasChanges}
+              className="w-fit"
+            >
+              Сохранить карточку
+            </AppButton>
+
+            {isSaved && !hasChanges && (
+              <p
+                role="status"
+                className="text-sm font-medium text-[var(--app-success)]"
+              >
+                Карточка сохранена.
+              </p>
+            )}
+          </div>
+        )}
+      </form>
+    </section>
+  );
+}
+
 export default function CatalogPriceCalculationPage() {
   const params = useParams<{ calculationId: string }>();
   const queryClient = useQueryClient();
@@ -448,6 +640,15 @@ export default function CatalogPriceCalculationPage() {
     onSuccess: refreshCalculation,
   });
 
+  const exportMutation = useMutation({
+    mutationFn: exportCatalogPriceCalculation,
+  });
+
+  const cardMutation = useMutation({
+    mutationFn: updateCatalogPriceCalculationCard,
+    onSuccess: refreshCalculation,
+  });
+
   const importPreviewMutation = useMutation({
     mutationFn: previewCatalogPriceCalculationImport,
   });
@@ -487,7 +688,9 @@ export default function CatalogPriceCalculationPage() {
     removeLineMutation.error ??
     setDiscountMutation.error ??
     removeDiscountMutation.error ??
-    completeMutation.error;
+    completeMutation.error ??
+    cardMutation.error ??
+    exportMutation.error;
 
   const searchTotalPages = Math.max(1, productsQuery.data?.totalPages ?? 0);
 
@@ -525,6 +728,20 @@ export default function CatalogPriceCalculationPage() {
     importApplyMutation.mutate({
       calculationId,
       rows,
+    });
+  }
+
+  function handleSaveCard(values: {
+    customerName: string | null;
+    objectName: string | null;
+    projectNumber: string | null;
+    responsibleName: string | null;
+    comment: string | null;
+    validUntil: string | null;
+  }): void {
+    cardMutation.mutate({
+      calculationId,
+      ...values,
     });
   }
 
@@ -640,6 +857,16 @@ export default function CatalogPriceCalculationPage() {
             Назад
           </Link>
 
+          <AppButton
+            type="button"
+            variant="secondary"
+            loading={exportMutation.isPending}
+            disabled={calculation.lines.length === 0}
+            onClick={() => exportMutation.mutate(calculationId)}
+          >
+            Скачать Excel
+          </AppButton>
+
           {editable && (
             <AppButton
               type="button"
@@ -691,6 +918,15 @@ export default function CatalogPriceCalculationPage() {
           </p>
         </div>
       </section>
+
+      <ProjectCardEditor
+        key={`${calculation.calculationId}-${calculation.updatedAtUtc ?? calculation.createdAtUtc}`}
+        calculation={calculation}
+        editable={editable}
+        isSaving={cardMutation.isPending}
+        isSaved={cardMutation.isSuccess}
+        onSave={handleSaveCard}
+      />
 
       {editable && (
         <section

@@ -8,6 +8,16 @@ public sealed class CatalogPriceCalculation : AggregateRoot
 {
     public const int MaximumTitleLength = 200;
 
+    public const int MaximumCustomerNameLength = 200;
+
+    public const int MaximumObjectNameLength = 300;
+
+    public const int MaximumProjectNumberLength = 100;
+
+    public const int MaximumResponsibleNameLength = 200;
+
+    public const int MaximumCommentLength = 2000;
+
     public const string DefaultCurrency = "RUB";
 
     private readonly List<CatalogPriceCalculationLine>
@@ -52,6 +62,42 @@ public sealed class CatalogPriceCalculation : AggregateRoot
         get;
         private set;
     } = DefaultCurrency;
+
+    public string? CustomerName
+    {
+        get;
+        private set;
+    }
+
+    public string? ObjectName
+    {
+        get;
+        private set;
+    }
+
+    public string? ProjectNumber
+    {
+        get;
+        private set;
+    }
+
+    public string? ResponsibleName
+    {
+        get;
+        private set;
+    }
+
+    public string? Comment
+    {
+        get;
+        private set;
+    }
+
+    public DateOnly? ValidUntil
+    {
+        get;
+        private set;
+    }
 
     public CatalogPriceCalculationStatus Status
     {
@@ -185,6 +231,63 @@ public sealed class CatalogPriceCalculation : AggregateRoot
         }
 
         Title = normalizedTitle;
+        Touch();
+
+        return UnitResult.Success<DomainError>();
+    }
+
+    public UnitResult<DomainError> UpdateProjectCard(
+        string? customerName,
+        string? objectName,
+        string? projectNumber,
+        string? responsibleName,
+        string? comment,
+        DateOnly? validUntil)
+    {
+        var editableResult = EnsureEditable();
+
+        if (editableResult.IsFailure)
+        {
+            return editableResult;
+        }
+
+        var customerNameResult = NormalizeOptional(customerName, nameof(customerName), MaximumCustomerNameLength);
+        var objectNameResult = NormalizeOptional(objectName, nameof(objectName), MaximumObjectNameLength);
+        var projectNumberResult = NormalizeOptional(projectNumber, nameof(projectNumber), MaximumProjectNumberLength);
+        var responsibleNameResult = NormalizeOptional(responsibleName, nameof(responsibleName), MaximumResponsibleNameLength);
+        var commentResult = NormalizeOptional(comment, nameof(comment), MaximumCommentLength);
+
+        if (customerNameResult.IsFailure)
+        {
+            return UnitResult.Failure(customerNameResult.Error);
+        }
+
+        if (objectNameResult.IsFailure)
+        {
+            return UnitResult.Failure(objectNameResult.Error);
+        }
+
+        if (projectNumberResult.IsFailure)
+        {
+            return UnitResult.Failure(projectNumberResult.Error);
+        }
+
+        if (responsibleNameResult.IsFailure)
+        {
+            return UnitResult.Failure(responsibleNameResult.Error);
+        }
+
+        if (commentResult.IsFailure)
+        {
+            return UnitResult.Failure(commentResult.Error);
+        }
+
+        CustomerName = customerNameResult.Value;
+        ObjectName = objectNameResult.Value;
+        ProjectNumber = projectNumberResult.Value;
+        ResponsibleName = responsibleNameResult.Value;
+        Comment = commentResult.Value;
+        ValidUntil = validUntil;
         Touch();
 
         return UnitResult.Success<DomainError>();
@@ -596,6 +699,26 @@ public sealed class CatalogPriceCalculation : AggregateRoot
         }
 
         return UnitResult.Success<DomainError>();
+    }
+
+    private static Result<string?, DomainError> NormalizeOptional(
+        string? value,
+        string propertyName,
+        int maximumLength)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return Result.Success<string?, DomainError>(null);
+        }
+
+        var normalizedValue = value.Trim();
+
+        if (normalizedValue.Length > maximumLength)
+        {
+            return Result.Failure<string?, DomainError>(GeneralErrors.ValueIsTooLong(propertyName, maximumLength));
+        }
+
+        return Result.Success<string?, DomainError>(normalizedValue);
     }
 
     private void RecalculateTotal()

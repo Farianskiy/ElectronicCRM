@@ -6,6 +6,7 @@ using ElectronicService.Core.Catalog.Assistant.DictionarySuggestions.CreateSugge
 using ElectronicService.Core.Catalog.Assistant.DictionarySuggestions.GetSuggestions;
 using ElectronicService.Core.Catalog.Assistant.DictionarySuggestions.RejectSuggestion;
 using ElectronicService.Core.Catalog.Assistant.Parsing;
+using ElectronicService.Core.Catalog.Assistant.PreviewCatalogAssistantBatch;
 using ElectronicService.Core.Catalog.CharacteristicDefinitions.CreateDefinition;
 using ElectronicService.Core.Catalog.CharacteristicDefinitions.DeleteDefinition;
 using ElectronicService.Core.Catalog.CharacteristicDefinitions.GetDefinitions;
@@ -49,12 +50,14 @@ using ElectronicService.Core.Catalog.PriceCalculations.ApplyCatalogPriceCalculat
 using ElectronicService.Core.Catalog.PriceCalculations.ChangeCatalogPriceCalculationLineQuantity;
 using ElectronicService.Core.Catalog.PriceCalculations.CompleteCatalogPriceCalculation;
 using ElectronicService.Core.Catalog.PriceCalculations.CreateCatalogPriceCalculation;
+using ElectronicService.Core.Catalog.PriceCalculations.ExportCatalogPriceCalculation;
 using ElectronicService.Core.Catalog.PriceCalculations.GetCatalogPriceCalculation;
 using ElectronicService.Core.Catalog.PriceCalculations.GetMyCatalogPriceCalculations;
 using ElectronicService.Core.Catalog.PriceCalculations.RemoveCatalogPriceCalculationLine;
 using ElectronicService.Core.Catalog.PriceCalculations.RemoveCatalogPriceCalculationManufacturerDiscount;
 using ElectronicService.Core.Catalog.PriceCalculations.SearchCatalogPriceCalculationProducts;
 using ElectronicService.Core.Catalog.PriceCalculations.SetCatalogPriceCalculationManufacturerDiscount;
+using ElectronicService.Core.Catalog.PriceCalculations.UpdateCatalogPriceCalculationCard;
 using ElectronicService.Core.Catalog.PriceLists.ActivateCatalogPriceList;
 using ElectronicService.Core.Catalog.PriceLists.ApplyCatalogPriceListIssueGroup;
 using ElectronicService.Core.Catalog.PriceLists.BulkUpdateCatalogPriceListRows;
@@ -135,6 +138,7 @@ public static class DependencyInjectionExtensions
         services.AddScoped<AddCatalogDictionaryTermCommandHandler>();
         services.AddScoped<SetCatalogDictionaryTermActiveCommandHandler>();
         services.AddScoped<AskCatalogAssistantCommandHandler>();
+        services.AddScoped<PreviewCatalogAssistantBatchCommandHandler>();
         services.AddScoped<ICatalogCharacteristicRecognitionStrategy, PoleCountRecognitionStrategy>();
         services.AddScoped<ICatalogCharacteristicRecognitionStrategy, BreakingCapacityRecognitionStrategy>();
         services.AddScoped<ICatalogCharacteristicRecognitionStrategy, LeakageCurrentRecognitionStrategy>();
@@ -192,8 +196,10 @@ public static class DependencyInjectionExtensions
         services.AddScoped<SetCatalogPriceCalculationManufacturerDiscountCommandHandler>();
         services.AddScoped<RemoveCatalogPriceCalculationManufacturerDiscountCommandHandler>();
         services.AddScoped<GetCatalogPriceCalculationQueryHandler>();
+        services.AddScoped<ExportCatalogPriceCalculationQueryHandler>();
         services.AddScoped<GetMyCatalogPriceCalculationsQueryHandler>();
         services.AddScoped<SearchCatalogPriceCalculationProductsQueryHandler>();
+        services.AddScoped<UpdateCatalogPriceCalculationCardCommandHandler>();
         services.AddScoped<UploadCatalogPriceListCommandHandler>();
         services.AddScoped<ProcessCatalogPriceListCommandHandler>();
         services.AddScoped<ActivateCatalogPriceListCommandHandler>();

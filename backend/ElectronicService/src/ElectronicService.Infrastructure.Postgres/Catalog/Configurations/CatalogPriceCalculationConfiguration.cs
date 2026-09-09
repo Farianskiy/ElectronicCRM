@@ -56,6 +56,41 @@ public sealed class CatalogPriceCalculationConfiguration
             .IsRequired();
 
         builder.Property(calculation =>
+                calculation.CustomerName)
+            .HasColumnName("customer_name")
+            .HasMaxLength(
+                CatalogPriceCalculation.MaximumCustomerNameLength);
+
+        builder.Property(calculation =>
+                calculation.ObjectName)
+            .HasColumnName("object_name")
+            .HasMaxLength(
+                CatalogPriceCalculation.MaximumObjectNameLength);
+
+        builder.Property(calculation =>
+                calculation.ProjectNumber)
+            .HasColumnName("project_number")
+            .HasMaxLength(
+                CatalogPriceCalculation.MaximumProjectNumberLength);
+
+        builder.Property(calculation =>
+                calculation.ResponsibleName)
+            .HasColumnName("responsible_name")
+            .HasMaxLength(
+                CatalogPriceCalculation.MaximumResponsibleNameLength);
+
+        builder.Property(calculation =>
+                calculation.Comment)
+            .HasColumnName("comment")
+            .HasMaxLength(
+                CatalogPriceCalculation.MaximumCommentLength);
+
+        builder.Property(calculation =>
+                calculation.ValidUntil)
+            .HasColumnName("valid_until")
+            .HasColumnType("date");
+
+        builder.Property(calculation =>
                 calculation.Status)
             .HasColumnName("status")
             .HasConversion<string>()

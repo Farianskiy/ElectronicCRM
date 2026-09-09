@@ -1,0 +1,3 @@
+namespace ElectronicService.Core.Catalog.PriceCalculations.ExportCatalogPriceCalculation;
+
+public sealed record ExportCatalogPriceCalculationQuery(Guid CalculationId, Guid CurrentUserId);

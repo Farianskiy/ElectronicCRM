@@ -92,3 +92,34 @@ export interface CreateDictionarySuggestionResponse {
   status: string;
   message: string;
 }
+
+export interface PreviewCatalogAssistantBatchRequest {
+  message: string;
+  onlyInStock: boolean;
+  matchesPerLine: number;
+}
+
+export interface CatalogAssistantBatchLine {
+  lineNumber: number;
+  sourceText: string;
+  searchText: string;
+  quantity: number | null;
+  status:
+    | "Matched"
+    | "MultipleMatches"
+    | "NotFound"
+    | "NeedsClarification"
+    | "Invalid";
+  message: string;
+  manufacturer: string | null;
+  characteristics: CatalogAssistantCharacteristic[];
+  products: CatalogAssistantProduct[];
+}
+
+export interface PreviewCatalogAssistantBatchResponse {
+  commonText: string | null;
+  totalLines: number;
+  matchedLines: number;
+  requiresAttentionLines: number;
+  lines: CatalogAssistantBatchLine[];
+}
