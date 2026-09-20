@@ -6,6 +6,7 @@ namespace ElectronicService.Web.Controllers.Catalog.Assistant.DictionarySuggesti
 
 [ApiController]
 [Route("api/catalog/assistant/dictionary-suggestions")]
+[PermissionAuthorize(UserPermissionCode.DictionariesManage)]
 public sealed class CatalogAssistantDictionarySuggestionsController : ControllerBase
 {
     private readonly GetCatalogAssistantDictionarySuggestionsQueryHandler _handler;

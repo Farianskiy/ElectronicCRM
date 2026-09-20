@@ -112,6 +112,12 @@ public sealed class CatalogRecognitionFeedback : AggregateRoot
 
     public string? FinalNormalizedValue { get; private set; }
 
+    public string? ConfirmedRawValue { get; private set; }
+
+    public int? ConfirmedSpanStart { get; private set; }
+
+    public int? ConfirmedSpanLength { get; private set; }
+
     public CatalogRecognitionFeedbackStatus Status { get; private set; }
 
     public CatalogRecognitionFeedbackType FeedbackType { get; private set; }
@@ -364,6 +370,63 @@ public sealed class CatalogRecognitionFeedback : AggregateRoot
             isTrainingEligible: false);
     }
 
+    public UnitResult<DomainError> SetConfirmedSpan(int start, int length)
+    {
+        if (!IsPending)
+        {
+            return UnitResult.Failure(GeneralErrors.ValueIsInvalid(nameof(Status)));
+        }
+
+        if (FeedbackType == CatalogRecognitionFeedbackType.Rejected || string.IsNullOrWhiteSpace(FinalNormalizedValue))
+        {
+            return UnitResult.Failure(GeneralErrors.ValueIsInvalid(nameof(FinalNormalizedValue)));
+        }
+
+        if (start < 0 || start >= ProductName.Length)
+        {
+            return UnitResult.Failure(GeneralErrors.ValueIsInvalid(nameof(start)));
+        }
+
+        if (length <= 0 || length > ProductName.Length - start)
+        {
+            return UnitResult.Failure(GeneralErrors.ValueIsInvalid(nameof(length)));
+        }
+
+        var end = start + length;
+
+        if ((start > 0 && char.IsLowSurrogate(ProductName[start]) && char.IsHighSurrogate(ProductName[start - 1])) || (end < ProductName.Length && char.IsLowSurrogate(ProductName[end]) && char.IsHighSurrogate(ProductName[end - 1])))
+        {
+            return UnitResult.Failure(GeneralErrors.ValueIsInvalid(nameof(length)));
+        }
+
+        var rawValue = ProductName.Substring(start, length);
+
+        if (string.IsNullOrWhiteSpace(rawValue))
+        {
+            return UnitResult.Failure(GeneralErrors.ValueIsInvalid(nameof(length)));
+        }
+
+        ConfirmedRawValue = rawValue;
+        ConfirmedSpanStart = start;
+        ConfirmedSpanLength = length;
+
+        return UnitResult.Success<DomainError>();
+    }
+
+    public UnitResult<DomainError> ClearConfirmedSpan()
+    {
+        if (!IsPending)
+        {
+            return UnitResult.Failure(GeneralErrors.ValueIsInvalid(nameof(Status)));
+        }
+
+        ConfirmedRawValue = null;
+        ConfirmedSpanStart = null;
+        ConfirmedSpanLength = null;
+
+        return UnitResult.Success<DomainError>();
+    }
+
     public UnitResult<DomainError> UpdatePendingDecision(CatalogRecognitionFeedbackType feedbackType, string? finalNormalizedValue)
     {
         if (!IsPending)
@@ -379,6 +442,15 @@ public sealed class CatalogRecognitionFeedback : AggregateRoot
         if (decisionResult.IsFailure)
         {
             return UnitResult.Failure(decisionResult.Error);
+        }
+
+        var decisionChanged = FeedbackType != feedbackType || !string.Equals(FinalNormalizedValue, decisionResult.Value, StringComparison.Ordinal);
+
+        if (decisionChanged)
+        {
+            ConfirmedRawValue = null;
+            ConfirmedSpanStart = null;
+            ConfirmedSpanLength = null;
         }
 
         FeedbackType = feedbackType;

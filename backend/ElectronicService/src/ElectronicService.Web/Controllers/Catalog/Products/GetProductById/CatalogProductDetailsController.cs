@@ -6,6 +6,7 @@ namespace ElectronicService.Web.Controllers.Catalog.Products;
 
 [ApiController]
 [Route("api/catalog/products/{id:guid}")]
+[PermissionAuthorize(UserPermissionCode.ProductsView)]
 public sealed class CatalogProductDetailsController : ControllerBase
 {
     private readonly GetCatalogProductByIdQueryHandler _getCatalogProductByIdQueryHandler;

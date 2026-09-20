@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ElectronicService.Web.Controllers.Catalog.ImportBatches.DownloadCatalogImportFile;
 
 [ApiController]
-[Authorize(Roles = "Regular,Manager,Technical")]
+[PermissionAnyAuthorize(UserPermissionCode.CatalogImportsCreate, UserPermissionCode.CatalogImportsReview)]
 [Route("api/catalog/import-batches")]
 public sealed class DownloadCatalogImportFileController : ControllerBase
 {

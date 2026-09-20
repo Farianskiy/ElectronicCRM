@@ -22,6 +22,8 @@ public sealed class ElectronicDbContext : DbContext
 
     public DbSet<User> Users => Set<User>();
 
+    public DbSet<UserPermissionOverride> UserPermissionOverrides => Set<UserPermissionOverride>();
+
     public DbSet<Product> Products => Set<Product>();
 
     public DbSet<ProductCharacteristic> ProductCharacteristics => Set<ProductCharacteristic>();
@@ -67,6 +69,32 @@ public sealed class ElectronicDbContext : DbContext
     public DbSet<CatalogCharacteristicRecognitionProfile> CatalogCharacteristicRecognitionProfiles => Set<CatalogCharacteristicRecognitionProfile>();
 
     public DbSet<CatalogRecognitionFeedback> CatalogRecognitionFeedbackEntries => Set<CatalogRecognitionFeedback>();
+
+    public DbSet<CatalogRecognitionTrainingExample> CatalogRecognitionTrainingExamples => Set<CatalogRecognitionTrainingExample>();
+
+    public DbSet<CatalogRecognitionLiteralDraft> CatalogRecognitionLiteralDrafts => Set<CatalogRecognitionLiteralDraft>();
+
+    public DbSet<CatalogRecognitionLiteralDraftEvidence> CatalogRecognitionLiteralDraftEvidenceEntries => Set<CatalogRecognitionLiteralDraftEvidence>();
+
+    public DbSet<CatalogRecognitionIntegerDraft> CatalogRecognitionIntegerDrafts => Set<CatalogRecognitionIntegerDraft>();
+
+    public DbSet<CatalogRecognitionIntegerDraftSuffix> CatalogRecognitionIntegerDraftSuffixes => Set<CatalogRecognitionIntegerDraftSuffix>();
+
+    public DbSet<CatalogRecognitionIntegerDraftEvidence> CatalogRecognitionIntegerDraftEvidenceEntries => Set<CatalogRecognitionIntegerDraftEvidence>();
+
+    public DbSet<CatalogRecognitionMultiIntegerDraft> CatalogRecognitionMultiIntegerDrafts => Set<CatalogRecognitionMultiIntegerDraft>();
+
+    public DbSet<CatalogRecognitionMultiIntegerDraftPart> CatalogRecognitionMultiIntegerDraftParts => Set<CatalogRecognitionMultiIntegerDraftPart>();
+
+    public DbSet<CatalogRecognitionMultiIntegerDraftEvidence> CatalogRecognitionMultiIntegerDraftEvidenceEntries => Set<CatalogRecognitionMultiIntegerDraftEvidence>();
+
+    public DbSet<CatalogRecognitionRuleSetVersion> CatalogRecognitionRuleSetVersions => Set<CatalogRecognitionRuleSetVersion>();
+
+    public DbSet<CatalogRecognitionRuleSetEntry> CatalogRecognitionRuleSetEntries => Set<CatalogRecognitionRuleSetEntry>();
+
+    public DbSet<CatalogRecognitionRuleSetReport> CatalogRecognitionRuleSetReports => Set<CatalogRecognitionRuleSetReport>();
+
+    public DbSet<CatalogRecognitionRuleSetSwitch> CatalogRecognitionRuleSetSwitches => Set<CatalogRecognitionRuleSetSwitch>();
 
     public DbSet<CatalogRecognitionCandidate> CatalogRecognitionCandidates => Set<CatalogRecognitionCandidate>();
 

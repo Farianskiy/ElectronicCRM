@@ -18,6 +18,9 @@ import { AppInput } from "@/shared/ui/AppInput";
 
 interface TechnicalProductEditorProps {
   product: CatalogProductDetails;
+  canEditDetails: boolean;
+  canManagePrices: boolean;
+  canManageStock: boolean;
 }
 
 function getErrorMessage(error: unknown): string {
@@ -46,6 +49,9 @@ function getErrorMessage(error: unknown): string {
 
 export function TechnicalProductEditor({
   product,
+  canEditDetails,
+  canManagePrices,
+  canManageStock,
 }: TechnicalProductEditorProps) {
   const queryClient = useQueryClient();
 
@@ -175,7 +181,7 @@ export function TechnicalProductEditor({
         </h2>
 
         <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">
-          Изменения доступны только техническому пользователю.
+          Показаны только действия, разрешённые вашей учётной записи.
         </p>
       </div>
 
@@ -206,113 +212,122 @@ export function TechnicalProductEditor({
         </div>
       )}
 
-      <div className="mt-6 min-w-0">
-        <TechnicalProductGeneralInformationEditor product={product} />
-      </div>
+      {canEditDetails && (
+        <>
+          <div className="mt-6 min-w-0">
+            <TechnicalProductGeneralInformationEditor product={product} />
+          </div>
 
-      <div className="mt-6 min-w-0">
-        <TechnicalProductTypeMigrationPreview
-          key={`${product.id}:${product.productTypeId}`}
-          product={product}
-        />
-      </div>
+          <div className="mt-6 min-w-0">
+            <TechnicalProductTypeMigrationPreview
+              key={`${product.id}:${product.productTypeId}`}
+              product={product}
+            />
+          </div>
+        </>
+      )}
 
       <div className="mt-6 grid min-w-0 gap-5 lg:grid-cols-2">
-        <form
-          onSubmit={handlePriceSubmit}
-          className="flex min-w-0 flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-panel-strong)] p-5"
-        >
-          <h3 className="text-base font-semibold text-[var(--app-text)]">
-            Цена
-          </h3>
+        {canManagePrices && (
+          <form
+            onSubmit={handlePriceSubmit}
+            className="flex min-w-0 flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-panel-strong)] p-5"
+          >
+            <h3 className="text-base font-semibold text-[var(--app-text)]">
+              Цена
+            </h3>
 
-          <div className="mt-4 grid min-w-0 gap-4 sm:grid-cols-[minmax(0,1fr)_120px]">
-            <label className="grid min-w-0 gap-2">
+            <div className="mt-4 grid min-w-0 gap-4 sm:grid-cols-[minmax(0,1fr)_120px]">
+              <label className="grid min-w-0 gap-2">
+                <span className="text-sm font-medium text-[var(--app-text)]">
+                  Значение
+                </span>
+
+                <AppInput
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  required
+                  value={priceAmount}
+                  onChange={(event) => setPriceAmountDraft(event.target.value)}
+                />
+              </label>
+
+              <label className="grid min-w-0 gap-2">
+                <span className="text-sm font-medium text-[var(--app-text)]">
+                  Валюта
+                </span>
+
+                <AppInput
+                  value={priceCurrency}
+                  onChange={(event) =>
+                    setPriceCurrencyDraft(event.target.value)
+                  }
+                  maxLength={3}
+                  required
+                  className="uppercase"
+                />
+              </label>
+            </div>
+
+            <AppButton
+              type="submit"
+              variant="primary"
+              loading={priceMutation.isPending}
+              className="mt-5 w-full sm:w-auto sm:self-start"
+            >
+              {priceMutation.isPending ? "Сохраняем..." : "Сохранить цену"}
+            </AppButton>
+          </form>
+        )}
+
+        {canManageStock && (
+          <form
+            onSubmit={handleStockSubmit}
+            className="flex min-w-0 flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-panel-strong)] p-5"
+          >
+            <h3 className="text-base font-semibold text-[var(--app-text)]">
+              Остаток
+            </h3>
+
+            <label className="mt-4 grid min-w-0 gap-2">
               <span className="text-sm font-medium text-[var(--app-text)]">
-                Значение
+                Количество на складе
               </span>
 
               <AppInput
                 type="number"
                 min="0"
-                step="0.01"
+                step="any"
                 required
-                value={priceAmount}
-                onChange={(event) => setPriceAmountDraft(event.target.value)}
+                value={stockQuantity}
+                onChange={(event) => setStockQuantityDraft(event.target.value)}
               />
             </label>
 
-            <label className="grid min-w-0 gap-2">
-              <span className="text-sm font-medium text-[var(--app-text)]">
-                Валюта
-              </span>
+            <AppButton
+              type="submit"
+              variant="primary"
+              loading={stockMutation.isPending}
+              className="mt-5 w-full sm:w-auto sm:self-start"
+            >
+              {stockMutation.isPending ? "Сохраняем..." : "Сохранить остаток"}
+            </AppButton>
+          </form>
+        )}
+      </div>
 
-              <AppInput
-                value={priceCurrency}
-                onChange={(event) => setPriceCurrencyDraft(event.target.value)}
-                maxLength={3}
-                required
-                className="uppercase"
-              />
-            </label>
+      {canEditDetails && (
+        <div className="mt-6 grid min-w-0 gap-5">
+          <TechnicalProductCharacteristicsEditor product={product} />
+
+          <TechnicalProductAliasesEditor product={product} />
+
+          <div className="min-w-0">
+            <TechnicalProductAuditHistory productId={product.id} />
           </div>
-
-          <AppButton
-            type="submit"
-            variant="primary"
-            loading={priceMutation.isPending}
-            className="mt-5 w-full sm:w-auto sm:self-start"
-          >
-            {priceMutation.isPending ? "Сохраняем..." : "Сохранить цену"}
-          </AppButton>
-        </form>
-
-        <form
-          onSubmit={handleStockSubmit}
-          className="flex min-w-0 flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-panel-strong)] p-5"
-        >
-          <h3 className="text-base font-semibold text-[var(--app-text)]">
-            Остаток
-          </h3>
-
-          <label className="mt-4 grid min-w-0 gap-2">
-            <span className="text-sm font-medium text-[var(--app-text)]">
-              Количество на складе
-            </span>
-
-            <AppInput
-              type="number"
-              min="0"
-              step="any"
-              required
-              value={stockQuantity}
-              onChange={(event) => setStockQuantityDraft(event.target.value)}
-            />
-          </label>
-
-          <AppButton
-            type="submit"
-            variant="primary"
-            loading={stockMutation.isPending}
-            className="mt-5 w-full sm:w-auto sm:self-start"
-          >
-            {stockMutation.isPending ? "Сохраняем..." : "Сохранить остаток"}
-          </AppButton>
-        </form>
-      </div>
-
-      <div className="mt-6 grid min-w-0 gap-5">
-        <TechnicalProductCharacteristicsEditor product={product} />
-
-        <TechnicalProductAliasesEditor product={product} />
-
-        <div className="mt-6 min-w-0">
-          <TechnicalProductAuditHistory
-            key={product.id}
-            productId={product.id}
-          />
         </div>
-      </div>
+      )}
     </section>
   );
 }

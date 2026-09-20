@@ -1,4 +1,5 @@
 using System.Globalization;
+using ElectronicService.Core.Catalog.Characteristics.Normalization;
 using ElectronicService.Core.Catalog.Products.Abstractions;
 using ElectronicService.Core.Catalog.Products.GetProductById;
 using ElectronicService.Core.Catalog.Products.GetProducts;
@@ -383,6 +384,26 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
 
                 if (characteristicDefinition.DataType == CharacteristicDataType.Text)
                 {
+                    if (string.Equals(characteristicCode, CatalogPoleConfigurationNormalizer.CharacteristicCode, StringComparison.Ordinal))
+                    {
+                        var poleConfigurations = CatalogPoleConfigurationNormalizer.ExpandForSearch(rawValue).ToArray();
+
+                        if (poleConfigurations.Length == 0)
+                        {
+                            productsQuery = productsQuery.Where(_ => false);
+                            break;
+                        }
+
+                        productsQuery = productsQuery.Where(item =>
+                            _dbContext.ProductCharacteristics.AsNoTracking().Any(characteristic =>
+                                characteristic.ProductId == item.Product.Id
+                                && characteristic.CharacteristicDefinitionId == characteristicDefinition.Id
+                                && characteristic.Value.TextValue != null
+                                && poleConfigurations.Contains(characteristic.Value.TextValue)));
+
+                        continue;
+                    }
+
                     var normalizedTextValue = NormalizeText(rawValue);
                     var textValuePattern = CreateLikePattern(normalizedTextValue);
 

@@ -9,7 +9,7 @@ using Microsoft.Net.Http.Headers;
 namespace ElectronicService.Web.Controllers.Catalog.Recognition.Datasets;
 
 [ApiController]
-[Authorize(Roles = "Technical")]
+[PermissionAuthorize(UserPermissionCode.DictionariesManage)]
 [Route("api/catalog/recognition/datasets")]
 public sealed class ExportCatalogRecognitionDatasetBundleController : ControllerBase
 {

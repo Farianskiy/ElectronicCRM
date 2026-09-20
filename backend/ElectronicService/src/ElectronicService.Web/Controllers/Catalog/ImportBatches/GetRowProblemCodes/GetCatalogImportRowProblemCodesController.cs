@@ -12,7 +12,7 @@ namespace ElectronicService.Web.Controllers.Catalog
     .ImportBatches.GetRowProblemCodes;
 
 [ApiController]
-[Authorize(Roles = "Regular,Manager,Technical")]
+[PermissionAnyAuthorize(UserPermissionCode.CatalogImportsCreate, UserPermissionCode.CatalogImportsReview)]
 [Route("api/catalog/import-batches")]
 public sealed class
     GetCatalogImportRowProblemCodesController

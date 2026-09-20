@@ -10,9 +10,14 @@ import {
   type ReactNode,
 } from "react";
 import { useAuthSession } from "@/features/auth/model/useAuthSession";
+import { useCurrentUserAccess } from "@/features/auth/model/CurrentUserAccessContext";
+import {
+  qualityWorkspacePermissions,
+  type UserPermissionCode,
+} from "@/features/auth/model/userPermissions";
 import {
   clearAuthSession,
-  isTechnicalUser,
+  getUserTypeLabel,
   type AuthSession,
 } from "@/shared/api/authToken";
 import { useAppTheme, type AppThemeMode } from "@/shared/theme/useAppTheme";
@@ -36,14 +41,15 @@ type NavigationIconName =
   | "types"
   | "characteristics"
   | "quality"
-  | "suggestions";
+  | "suggestions"
+  | "users";
 
 interface NavigationItem {
   href: string;
   label: string;
   description: string;
   icon: NavigationIconName;
-  technicalOnly?: boolean;
+  permission?: UserPermissionCode;
 }
 
 interface NavigationGroup {
@@ -55,6 +61,19 @@ interface NavigationGroup {
 type HeaderMenu = "workspace" | "notifications" | "user";
 
 const navigationGroups: NavigationGroup[] = [
+  {
+    label: "Администрирование",
+    workspaceMode: "catalog",
+    items: [
+      {
+        href: "/admin/users",
+        label: "Пользователи",
+        description: "Учётные записи и роли",
+        icon: "users",
+        permission: "UsersManage",
+      },
+    ],
+  },
   {
     label: "Обзор",
     workspaceMode: "catalog",
@@ -76,24 +95,28 @@ const navigationGroups: NavigationGroup[] = [
         label: "Ассистент",
         description: "Поиск товаров обычным текстом",
         icon: "assistant",
+        permission: "AssistantUse",
       },
       {
         href: "/catalog/products",
         label: "Товары",
         description: "Каталог, цены и характеристики",
         icon: "products",
+        permission: "ProductsView",
       },
       {
         href: "/catalog/price-calculations",
         label: "Расчёт цен",
         description: "Проектные скидки и расчёты",
         icon: "priceCalculations",
+        permission: "PriceCalculationsManage",
       },
       {
         href: "/catalog/imports",
         label: "Импорт",
         description: "Загрузка и обработка Excel",
         icon: "imports",
+        permission: "CatalogImportsCreate",
       },
     ],
   },
@@ -106,14 +129,14 @@ const navigationGroups: NavigationGroup[] = [
         label: "Очередь проверки",
         description: "Импорты, ожидающие решения",
         icon: "review",
-        technicalOnly: true,
+        permission: "CatalogImportsReview",
       },
       {
         href: "/catalog/price-lists",
         label: "Прайс-листы",
         description: "Загрузка, проверка и активация цен",
-        icon: "priceLists",
-        technicalOnly: true,
+        icon: "types",
+        permission: "DictionariesManage",
       },
     ],
   },
@@ -126,14 +149,14 @@ const navigationGroups: NavigationGroup[] = [
         label: "Типы товаров",
         description: "Схемы типов и их характеристики",
         icon: "types",
-        technicalOnly: true,
+        permission: "DictionariesManage",
       },
       {
         href: "/catalog/characteristics",
         label: "Характеристики",
         description: "Определения и правила значений",
         icon: "characteristics",
-        technicalOnly: true,
+        permission: "DictionariesManage",
       },
     ],
   },
@@ -146,14 +169,14 @@ const navigationGroups: NavigationGroup[] = [
         label: "Распознавание",
         description: "Правила, профили и диагностика",
         icon: "quality",
-        technicalOnly: true,
+        permission: "DictionariesManage",
       },
       {
         href: "/catalog/assistant-suggestions",
         label: "Предложения словаря",
         description: "Неизвестные слова и исправления",
         icon: "suggestions",
-        technicalOnly: true,
+        permission: "DictionariesManage",
       },
     ],
   },
@@ -204,14 +227,16 @@ function getPathnameWorkspaceMode(pathname: string): AppWorkspaceMode | null {
 }
 
 function getVisibleNavigationGroups(
-  technical: boolean,
+  allowedPermissions: ReadonlySet<UserPermissionCode>,
   workspaceMode: AppWorkspaceMode,
 ): NavigationGroup[] {
   return navigationGroups
     .filter((group) => group.workspaceMode === workspaceMode)
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => !item.technicalOnly || technical),
+      items: group.items.filter(
+        (item) => !item.permission || allowedPermissions.has(item.permission),
+      ),
     }))
     .filter((group) => group.items.length > 0);
 }
@@ -256,7 +281,10 @@ export function AppShell({ children }: AppShellProps) {
   const router = useRouter();
   const pathname = usePathname();
   const session = useAuthSession();
-  const technical = isTechnicalUser(session);
+  const { allowedPermissions } = useCurrentUserAccess();
+  const canUseQualityWorkspace = qualityWorkspacePermissions.some(
+    (permission) => allowedPermissions.has(permission),
+  );
 
   const { mode: themeMode, setMode: setThemeMode } = useAppTheme();
 
@@ -278,12 +306,12 @@ export function AppShell({ children }: AppShellProps) {
 
   const pathnameWorkspaceMode = getPathnameWorkspaceMode(pathname);
 
-  const workspaceMode: AppWorkspaceMode = technical
+  const workspaceMode: AppWorkspaceMode = canUseQualityWorkspace
     ? (pathnameWorkspaceMode ?? storedWorkspaceMode)
     : "catalog";
 
   const visibleNavigationGroups = getVisibleNavigationGroups(
-    technical,
+    allowedPermissions,
     workspaceMode,
   );
 
@@ -389,7 +417,12 @@ export function AppShell({ children }: AppShellProps) {
     setOpenHeaderMenu(null);
     setMobileNavigationOpen(false);
 
-    router.push(mode === "catalog" ? "/" : "/catalog/import-reviews");
+    const firstAvailableHref = getVisibleNavigationGroups(
+      allowedPermissions,
+      mode,
+    ).flatMap((group) => group.items)[0]?.href;
+
+    router.push(firstAvailableHref ?? "/");
   }
 
   function handleNavigation(): void {
@@ -507,7 +540,7 @@ export function AppShell({ children }: AppShellProps) {
                 </svg>
               </button>
 
-              {technical ? (
+              {canUseQualityWorkspace ? (
                 <div className="min-w-0 sm:relative">
                   <button
                     type="button"
@@ -667,7 +700,7 @@ export function AppShell({ children }: AppShellProps) {
                     </p>
 
                     <p className="text-xs text-[var(--app-subtle)]">
-                      {technical ? "Технический специалист" : "Пользователь"}
+                      {getUserTypeLabel(session?.userType)}
                     </p>
                   </div>
 
@@ -686,7 +719,7 @@ export function AppShell({ children }: AppShellProps) {
                       </p>
 
                       <p className="mt-1 text-xs text-[var(--app-muted)]">
-                        {technical ? "Технический специалист" : "Пользователь"}
+                        {getUserTypeLabel(session?.userType)}
                       </p>
                     </div>
 
@@ -1050,6 +1083,14 @@ function UserAvatar({ session }: { session: AuthSession | null }) {
 }
 
 function NavigationIcon({ name }: { name: NavigationIconName }) {
+  if (name === "users") {
+    return (
+      <NavigationIconContainer>
+        <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM17 11l2 2 3-4" />
+      </NavigationIconContainer>
+    );
+  }
+
   if (name === "home") {
     return (
       <NavigationIconContainer>

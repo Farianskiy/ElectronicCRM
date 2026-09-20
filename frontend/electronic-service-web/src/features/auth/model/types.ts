@@ -1,3 +1,5 @@
+import type { UserType } from "@/shared/api/authToken";
+
 export interface LoginRequest {
   email: string;
   password: string;
@@ -6,6 +8,6 @@ export interface LoginRequest {
 export interface LoginResponse {
   accessToken: string;
   userId: string;
-  userType: string;
+  userType: UserType;
   displayName: string;
 }

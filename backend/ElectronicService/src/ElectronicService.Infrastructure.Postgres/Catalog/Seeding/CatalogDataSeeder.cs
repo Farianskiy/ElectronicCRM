@@ -95,10 +95,10 @@ public sealed partial class CatalogDataSeeder
         new("АД 2", CatalogDictionaryTermKind.Characteristic, "PRODUCT_SERIES", "АД 2", 200, "EKF", "DIFFERENTIAL_CIRCUIT_BREAKER"),
         new("АД 2 S", CatalogDictionaryTermKind.Characteristic, "PRODUCT_SERIES", "АД 2 S", 200, "EKF", "DIFFERENTIAL_CIRCUIT_BREAKER"),
 
-        new("ОДНОПОЛЮСНЫЙ", CatalogDictionaryTermKind.Characteristic, "POLES", "1", 100),
-        new("ДВУХПОЛЮСНЫЙ", CatalogDictionaryTermKind.Characteristic, "POLES", "2", 100),
-        new("ТРЕХПОЛЮСНЫЙ", CatalogDictionaryTermKind.Characteristic, "POLES", "3", 100),
-        new("ЧЕТЫРЕХПОЛЮСНЫЙ", CatalogDictionaryTermKind.Characteristic, "POLES", "4", 100),
+        new("ОДНОПОЛЮСНЫЙ", CatalogDictionaryTermKind.Characteristic, "POLES", "1P", 100),
+        new("ДВУХПОЛЮСНЫЙ", CatalogDictionaryTermKind.Characteristic, "POLES", "2P", 100),
+        new("ТРЕХПОЛЮСНЫЙ", CatalogDictionaryTermKind.Characteristic, "POLES", "3P", 100),
+        new("ЧЕТЫРЕХПОЛЮСНЫЙ", CatalogDictionaryTermKind.Characteristic, "POLES", "4P", 100),
 
         new("РЕВЕРСИВНЫЙ", CatalogDictionaryTermKind.Characteristic, "REVERSIBLE", "TRUE", 100),
         new("С ЗАЩИТОЙ", CatalogDictionaryTermKind.Characteristic, "HAS_THERMAL_RELEASE", "TRUE", 100),
@@ -128,7 +128,7 @@ public sealed partial class CatalogDataSeeder
 
         // Автоматы, УЗО, дифавтоматы
         new("RATED_CURRENT", "Номинальный ток", CharacteristicDataType.Number, "А"),
-        new("POLES", "Количество полюсов", CharacteristicDataType.Number, null),
+        new("POLES", "Количество полюсов", CharacteristicDataType.Text, null),
         new("MODULE_COUNT", "Количество модулей", CharacteristicDataType.Number, null),
         new("CURVE", "Характеристика срабатывания", CharacteristicDataType.Text, null),
         new("BREAKING_CAPACITY", "ПКС", CharacteristicDataType.Number, "кА"),

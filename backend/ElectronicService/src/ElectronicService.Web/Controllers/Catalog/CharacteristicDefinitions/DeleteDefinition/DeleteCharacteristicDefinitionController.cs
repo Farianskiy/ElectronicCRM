@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ElectronicService.Web.Controllers.Catalog.CharacteristicDefinitions.DeleteDefinition;
 
-[Authorize(Roles = "Technical")]
+[PermissionAuthorize(UserPermissionCode.DictionariesManage)]
 [ApiController]
 [Route("api/catalog/characteristic-definitions/{characteristicDefinitionId:guid}")]
 public sealed class DeleteCharacteristicDefinitionController : ControllerBase

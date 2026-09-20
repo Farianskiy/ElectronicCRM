@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import type { FormEvent } from "react";
 import { useState } from "react";
-import { RequireTechnicalUser } from "@/features/auth/ui/RequireTechnicalUser";
+import { RequirePermission } from "@/features/auth/ui/RequirePermission";
 import { getCatalogCharacteristicDefinitions } from "@/features/catalogCharacteristicDefinitions/api/getCatalogCharacteristicDefinitions";
 import { CharacteristicDefinitionEditorCard } from "@/features/catalogCharacteristicDefinitions/ui/CharacteristicDefinitionEditorCard";
 import { CreateCharacteristicDefinitionForm } from "@/features/catalogCharacteristicDefinitions/ui/CreateCharacteristicDefinitionForm";
@@ -36,9 +36,9 @@ function getErrorMessage(error: unknown): string {
 
 export default function CatalogCharacteristicsPage() {
   return (
-    <RequireTechnicalUser>
+    <RequirePermission permission="DictionariesManage">
       <CatalogCharacteristicsContent />
-    </RequireTechnicalUser>
+    </RequirePermission>
   );
 }
 

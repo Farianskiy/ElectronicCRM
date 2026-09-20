@@ -34,6 +34,7 @@ export function CatalogAssistantBatchPreview({
   isApplying,
   isApplied,
   applyErrorMessage,
+  canManageCalculations,
 }: {
   preview: PreviewCatalogAssistantBatchResponse;
   calculations: CatalogPriceCalculationListItem[];
@@ -45,6 +46,7 @@ export function CatalogAssistantBatchPreview({
   isApplying: boolean;
   isApplied: boolean;
   applyErrorMessage: string | null;
+  canManageCalculations: boolean;
 }) {
   const selectedLinesCount = preview.lines.filter(
     (line) => line.quantity !== null && selectedProducts[line.lineNumber],
@@ -73,43 +75,45 @@ export function CatalogAssistantBatchPreview({
         />
       </div>
 
-      <div className="grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-        <label className="grid gap-2">
-          <span className="text-sm font-medium text-slate-300">
-            Проект для добавления
-          </span>
+      {canManageCalculations && (
+        <div className="grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+          <label className="grid gap-2">
+            <span className="text-sm font-medium text-slate-300">
+              Проект для добавления
+            </span>
 
-          <select
-            value={selectedCalculationId}
-            onChange={(event) => onCalculationChange(event.target.value)}
-            className="rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-slate-100 outline-none focus:border-teal-400"
+            <select
+              value={selectedCalculationId}
+              onChange={(event) => onCalculationChange(event.target.value)}
+              className="rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-slate-100 outline-none focus:border-teal-400"
+            >
+              <option value="">Выберите черновик проекта</option>
+
+              {calculations.map((calculation) => (
+                <option
+                  key={calculation.calculationId}
+                  value={calculation.calculationId}
+                >
+                  {calculation.title}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <button
+            type="button"
+            onClick={onApply}
+            disabled={
+              isApplying || !selectedCalculationId || selectedLinesCount === 0
+            }
+            className="rounded-2xl bg-teal-500 px-5 py-3 text-sm font-medium text-white disabled:opacity-60"
           >
-            <option value="">Выберите черновик проекта</option>
-
-            {calculations.map((calculation) => (
-              <option
-                key={calculation.calculationId}
-                value={calculation.calculationId}
-              >
-                {calculation.title}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <button
-          type="button"
-          onClick={onApply}
-          disabled={
-            isApplying || !selectedCalculationId || selectedLinesCount === 0
-          }
-          className="rounded-2xl bg-teal-500 px-5 py-3 text-sm font-medium text-white disabled:opacity-60"
-        >
-          {isApplying
-            ? "Добавляем..."
-            : `Добавить выбранные (${selectedLinesCount})`}
-        </button>
-      </div>
+            {isApplying
+              ? "Добавляем..."
+              : `Добавить выбранные (${selectedLinesCount})`}
+          </button>
+        </div>
+      )}
 
       {isApplied && (
         <p className="rounded-2xl border border-green-500/30 bg-green-500/10 p-3 text-sm text-green-200">

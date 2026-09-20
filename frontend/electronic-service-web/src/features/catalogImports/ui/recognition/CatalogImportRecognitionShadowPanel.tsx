@@ -496,6 +496,14 @@ export function CatalogImportRecognitionShadowPanel({
   recognitionEnrichment,
 }: CatalogImportRecognitionShadowPanelProps) {
   if (recognitionShadow === null) {
+    if (recognitionEnrichment !== null) {
+      return (
+        <CatalogImportRecognitionEnrichmentPanel
+          recognitionEnrichment={recognitionEnrichment}
+        />
+      );
+    }
+
     return (
       <section className="rounded-3xl border border-sky-500/20 bg-sky-500/[0.04] p-6">
         <h2 className="text-xl font-semibold text-white">

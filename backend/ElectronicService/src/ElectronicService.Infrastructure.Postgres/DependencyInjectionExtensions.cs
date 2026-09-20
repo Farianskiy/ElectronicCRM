@@ -22,6 +22,7 @@ using ElectronicService.Core.Catalog.Products.StockImport;
 using ElectronicService.Core.Catalog.ProductTypes.Abstractions;
 using ElectronicService.Core.Catalog.Recognition.Abstractions;
 using ElectronicService.Core.Users;
+using ElectronicService.Core.Users.Access;
 using ElectronicService.Infrastructure.Postgres.Catalog.ImportBatches;
 using ElectronicService.Infrastructure.Postgres.Catalog.ImportBatches.Cleanup;
 using ElectronicService.Infrastructure.Postgres.Catalog.ImportBatches.Reports;
@@ -95,6 +96,7 @@ public static class DependencyInjectionExtensions
         services.AddHostedService<CatalogImportCleanupHostedService>();
 
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IUserPermissionOverrideRepository, UserPermissionOverrideRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<CatalogDataSeeder>();
         services.AddScoped<ICatalogProductsReader, CatalogProductsReader>();
@@ -134,6 +136,22 @@ public static class DependencyInjectionExtensions
         services.AddScoped<ICatalogCharacteristicRecognitionProfileReader, CatalogCharacteristicRecognitionProfileReader>();
         services.AddScoped<ICatalogCharacteristicRecognitionProfileRepository, CatalogCharacteristicRecognitionProfileRepository>();
         services.AddScoped<ICatalogRecognitionFeedbackRepository, CatalogRecognitionFeedbackRepository>();
+        services.AddScoped<ICatalogRecognitionTrainingExampleRepository, CatalogRecognitionTrainingExampleRepository>();
+        services.AddScoped<ICatalogRecognitionTrainingSampleReader, CatalogRecognitionTrainingSampleReader>();
+        services.AddScoped<ICatalogRecognitionLiteralDraftRepository, CatalogRecognitionLiteralDraftRepository>();
+        services.AddScoped<ICatalogRecognitionIntegerDraftRepository, CatalogRecognitionIntegerDraftRepository>();
+        services.AddScoped<ICatalogRecognitionMultiIntegerDraftRepository, CatalogRecognitionMultiIntegerDraftRepository>();
+        services.AddScoped<ICatalogRecognitionRuleSetVersionRepository, CatalogRecognitionRuleSetVersionRepository>();
+        services.AddScoped<ICatalogRecognitionRuleSetVersionReader, CatalogRecognitionRuleSetVersionReader>();
+        services.AddScoped<ICatalogRecognitionRuleSetExecutionReader, CatalogRecognitionRuleSetExecutionReader>();
+        services.AddScoped<ICatalogRecognitionRuleSetReportCreator, CatalogRecognitionRuleSetReportCreator>();
+        services.AddScoped<ICatalogRecognitionRuleSetReportReader, CatalogRecognitionRuleSetReportReader>();
+        services.AddScoped<CatalogRecognitionRuleSetActivationValidator>();
+        services.AddScoped<ICatalogRecognitionRuleSetSwitcher, CatalogRecognitionRuleSetSwitcher>();
+        services.AddScoped<ICatalogRecognitionActiveRuleSetReader, CatalogRecognitionActiveRuleSetReader>();
+        services.AddScoped<ICatalogRecognitionMultiIntegerDraftReader, CatalogRecognitionMultiIntegerDraftReader>();
+        services.AddScoped<ICatalogRecognitionIntegerDraftReader, CatalogRecognitionIntegerDraftReader>();
+        services.AddScoped<ICatalogRecognitionLiteralDraftReader, CatalogRecognitionLiteralDraftReader>();
         services.AddScoped<ICatalogRecognitionDatasetReader, CatalogRecognitionDatasetReader>();
         services.AddScoped<ICatalogRecognitionCandidateRepository, CatalogRecognitionCandidateRepository>();
         services.AddScoped<IManufacturerRepository, ManufacturerRepository>();

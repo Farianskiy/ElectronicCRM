@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ElectronicService.Web.Controllers.Catalog.Manufacturers.CreateFromUnresolvedPhrase;
 
-[Authorize(Roles = "Technical")]
+[PermissionAuthorize(UserPermissionCode.DictionariesManage)]
 [ApiController]
 [Route("api/catalog/manufacturers")]
 public sealed class CreateManufacturerFromUnresolvedPhraseController : ControllerBase

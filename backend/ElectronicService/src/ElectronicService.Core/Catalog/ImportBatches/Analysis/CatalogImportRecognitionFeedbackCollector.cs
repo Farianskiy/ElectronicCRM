@@ -45,6 +45,17 @@ public sealed class CatalogImportRecognitionFeedbackCollector : ICatalogImportRe
         var beforeRecognitionSuggestions = GetRecognitionSuggestionsByDefinitionId(request.Before.CharacteristicRecognitionSuggestions);
         var mergedOrigins = BuildMergedOrigins(request.After.Characteristics, beforeValues, beforeOrigins);
 
+        foreach (var characteristicId in request.ProductType.Characteristics.Select(item => item.CharacteristicDefinitionId))
+        {
+            if (!afterValues.ContainsKey(characteristicId)
+                && (beforeValues.ContainsKey(characteristicId)
+                    || (beforeOrigins.TryGetValue(characteristicId, out var origin)
+                        && origin.Source == CatalogImportCharacteristicValueSource.Manual)))
+            {
+                mergedOrigins[characteristicId.ToString()] = CatalogImportCharacteristicValueOrigin.FromManual();
+            }
+        }
+
         var recognitionContextIsUnchanged = string.Equals(request.Before.Name, request.After.Name, StringComparison.Ordinal) && request.Before.ProductTypeId == request.After.ProductTypeId && request.Before.ManufacturerId == request.After.ManufacturerId;
 
         var dataWithPreservedOrigins = request.After with
@@ -58,6 +69,32 @@ public sealed class CatalogImportRecognitionFeedbackCollector : ICatalogImportRe
         var existingFeedbackByDefinitionId = existingFeedback.ToDictionary(feedback => feedback.CharacteristicDefinitionId);
 
         var definitionsById = request.CharacteristicDefinitions.ToDictionary(definition => definition.Id);
+
+        if (request.ConfirmedSpans is { Count: > 0 })
+        {
+            if (!request.After.ManufacturerId.HasValue || request.After.ManufacturerId.Value == Guid.Empty)
+            {
+                return Result.Failure<CatalogImportRecognitionFeedbackCollectionResult, DomainError>(GeneralErrors.ValueIsRequired(nameof(request.After.ManufacturerId)));
+            }
+
+            foreach (var item in request.ConfirmedSpans)
+            {
+                if (item.Key == Guid.Empty || !definitionsById.ContainsKey(item.Key) || !afterValues.TryGetValue(item.Key, out var finalValue) || string.IsNullOrWhiteSpace(finalValue))
+                {
+                    return Result.Failure<CatalogImportRecognitionFeedbackCollectionResult, DomainError>(GeneralErrors.ValueIsInvalid(nameof(request.ConfirmedSpans)));
+                }
+
+                if (item.Value is null || string.IsNullOrWhiteSpace(item.Value.ProductName) || !string.Equals(item.Value.ProductName, request.After.Name?.Trim(), StringComparison.Ordinal))
+                {
+                    return Result.Failure<CatalogImportRecognitionFeedbackCollectionResult, DomainError>(GeneralErrors.ValueIsInvalid(nameof(request.ConfirmedSpans)));
+                }
+
+                if (existingFeedbackByDefinitionId.TryGetValue(item.Key, out var storedFeedback) && storedFeedback.IsFinalized)
+                {
+                    return Result.Failure<CatalogImportRecognitionFeedbackCollectionResult, DomainError>(GeneralErrors.ValueIsInvalid(nameof(storedFeedback.Status)));
+                }
+            }
+        }
 
         var characteristicDefinitionIds = new HashSet<Guid>(beforeValues.Keys);
         characteristicDefinitionIds.UnionWith(afterValues.Keys);
@@ -84,6 +121,80 @@ public sealed class CatalogImportRecognitionFeedbackCollector : ICatalogImportRe
             beforeOrigins.TryGetValue(characteristicDefinitionId, out var beforeOrigin);
             beforeRecognitionSuggestions.TryGetValue(characteristicDefinitionId, out var beforeRecognitionSuggestion);
             existingFeedbackByDefinitionId.TryGetValue(characteristicDefinitionId, out var currentFeedback);
+
+            if (request.ConfirmedSpans is not null && request.ConfirmedSpans.TryGetValue(characteristicDefinitionId, out var confirmedSpan))
+            {
+                if (currentFeedback is not null)
+                {
+                    if (!string.Equals(currentFeedback.ProductName, confirmedSpan.ProductName, StringComparison.Ordinal) || currentFeedback.ManufacturerId != request.After.ManufacturerId || currentFeedback.ProductTypeId != request.ProductType.Id)
+                    {
+                        return Result.Failure<CatalogImportRecognitionFeedbackCollectionResult, DomainError>(GeneralErrors.ValueIsInvalid(nameof(request.ConfirmedSpans)));
+                    }
+
+                    CatalogRecognitionFeedbackType decisionType;
+
+                    if (currentFeedback.SuggestedNormalizedValue is null)
+                    {
+                        decisionType = CatalogRecognitionFeedbackType.AddedManually;
+                    }
+                    else if (string.Equals(currentFeedback.SuggestedNormalizedValue, afterValue, StringComparison.Ordinal))
+                    {
+                        decisionType = CatalogRecognitionFeedbackType.Accepted;
+                    }
+                    else
+                    {
+                        decisionType = CatalogRecognitionFeedbackType.Corrected;
+                    }
+
+                    var updateDecisionResult = currentFeedback.UpdatePendingDecision(decisionType, afterValue);
+
+                    if (updateDecisionResult.IsFailure)
+                    {
+                        return Result.Failure<CatalogImportRecognitionFeedbackCollectionResult, DomainError>(updateDecisionResult.Error);
+                    }
+
+                    var spanResult = currentFeedback.SetConfirmedSpan(confirmedSpan.Start, confirmedSpan.Length);
+
+                    if (spanResult.IsFailure)
+                    {
+                        return Result.Failure<CatalogImportRecognitionFeedbackCollectionResult, DomainError>(spanResult.Error);
+                    }
+
+                    updatedFeedbackCount++;
+                    continue;
+                }
+
+                var explicitDecision = recognitionContextIsUnchanged
+                    ? ClassifyNewFeedback(hasBeforeValue, beforeValue, beforeOrigin, beforeRecognitionSuggestion, true, hasAfterValue, afterValue)
+                    : null;
+
+                explicitDecision ??= new FeedbackDecision(CatalogRecognitionFeedbackType.AddedManually, afterValue, HasRecognitionEvidence: false);
+
+                var explicitFeedbackResult = CreateFeedback(request, characteristicDefinition, beforeValue, beforeOrigin, beforeRecognitionSuggestion, explicitDecision);
+
+                if (explicitFeedbackResult.IsFailure)
+                {
+                    return Result.Failure<CatalogImportRecognitionFeedbackCollectionResult, DomainError>(explicitFeedbackResult.Error);
+                }
+
+                var explicitFeedback = explicitFeedbackResult.Value;
+
+                if (explicitFeedback is null || !string.Equals(explicitFeedback.ProductName, confirmedSpan.ProductName, StringComparison.Ordinal))
+                {
+                    return Result.Failure<CatalogImportRecognitionFeedbackCollectionResult, DomainError>(GeneralErrors.ValueIsInvalid(nameof(request.ConfirmedSpans)));
+                }
+
+                var explicitSpanResult = explicitFeedback.SetConfirmedSpan(confirmedSpan.Start, confirmedSpan.Length);
+
+                if (explicitSpanResult.IsFailure)
+                {
+                    return Result.Failure<CatalogImportRecognitionFeedbackCollectionResult, DomainError>(explicitSpanResult.Error);
+                }
+
+                _feedbackRepository.Add(explicitFeedback);
+                createdFeedbackCount++;
+                continue;
+            }
 
             if (currentFeedback?.IsFinalized == true)
             {
@@ -148,21 +259,38 @@ public sealed class CatalogImportRecognitionFeedbackCollector : ICatalogImportRe
             removedFeedbackCount);
     }
 
-    public async Task<Result<int, DomainError>> RemovePendingForBatchAsync(Guid importBatchId, CancellationToken cancellationToken = default)
+    public async Task<Result<int, DomainError>> RemovePendingForBatchAsync(
+    Guid importBatchId,
+    IReadOnlyCollection<Guid> preservedRowIds,
+    CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(preservedRowIds);
+
         if (importBatchId == Guid.Empty)
         {
-            return Result.Failure<int, DomainError>(GeneralErrors.ValueIsInvalid(nameof(importBatchId)));
+            return GeneralErrors.ValueIsInvalid(nameof(importBatchId));
         }
 
-        var pendingFeedback = await _feedbackRepository.GetPendingByImportBatchAsync(importBatchId, cancellationToken).ConfigureAwait(false);
+        var preservedIds = preservedRowIds.ToHashSet();
 
-        foreach (var feedback in pendingFeedback)
+        var pendingFeedback = await _feedbackRepository
+            .GetPendingByImportBatchAsync(
+                importBatchId,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        var removable = pendingFeedback
+            .Where(feedback =>
+                !feedback.ImportRowId.HasValue ||
+                !preservedIds.Contains(feedback.ImportRowId.Value))
+            .ToArray();
+
+        foreach (var feedback in removable)
         {
             _feedbackRepository.Remove(feedback);
         }
 
-        return pendingFeedback.Count;
+        return removable.Length;
     }
 
     private static FeedbackDecision? ClassifyExistingPendingFeedback(CatalogRecognitionFeedback feedback, bool hasAfterValue, string? afterValue)

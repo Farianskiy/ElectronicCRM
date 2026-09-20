@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ElectronicService.Web.Controllers.Catalog.Products;
 
-[Authorize(Roles = "Technical")]
+[PermissionAuthorize(UserPermissionCode.StockManage)]
 [ApiController]
 [Route("api/catalog/products/{id:guid}/stock")]
 public sealed class CatalogProductStockController : ControllerBase

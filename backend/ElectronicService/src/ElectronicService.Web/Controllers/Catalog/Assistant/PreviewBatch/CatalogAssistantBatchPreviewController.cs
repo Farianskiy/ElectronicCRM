@@ -8,6 +8,7 @@ namespace ElectronicService.Web.Controllers.Catalog.Assistant.PreviewBatch;
 
 [ApiController]
 [Route("api/catalog/assistant/preview-batch")]
+[PermissionAuthorize(UserPermissionCode.AssistantUse)]
 public sealed class CatalogAssistantBatchPreviewController : ControllerBase
 {
     private readonly PreviewCatalogAssistantBatchCommandHandler _handler;

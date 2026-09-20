@@ -9,7 +9,7 @@ using ElectronicService.Web.Controllers.Catalog.ImportBatches.Common;
 namespace ElectronicService.Web.Controllers.Catalog.ImportBatches.UpdateCatalogImportMapping;
 
 [ApiController]
-[Authorize(Roles = "Regular,Manager,Technical")]
+[PermissionAnyAuthorize(UserPermissionCode.CatalogImportsCreate, UserPermissionCode.CatalogImportsReview)]
 [Route("api/catalog/import-batches")]
 public sealed class UpdateCatalogImportMappingController : ControllerBase
 {

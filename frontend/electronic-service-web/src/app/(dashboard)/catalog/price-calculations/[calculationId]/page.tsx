@@ -18,6 +18,7 @@ import {
   updateCatalogPriceCalculationCard,
 } from "@/features/catalogPriceCalculations/api/catalogPriceCalculationEditorApi";
 import { exportCatalogPriceCalculation } from "@/features/catalogPriceCalculations/api/exportCatalogPriceCalculation";
+import { useCurrentUserAccess } from "@/features/auth/model/CurrentUserAccessContext";
 import { catalogPriceCalculationQueryKeys } from "@/features/catalogPriceCalculations/model/queryKeys";
 import type {
   CatalogPriceCalculationDetails,
@@ -564,6 +565,8 @@ function ProjectCardEditor({
 export default function CatalogPriceCalculationPage() {
   const params = useParams<{ calculationId: string }>();
   const queryClient = useQueryClient();
+  const { hasPermission } = useCurrentUserAccess();
+  const canExport = hasPermission("PriceCalculationsExport");
 
   const calculationId = params.calculationId ?? "";
 
@@ -857,15 +860,17 @@ export default function CatalogPriceCalculationPage() {
             Назад
           </Link>
 
-          <AppButton
-            type="button"
-            variant="secondary"
-            loading={exportMutation.isPending}
-            disabled={calculation.lines.length === 0}
-            onClick={() => exportMutation.mutate(calculationId)}
-          >
-            Скачать Excel
-          </AppButton>
+          {canExport && (
+            <AppButton
+              type="button"
+              variant="secondary"
+              loading={exportMutation.isPending}
+              disabled={calculation.lines.length === 0}
+              onClick={() => exportMutation.mutate(calculationId)}
+            >
+              Скачать Excel
+            </AppButton>
+          )}
 
           {editable && (
             <AppButton

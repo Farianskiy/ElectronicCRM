@@ -441,6 +441,7 @@ export interface CatalogImportRecognitionEnrichment {
   failedRecognitionRowsCount: number;
   appliedValuesDetailsTruncated: boolean;
   appliedValues: CatalogImportRecognitionAppliedValue[];
+  preservedManualRowsCount?: number;
 }
 
 export interface AnalyzeCatalogImportBatchResponse {
@@ -646,6 +647,50 @@ export interface UpdateCatalogImportMappingResponse {
   version: number;
 }
 
+export interface CatalogImportConfirmedSpan {
+  productName: string;
+  start: number;
+  length: number;
+}
+
+export interface CatalogImportTrainingExampleState {
+  exampleId: string;
+  productName: string;
+  rawValue: string;
+  normalizedValue: string;
+  spanStart: number;
+  spanLength: number;
+  confirmedAtUtc: string;
+  matchesSavedFeedback: boolean;
+}
+
+export interface CatalogImportFeedbackSpan {
+  characteristicDefinitionId: string;
+  productName: string;
+  manufacturerId: string | null;
+  productTypeId: string;
+  finalNormalizedValue: string | null;
+  confirmedRawValue: string | null;
+  confirmedSpanStart: number | null;
+  confirmedSpanLength: number | null;
+  isFinalized: boolean;
+  trainingExample: CatalogImportTrainingExampleState | null;
+}
+
+export interface ConfirmCatalogImportTrainingExampleRequest {
+  productName: string;
+  manufacturerId: string;
+  productTypeId: string;
+  normalizedValue: string;
+  rawValue: string;
+  spanStart: number;
+  spanLength: number;
+}
+
+export interface ConfirmCatalogImportTrainingExampleResponse {
+  exampleId: string;
+}
+
 export interface UpdateCatalogImportRowRequest {
   name?: string | null;
   article?: string | null;
@@ -654,6 +699,7 @@ export interface UpdateCatalogImportRowRequest {
   price?: number | null;
   stockQuantity?: number | null;
   characteristics: Record<string, string>;
+  confirmedSpans?: Record<string, CatalogImportConfirmedSpan>;
 }
 
 export interface UpdateCatalogImportRowResponse {

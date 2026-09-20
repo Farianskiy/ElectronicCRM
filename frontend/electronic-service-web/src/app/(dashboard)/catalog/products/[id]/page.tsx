@@ -5,11 +5,10 @@ import axios from "axios";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
-import { useAuthSession } from "@/features/auth/model/useAuthSession";
+import { useCurrentUserAccess } from "@/features/auth/model/CurrentUserAccessContext";
 import { getCatalogProductDetails } from "@/features/catalogProducts/api/getCatalogProductDetails";
 import type { CatalogProductCharacteristic } from "@/features/catalogProducts/model/types";
 import { TechnicalProductEditor } from "@/features/catalogProducts/ui/TechnicalProductEditor";
-import { isTechnicalUser } from "@/shared/api/authToken";
 import { formatPrice } from "@/shared/lib/formatters";
 import { PageWorkspace } from "@/shared/ui/PageWorkspace";
 import { AppButton } from "@/shared/ui/AppButton";
@@ -62,8 +61,11 @@ export default function CatalogProductDetailsPage() {
   const params = useParams();
   const productId = getProductIdFromParams(params);
 
-  const session = useAuthSession();
-  const canEditProduct = isTechnicalUser(session);
+  const { hasPermission } = useCurrentUserAccess();
+  const canEditDetails = hasPermission("ProductsEdit");
+  const canManagePrices = hasPermission("PricesManage");
+  const canManageStock = hasPermission("StockManage");
+  const canOpenEditor = canEditDetails || canManagePrices || canManageStock;
 
   const [isEditorOpen, setIsEditorOpen] = useState(false);
 
@@ -165,7 +167,7 @@ export default function CatalogProductDetailsPage() {
                   {product.stockQuantity > 0 ? "В наличии" : "Нет в наличии"}
                 </span>
 
-                {canEditProduct && (
+                {canOpenEditor && (
                   <AppButton
                     type="button"
                     variant="primary"
@@ -193,8 +195,13 @@ export default function CatalogProductDetailsPage() {
             </div>
           </section>
 
-          {canEditProduct && isEditorOpen ? (
-            <TechnicalProductEditor product={product} />
+          {canOpenEditor && isEditorOpen ? (
+            <TechnicalProductEditor
+              product={product}
+              canEditDetails={canEditDetails}
+              canManagePrices={canManagePrices}
+              canManageStock={canManageStock}
+            />
           ) : (
             <>
               <section

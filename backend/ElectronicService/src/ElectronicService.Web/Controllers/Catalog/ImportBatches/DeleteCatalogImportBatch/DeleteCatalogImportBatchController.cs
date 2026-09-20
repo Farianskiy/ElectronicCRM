@@ -7,7 +7,7 @@ using ElectronicService.Web.Controllers.Catalog.ImportBatches.Common;
 namespace ElectronicService.Web.Controllers.Catalog.ImportBatches.DeleteCatalogImportBatch;
 
 [ApiController]
-[Authorize(Roles = "Regular,Manager,Technical")]
+[PermissionAuthorize(UserPermissionCode.CatalogImportsCreate)]
 [Route("api/catalog/import-batches")]
 public sealed class DeleteCatalogImportBatchController : ControllerBase
 {

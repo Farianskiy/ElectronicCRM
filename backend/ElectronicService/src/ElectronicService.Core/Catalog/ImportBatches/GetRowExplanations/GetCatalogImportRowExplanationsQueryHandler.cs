@@ -7,12 +7,12 @@ using ElectronicService.Core.Catalog.Manufacturers.Resolution;
 using ElectronicService.Core.Catalog.ProductNames.Explanation;
 using ElectronicService.Core.Catalog.Products.Abstractions;
 using ElectronicService.Core.Catalog.ProductTypes.Suggestions;
-using ElectronicService.Core.Catalog.Recognition.Abstractions;
-using ElectronicService.Core.Catalog.Recognition.Models;
-using ElectronicService.Core.Catalog.Recognition.Normalization;
 using ElectronicService.Core.Users;
+using ElectronicService.Domain.Catalog.Characteristics;
 using ElectronicService.Domain.Catalog.ImportBatches;
+using ElectronicService.Domain.Catalog.ProductTypes;
 using ElectronicService.Domain.Common;
+using ElectronicService.Core.Catalog.Recognition.Normalization;
 
 namespace ElectronicService.Core.Catalog.ImportBatches.GetRowExplanations;
 
@@ -22,7 +22,7 @@ public sealed class GetCatalogImportRowExplanationsQueryHandler(
     ICatalogProductMetadataRepository metadata,
     IManufacturerResolver manufacturers,
     ICatalogProductTypeSuggestionService productTypes,
-    ICatalogProductNameRecognitionService recognition,
+    ICatalogImportRecognitionEnrichmentService recognition,
     ICatalogProductNameEvidenceCoverageService coverage)
 {
     private const int MaximumRows = 25;
@@ -99,45 +99,11 @@ public sealed class GetCatalogImportRowExplanationsQueryHandler(
                 "Обновите список.");
         }
 
-        string[] allowedCodes = [];
+        var typeContexts = new Dictionary<Guid, RowTypeContext>();
 
-        if (batch.ProductTypeId.HasValue)
-        {
-            var productType = await metadata
-                .GetProductTypeByIdAsync(
-                    batch.ProductTypeId.Value,
-                    cancellationToken)
-                .ConfigureAwait(false);
-
-            if (productType is null)
-            {
-                return CatalogImportErrors.ProductTypeNotFound(
-                    batch.ProductTypeId.Value);
-            }
-
-            var definitionIds = productType.Characteristics
-                .Select(item => item.CharacteristicDefinitionId)
-                .Distinct()
-                .ToArray();
-
-            var definitions = await metadata
-                .GetCharacteristicDefinitionsByIdsAsync(
-                    definitionIds,
-                    cancellationToken)
-                .ConfigureAwait(false);
-
-            allowedCodes = definitions
-                .Where(definition =>
-                    productType.AllowsCharacteristic(definition.Id))
-                .GroupBy(
-                    definition =>
-                        CatalogRecognitionTextNormalizer.NormalizeCode(
-                            definition.Code),
-                    StringComparer.Ordinal)
-                .Where(group => group.Count() == 1)
-                .Select(group => group.Key)
-                .ToArray();
-        }
+        await recognition
+            .PrepareRunAsync(cancellationToken)
+            .ConfigureAwait(false);
 
         var manufacturerIndex = await manufacturers
             .LoadIndexAsync(cancellationToken)
@@ -176,6 +142,7 @@ public sealed class GetCatalogImportRowExplanationsQueryHandler(
             }
 
             var name = data.Name;
+            var effectiveTypeId = data.ProductTypeId ?? batch.ProductTypeId;
 
             CatalogImportRowExplanationStatus status;
 
@@ -187,7 +154,7 @@ public sealed class GetCatalogImportRowExplanationsQueryHandler(
             {
                 status = CatalogImportRowExplanationStatus.NameTooLong;
             }
-            else if (!batch.ProductTypeId.HasValue)
+            else if (!effectiveTypeId.HasValue || effectiveTypeId.Value == Guid.Empty)
             {
                 status = CatalogImportRowExplanationStatus.ProductTypeRequired;
             }
@@ -211,6 +178,34 @@ public sealed class GetCatalogImportRowExplanationsQueryHandler(
 
             try
             {
+                var typeId = effectiveTypeId!.Value;
+
+                if (!typeContexts.TryGetValue(typeId, out var typeContext))
+                {
+                    var productType = await metadata
+                        .GetProductTypeByIdAsync(typeId, cancellationToken)
+                        .ConfigureAwait(false);
+
+                    if (productType is null)
+                    {
+                        return CatalogImportErrors.ProductTypeNotFound(typeId);
+                    }
+
+                    var definitionIds = productType.Characteristics
+                        .Select(item => item.CharacteristicDefinitionId)
+                        .Distinct()
+                        .ToArray();
+
+                    var definitions = await metadata
+                        .GetCharacteristicDefinitionsByIdsAsync(
+                            definitionIds,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+
+                    typeContext = new RowTypeContext(productType, definitions);
+                    typeContexts.Add(typeId, typeContext);
+                }
+
                 var manufacturer =
                     manufacturerIndex.RecognizeInText(name!);
 
@@ -249,36 +244,37 @@ public sealed class GetCatalogImportRowExplanationsQueryHandler(
                 var hasConflicts =
                     manufacturer.IsConflict || type.IsConflict;
 
-                if (allowedCodes.Length > 0)
+                var recognitionResult = await recognition
+                    .RecognizeRowAsync(
+                        data,
+                        typeContext.ProductType,
+                        typeContext.Definitions,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (recognitionResult.IsFailure)
                 {
-                    var recognized = await recognition
-                        .RecognizeAsync(
-                            new CatalogProductNameRecognitionRequest(
-                                name!,
-                                batch.ProductTypeId,
-                                allowedCodes,
-                                data.ManufacturerId),
-                            cancellationToken)
-                        .ConfigureAwait(false);
+                    return recognitionResult.Error;
+                }
 
-                    hasConflicts |= recognized.Conflicts.Count > 0;
+                var recognized = recognitionResult.Value;
+                hasConflicts |= recognized.Conflicts.Count > 0;
 
-                    foreach (var candidate in recognized.Candidates)
+                foreach (var candidate in recognized.Candidates)
+                {
+                    var mapped = CatalogImportNameEvidenceMapper.Map(
+                        name!,
+                        candidate);
+
+                    if (mapped is null)
                     {
-                        var mapped = CatalogImportNameEvidenceMapper.Map(
-                            name!,
-                            candidate);
+                        status =
+                            CatalogImportRowExplanationStatus.InvalidEvidence;
 
-                        if (mapped is null)
-                        {
-                            status =
-                                CatalogImportRowExplanationStatus.InvalidEvidence;
-
-                            break;
-                        }
-
-                        evidence.Add(mapped);
+                        break;
                     }
+
+                    evidence.Add(mapped);
                 }
 
                 // Проверяем координаты до вычисления покрытия.
@@ -336,4 +332,8 @@ public sealed class GetCatalogImportRowExplanationsQueryHandler(
             DateTimeOffset.UtcNow,
             items);
     }
+
+    private sealed record RowTypeContext(
+        ProductType ProductType,
+        IReadOnlyCollection<CharacteristicDefinition> Definitions);
 }

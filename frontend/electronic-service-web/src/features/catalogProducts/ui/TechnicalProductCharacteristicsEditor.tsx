@@ -13,6 +13,10 @@ import { AppButton } from "@/shared/ui/AppButton";
 import { AppInput } from "@/shared/ui/AppInput";
 import { setCatalogProductCharacteristic } from "../api/setCatalogProductCharacteristic";
 import { removeCatalogProductCharacteristic } from "../api/removeCatalogProductCharacteristic";
+import {
+  POLE_CONFIGURATION_OPTIONS,
+  POLES_CHARACTERISTIC_CODE,
+} from "../model/poleConfigurations";
 import type { CatalogProductDetails } from "../model/types";
 import { catalogProductAuditHistoryQueryKey } from "@/features/catalogProductAuditHistory/model/queryKeys";
 
@@ -384,7 +388,19 @@ export function TechnicalProductCharacteristicsEditor({
               </div>
 
               <div className="min-w-0">
-                {characteristic.dataType === "Boolean" ? (
+                {characteristic.code === POLES_CHARACTERISTIC_CODE ? (
+                  <AppSelect
+                    ariaLabel={label}
+                    value={fieldValue}
+                    onChange={(value) =>
+                      handleValueChange(characteristic.code, value)
+                    }
+                    options={[
+                      { value: "", label: "Не указано" },
+                      ...POLE_CONFIGURATION_OPTIONS,
+                    ]}
+                  />
+                ) : characteristic.dataType === "Boolean" ? (
                   <AppSelect
                     ariaLabel={label}
                     value={fieldValue}

@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { useState } from "react";
-import { RequireTechnicalUser } from "@/features/auth/ui/RequireTechnicalUser";
+import { RequirePermission } from "@/features/auth/ui/RequirePermission";
 import { getCatalogProductTypes } from "@/features/catalogMetadata/api/getCatalogProductTypes";
 import { getCatalogProductTypeCharacteristicSchema } from "@/features/catalogProductTypes/api/getCatalogProductTypeCharacteristicSchema";
 import type { CatalogProductTypeCharacteristicSchemaItem } from "@/features/catalogProductTypes/model/types";
@@ -88,9 +88,9 @@ function formatDataType(dataType: string): string {
 
 export default function CatalogProductTypesPage() {
   return (
-    <RequireTechnicalUser>
+    <RequirePermission permission="DictionariesManage">
       <CatalogProductTypesContent />
-    </RequireTechnicalUser>
+    </RequirePermission>
   );
 }
 

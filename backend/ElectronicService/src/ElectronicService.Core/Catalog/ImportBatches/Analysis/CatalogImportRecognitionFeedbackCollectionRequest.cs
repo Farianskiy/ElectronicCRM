@@ -10,4 +10,5 @@ public sealed record CatalogImportRecognitionFeedbackCollectionRequest(
     IReadOnlyCollection<CharacteristicDefinition> CharacteristicDefinitions,
     CatalogImportNormalizedRowData Before,
     CatalogImportNormalizedRowData After,
-    bool ConfirmRecognitionSuggestions = false);
+    bool ConfirmRecognitionSuggestions = false,
+    IReadOnlyDictionary<Guid, CatalogImportConfirmedSpan>? ConfirmedSpans = null);

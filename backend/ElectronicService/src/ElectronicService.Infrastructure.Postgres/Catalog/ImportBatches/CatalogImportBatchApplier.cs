@@ -110,7 +110,7 @@ public sealed class CatalogImportBatchApplier : ICatalogImportBatchApplier
                 CatalogImportErrors.CurrentUserNotFound());
         }
 
-        if (appliedByUserType != UserType.Technical)
+        if (appliedByUserType is not UserType.Technical and not UserType.SystemDeveloper)
         {
             return Result.Failure<CatalogImportApplyExecutionResult, DomainError>(
                 CatalogImportErrors.UserCannotApplyCatalogImport());

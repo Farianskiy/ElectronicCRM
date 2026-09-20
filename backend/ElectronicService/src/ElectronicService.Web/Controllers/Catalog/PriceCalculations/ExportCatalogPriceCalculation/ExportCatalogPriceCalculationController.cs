@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ElectronicService.Web.Controllers.Catalog.PriceCalculations.ExportCatalogPriceCalculation;
 
 [ApiController]
-[Authorize(Roles = "Regular,Manager,Technical")]
+[PermissionAuthorize(UserPermissionCode.PriceCalculationsExport)]
 [Route("api/catalog/price-calculations")]
 public sealed class ExportCatalogPriceCalculationController : ControllerBase
 {

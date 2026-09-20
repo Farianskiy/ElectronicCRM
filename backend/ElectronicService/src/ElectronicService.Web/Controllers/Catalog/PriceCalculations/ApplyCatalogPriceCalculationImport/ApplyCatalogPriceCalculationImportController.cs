@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ElectronicService.Web.Controllers.Catalog.PriceCalculations.ApplyCatalogPriceCalculationImport;
 
 [ApiController]
-[Authorize]
+[PermissionAuthorize(UserPermissionCode.PriceCalculationsManage)]
 [Route("api/catalog/price-calculations")]
 public sealed class ApplyCatalogPriceCalculationImportController
     : ControllerBase

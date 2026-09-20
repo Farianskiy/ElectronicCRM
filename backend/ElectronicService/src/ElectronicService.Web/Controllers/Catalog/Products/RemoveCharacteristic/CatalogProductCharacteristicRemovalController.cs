@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ElectronicService.Web.Controllers.Catalog.Products
     .RemoveCharacteristic;
 
-[Authorize(Roles = "Technical")]
+[PermissionAuthorize(UserPermissionCode.ProductsEdit)]
 [ApiController]
 [Route("api/catalog/products/{id:guid}/characteristics/{code}")]
 public sealed class CatalogProductCharacteristicRemovalController

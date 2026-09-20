@@ -25,7 +25,9 @@ public static class CatalogRecognitionValueNormalizer
                 => NormalizeNumber(value),
 
             "POLES"
-                => NormalizeNumber(value),
+                => CatalogPoleConfigurationNormalizer.TryNormalize(value, out var normalizedPoleConfiguration)
+                    ? normalizedPoleConfiguration
+                    : CatalogRecognitionTextNormalizer.NormalizeValue(value),
 
             "BREAKING_CAPACITY"
                 => NormalizeBreakingCapacity(value),

@@ -1,5 +1,6 @@
 using ElectronicService.Contracts.Catalog.ImportBatches;
 using ElectronicService.Core.Catalog.ImportBatches.UpdateCatalogImportRow;
+using ElectronicService.Core.Catalog.ImportBatches.Analysis;
 using ElectronicService.Web.Controllers.Catalog.ImportBatches.Common;
 using ElectronicService.Web.Auth;
 using Microsoft.AspNetCore.Authorization;
@@ -8,7 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ElectronicService.Web.Controllers.Catalog.ImportBatches.UpdateCatalogImportRow;
 
 [ApiController]
-[Authorize(Roles = "Regular,Manager,Technical")]
+[PermissionAnyAuthorize(UserPermissionCode.CatalogImportsCreate, UserPermissionCode.CatalogImportsReview)]
 [Route("api/catalog/import-batches")]
 public sealed class UpdateCatalogImportRowController : ControllerBase
 {
@@ -32,6 +33,13 @@ public sealed class UpdateCatalogImportRowController : ControllerBase
             return this.ToCurrentUserProblem();
         }
 
+        if (request.ConfirmedSpans is not null && request.ConfirmedSpans.Any(item => item.Value is null))
+        {
+            return BadRequest(new ProblemDetails { Title = ProblemTitle, Detail = "Разметка характеристики не может быть null.", Status = StatusCodes.Status400BadRequest });
+        }
+
+        var confirmedSpans = request.ConfirmedSpans?.ToDictionary(item => item.Key, item => new CatalogImportConfirmedSpan(item.Value.ProductName, item.Value.Start, item.Value.Length));
+
         var command = new UpdateCatalogImportRowCommand(
             batchId,
             rowId,
@@ -42,7 +50,8 @@ public sealed class UpdateCatalogImportRowController : ControllerBase
             request.ManufacturerId,
             request.Price,
             request.StockQuantity,
-            request.Characteristics ?? new Dictionary<string, string>(StringComparer.Ordinal));
+            request.Characteristics ?? new Dictionary<string, string>(StringComparer.Ordinal),
+            confirmedSpans);
 
         var result = await handler
             .Handle(command, cancellationToken)

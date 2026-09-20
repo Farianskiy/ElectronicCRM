@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ElectronicService.Web.Controllers.Catalog.Products.ImportStock;
 
-[Authorize(Roles = "Technical")]
+[PermissionAuthorize(UserPermissionCode.StockManage)]
 [ApiController]
 [Route("api/catalog/products/stock-import")]
 public sealed class CatalogStockImportController : ControllerBase

@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useAuthSession } from "@/features/auth/model/useAuthSession";
-import { isTechnicalUser } from "@/shared/api/authToken";
+import { useCurrentUserAccess } from "@/features/auth/model/CurrentUserAccessContext";
+import type { UserPermissionCode } from "@/features/auth/model/userPermissions";
+import { getUserTypeLabel } from "@/shared/api/authToken";
 import { PageWorkspace } from "@/shared/ui/PageWorkspace";
 
 interface HomeAction {
@@ -10,7 +12,7 @@ interface HomeAction {
   title: string;
   description: string;
   eyebrow: string;
-  technicalOnly?: boolean;
+  permission: UserPermissionCode;
 }
 
 const homeActions: HomeAction[] = [
@@ -20,6 +22,7 @@ const homeActions: HomeAction[] = [
     description:
       "Используйте обычный текстовый запрос для поиска по каталогу, производителю и характеристикам.",
     eyebrow: "Ассистент",
+    permission: "AssistantUse",
   },
   {
     href: "/catalog/products",
@@ -27,6 +30,7 @@ const homeActions: HomeAction[] = [
     description:
       "Просматривайте товары, цены, остатки, производителей и технические характеристики.",
     eyebrow: "Каталог",
+    permission: "ProductsView",
   },
   {
     href: "/catalog/imports",
@@ -34,6 +38,7 @@ const homeActions: HomeAction[] = [
     description:
       "Загрузите файл поставщика и проверьте распознавание наименований перед применением.",
     eyebrow: "Импорт",
+    permission: "CatalogImportsCreate",
   },
   {
     href: "/catalog/recognition",
@@ -41,17 +46,21 @@ const homeActions: HomeAction[] = [
     description:
       "Исследуйте распознавание, конфликты, словарные правила и диагностические evidence.",
     eyebrow: "Technical",
-    technicalOnly: true,
+    permission: "DictionariesManage",
   },
 ];
 
 export default function HomePage() {
   const session = useAuthSession();
-  const technical = isTechnicalUser(session);
+  const { access, hasPermission } = useCurrentUserAccess();
 
-  const visibleActions = homeActions.filter(
-    (action) => !action.technicalOnly || technical,
+  const visibleActions = homeActions.filter((action) =>
+    hasPermission(action.permission),
   );
+
+  const allowedPermissionsCount =
+    access?.permissions.filter((permission) => permission.isAllowed).length ??
+    0;
 
   return (
     <PageWorkspace
@@ -99,20 +108,14 @@ export default function HomePage() {
             </h2>
 
             <p className="mt-1 text-sm text-[var(--app-muted)]">
-              {technical
-                ? "Доступны каталог, импорт и технические инструменты качества данных."
-                : "Доступны каталог, импорт и поиск через Ассистента."}
+              Доступно разрешений: {allowedPermissionsCount}. Меню и действия
+              автоматически скрываются в соответствии с настройками учётной
+              записи.
             </p>
           </div>
 
-          <span
-            className={
-              technical
-                ? "inline-flex w-fit rounded-full border border-[var(--app-role-border)] bg-[var(--app-role-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--app-role-text)]"
-                : "inline-flex w-fit rounded-full border border-[var(--app-accent-border)] bg-[var(--app-accent-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--app-accent)]"
-            }
-          >
-            {technical ? "Technical" : "Regular"}
+          <span className="inline-flex w-fit rounded-full border border-[var(--app-role-border)] bg-[var(--app-role-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--app-role-text)]">
+            {getUserTypeLabel(access?.userType ?? session?.userType)}
           </span>
         </div>
       </section>

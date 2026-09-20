@@ -9,6 +9,7 @@ namespace ElectronicService.Web.Controllers.Catalog.Assistant.Ask;
 
 [ApiController]
 [Route("api/catalog/assistant/ask")]
+[PermissionAuthorize(UserPermissionCode.AssistantUse)]
 public sealed class CatalogAssistantAskController : ControllerBase
 {
     private readonly AskCatalogAssistantCommandHandler _handler;

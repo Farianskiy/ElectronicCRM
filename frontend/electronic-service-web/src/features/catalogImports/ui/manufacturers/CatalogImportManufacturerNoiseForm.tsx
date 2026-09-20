@@ -2,11 +2,10 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
-import { useAuthSession } from "@/features/auth/model/useAuthSession";
 import { markManufacturerPhraseAsNoise } from "@/features/catalogManufacturers/api/markManufacturerPhraseAsNoise";
 import type { MarkManufacturerPhraseAsNoiseResponse } from "@/features/catalogManufacturers/model/types";
 import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
-import { isTechnicalUser } from "@/shared/api/authToken";
+import { useCurrentUserAccess } from "@/features/auth/model/CurrentUserAccessContext";
 import { analyzeCatalogImportBatch } from "../../api/analyzeCatalogImportBatch";
 import { catalogImportQueryKeys } from "../../model/queryKeys";
 import type {
@@ -28,8 +27,8 @@ export function CatalogImportManufacturerNoiseForm({
   onAnalysisChange,
 }: CatalogImportManufacturerNoiseFormProps) {
   const queryClient = useQueryClient();
-  const session = useAuthSession();
-  const canManageManufacturers = isTechnicalUser(session);
+  const { hasPermission } = useCurrentUserAccess();
+  const canManageManufacturers = hasPermission("DictionariesManage");
 
   const [reason, setReason] = useState("");
   const [changeConfirmed, setChangeConfirmed] = useState(false);

@@ -6,6 +6,7 @@ namespace ElectronicService.Web.Controllers.Catalog.Products;
 
 [ApiController]
 [Route("api/catalog/products/{id:guid}/replacements")]
+[PermissionAuthorize(UserPermissionCode.ProductsView)]
 public sealed class CatalogProductReplacementsController : ControllerBase
 {
     private readonly GetProductReplacementsQueryHandler _handler;

@@ -15,11 +15,10 @@ import type {
   CatalogAssistantReplacement,
 } from "@/features/catalogAssistant/model/types";
 import { CatalogAssistantBatchPreview } from "@/features/catalogAssistant/ui/CatalogAssistantBatchPreview";
-import { useAuthSession } from "@/features/auth/model/useAuthSession";
+import { useCurrentUserAccess } from "@/features/auth/model/CurrentUserAccessContext";
 import { applyCatalogPriceCalculationImport } from "@/features/catalogPriceCalculations/api/catalogPriceCalculationEditorApi";
 import { getMyCatalogPriceCalculations } from "@/features/catalogPriceCalculations/api/getMyCatalogPriceCalculations";
 import { catalogPriceCalculationQueryKeys } from "@/features/catalogPriceCalculations/model/queryKeys";
-import { isTechnicalUser } from "@/shared/api/authToken";
 import { formatPercent, formatPrice } from "@/shared/lib/formatters";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { VoiceInputButton } from "@/shared/ui/VoiceInputButton";
@@ -276,8 +275,9 @@ function TechnicalParsedRequestBlock({
 }
 
 export default function CatalogAssistantPage() {
-  const session = useAuthSession();
-  const technical = isTechnicalUser(session);
+  const { hasPermission } = useCurrentUserAccess();
+  const canViewTechnicalDetails = hasPermission("DictionariesManage");
+  const canManageCalculations = hasPermission("PriceCalculationsManage");
 
   const [message, setMessage] = useState("");
   const [onlyInStock, setOnlyInStock] = useState(false);
@@ -296,6 +296,7 @@ export default function CatalogAssistantPage() {
         page: 1,
         pageSize: 100,
       }),
+    enabled: canManageCalculations,
   });
 
   const assistantMutation = useMutation({
@@ -561,6 +562,7 @@ export default function CatalogAssistantPage() {
               ? getErrorMessage(applyBatchMutation.error)
               : null
           }
+          canManageCalculations={canManageCalculations}
         />
       )}
 
@@ -630,7 +632,7 @@ export default function CatalogAssistantPage() {
           </section>
         )}
 
-      {response && technical && (
+      {response && canViewTechnicalDetails && (
         <TechnicalParsedRequestBlock response={response} />
       )}
     </div>

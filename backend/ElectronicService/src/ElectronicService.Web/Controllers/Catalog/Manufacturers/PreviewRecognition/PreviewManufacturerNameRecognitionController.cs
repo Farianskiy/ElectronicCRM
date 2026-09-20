@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ElectronicService.Web.Controllers.Catalog.Manufacturers.PreviewRecognition;
 
-[Authorize(Roles = "Technical")]
+[PermissionAuthorize(UserPermissionCode.DictionariesManage)]
 [ApiController]
 [Route("api/catalog/manufacturers/recognition/preview")]
 public sealed class PreviewManufacturerNameRecognitionController : ControllerBase

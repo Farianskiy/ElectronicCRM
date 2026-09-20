@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ElectronicService.Web.Controllers.Catalog.ImportBatches.SubmitCatalogImportBatch;
 
 [ApiController]
-[Authorize(Roles = "Regular,Manager")]
+[PermissionAuthorize(UserPermissionCode.CatalogImportsCreate)]
 [Route("api/catalog/import-batches")]
 public sealed class SubmitCatalogImportBatchController : ControllerBase
 {

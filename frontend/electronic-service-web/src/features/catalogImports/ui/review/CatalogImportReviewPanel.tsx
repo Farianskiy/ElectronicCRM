@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useCurrentUserAccess } from "@/features/auth/model/CurrentUserAccessContext";
 import { useAuthSession } from "@/features/auth/model/useAuthSession";
 import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
 import { formatDate } from "@/shared/lib/formatters";
@@ -24,6 +25,7 @@ export function CatalogImportReviewPanel({
   reviewedAtUtc,
 }: CatalogImportReviewPanelProps) {
   const session = useAuthSession();
+  const { hasPermission } = useCurrentUserAccess();
   const queryClient = useQueryClient();
 
   const startMutation = useMutation({
@@ -52,7 +54,7 @@ export function CatalogImportReviewPanel({
     },
   });
 
-  const isTechnical = session?.userType === "Technical";
+  const canReview = hasPermission("CatalogImportsReview");
 
   const assignedToCurrentUser =
     Boolean(session?.userId) && reviewedByUserId === session?.userId;
@@ -62,7 +64,7 @@ export function CatalogImportReviewPanel({
     Boolean(reviewedByUserId) &&
     !assignedToCurrentUser;
 
-  if (!isTechnical || (status !== "Submitted" && status !== "UnderReview")) {
+  if (!canReview || (status !== "Submitted" && status !== "UnderReview")) {
     return null;
   }
 

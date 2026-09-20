@@ -9,7 +9,7 @@ using ElectronicService.Web.Controllers.Catalog.ImportBatches.Common;
 namespace ElectronicService.Web.Controllers.Catalog.ImportBatches.CreateCatalogImportBatch;
 
 [ApiController]
-[Authorize(Roles = "Regular,Manager,Technical")]
+[PermissionAuthorize(UserPermissionCode.CatalogImportsCreate)]
 [Route("api/catalog/import-batches")]
 public sealed class CreateCatalogImportBatchController : ControllerBase
 {

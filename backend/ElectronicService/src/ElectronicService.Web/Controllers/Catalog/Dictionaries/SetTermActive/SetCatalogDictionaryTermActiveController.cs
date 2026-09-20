@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ElectronicService.Web.Controllers.Catalog.Dictionaries.SetTermActive;
 
-[Authorize(Roles = "Technical")]
+[PermissionAuthorize(UserPermissionCode.DictionariesManage)]
 [ApiController]
 [Route("api/catalog/dictionary/terms/{termId:guid}/active")]
 public sealed class SetCatalogDictionaryTermActiveController : ControllerBase

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { useCurrentUserAccess } from "@/features/auth/model/CurrentUserAccessContext";
 import { useAuthSession } from "@/features/auth/model/useAuthSession";
-import { isTechnicalUser } from "@/shared/api/authToken";
+import { getUserTypeLabel } from "@/shared/api/authToken";
 import { PageWorkspace } from "@/shared/ui/PageWorkspace";
 import { AppButton } from "@/shared/ui/AppButton";
 
@@ -10,13 +11,17 @@ type CopyState = "idle" | "copied" | "failed";
 
 export default function ProfilePage() {
   const session = useAuthSession();
-  const technical = isTechnicalUser(session);
+  const { access } = useCurrentUserAccess();
   const [copyState, setCopyState] = useState<CopyState>("idle");
 
-  const catalogAllowedCount = 3;
-  const catalogPermissionCount = 3;
-  const qualityAllowedCount = technical ? 3 : 0;
-  const qualityPermissionCount = 3;
+  const permissionGroups = Object.entries(
+    (access?.permissions ?? []).reduce<
+      Record<string, NonNullable<typeof access>["permissions"]>
+    >((groups, permission) => {
+      (groups[permission.group] ??= []).push(permission);
+      return groups;
+    }, {}),
+  );
 
   async function handleCopyUserId(): Promise<void> {
     const userId = session?.userId;
@@ -54,14 +59,12 @@ export default function ProfilePage() {
                   </h2>
 
                   <span className="inline-flex rounded-full border border-[var(--app-role-border)] bg-[var(--app-role-soft)] px-3 py-1 text-xs font-semibold text-[var(--app-role-text)]">
-                    {session?.userType ?? "Unknown"}
+                    {getUserTypeLabel(session?.userType)}
                   </span>
                 </div>
 
                 <p className="mt-1 text-sm text-[var(--app-muted)]">
-                  {technical
-                    ? "Технический специалист"
-                    : "Пользователь каталога"}
+                  {getUserTypeLabel(session?.userType)}
                 </p>
 
                 <p className="mt-3 text-xs leading-5 text-[var(--app-subtle)]">
@@ -112,21 +115,22 @@ export default function ProfilePage() {
           </div>
 
           <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <AccessSummaryCard
-              title="Работа с каталогом"
-              description="Поиск, просмотр каталога и передача предложений."
-              allowedCount={catalogAllowedCount}
-              totalCount={catalogPermissionCount}
-              available
-            />
+            {permissionGroups.map(([group, permissions]) => {
+              const allowedCount = permissions.filter(
+                (permission) => permission.isAllowed,
+              ).length;
 
-            <AccessSummaryCard
-              title="Настройка и качество"
-              description="Технический разбор, модерация и изменение справочников."
-              allowedCount={qualityAllowedCount}
-              totalCount={qualityPermissionCount}
-              available={technical}
-            />
+              return (
+                <AccessSummaryCard
+                  key={group}
+                  title={group}
+                  description="Права назначены ролью и индивидуальными настройками."
+                  allowedCount={allowedCount}
+                  totalCount={permissions.length}
+                  available={allowedCount > 0}
+                />
+              );
+            })}
           </div>
         </section>
 
@@ -149,51 +153,26 @@ export default function ProfilePage() {
 
           <div className="border-t border-[var(--app-border)] p-5 sm:p-6">
             <div className="grid gap-6 lg:grid-cols-2">
-              <PermissionGroup
-                title="Работа с каталогом"
-                description="Основные ежедневные операции с товарами."
-              >
-                <AccessRow
-                  label="Поиск через Ассистента"
-                  description="Поиск товаров с помощью обычного текстового запроса."
-                  allowed
-                />
-
-                <AccessRow
-                  label="Просмотр каталога"
-                  description="Товары, производители, цены, остатки и характеристики."
-                  allowed
-                />
-
-                <AccessRow
-                  label="Предложения по неизвестным словам"
-                  description="Передача неизвестных фрагментов на техническую проверку."
-                  allowed
-                />
-              </PermissionGroup>
-
-              <PermissionGroup
-                title="Настройка и качество"
-                description="Технические инструменты управления знаниями CRM."
-              >
-                <AccessRow
-                  label="Технический разбор запроса"
-                  description="Распознанные значения, источники и внутреннее представление."
-                  allowed={technical}
-                />
-
-                <AccessRow
-                  label="Модерация словаря"
-                  description="Одобрение, изменение и отклонение предложений."
-                  allowed={technical}
-                />
-
-                <AccessRow
-                  label="Изменение каталога"
-                  description="Редактирование справочников и технических данных."
-                  allowed={technical}
-                />
-              </PermissionGroup>
+              {permissionGroups.map(([group, permissions]) => (
+                <PermissionGroup
+                  key={group}
+                  title={group}
+                  description="Фактические разрешения текущей учётной записи."
+                >
+                  {permissions.map((permission) => (
+                    <AccessRow
+                      key={permission.code}
+                      label={permission.label}
+                      description={
+                        permission.isOverridden
+                          ? "Назначено индивидуальной настройкой."
+                          : "Назначено стандартными правами роли."
+                      }
+                      allowed={permission.isAllowed}
+                    />
+                  ))}
+                </PermissionGroup>
+              ))}
             </div>
           </div>
         </details>

@@ -14,6 +14,9 @@ import { AppSelect } from "@/shared/ui/AppSelect";
 import { AppButton } from "@/shared/ui/AppButton";
 import { AppInput } from "@/shared/ui/AppInput";
 import { updateCatalogImportRow } from "../../api/updateCatalogImportRow";
+import { catalogImportConfirmedSpansQueryKey } from "../../api/getCatalogImportRowConfirmedSpans";
+import { CatalogImportConfirmedSpanEditor } from "./CatalogImportConfirmedSpanEditor";
+import type { CatalogImportConfirmedSpan } from "../../model/types";
 import { catalogImportQueryKeys } from "../../model/queryKeys";
 import type {
   CatalogImportRow,
@@ -155,6 +158,9 @@ export function CatalogImportRowEditor({
   });
 
   const [formErrors, setFormErrors] = useState<string[]>([]);
+  const [confirmedSpans, setConfirmedSpans] = useState<
+    Record<string, CatalogImportConfirmedSpan>
+  >({});
 
   const productTypesQuery = useQuery({
     queryKey: ["catalog-product-types"],
@@ -197,7 +203,12 @@ export function CatalogImportRowEditor({
       updateCatalogImportRow(batchId, row.rowId, request),
 
     onSuccess: async (result) => {
+      setConfirmedSpans({});
+
       await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: catalogImportConfirmedSpansQueryKey(batchId, row.rowId),
+        }),
         queryClient.invalidateQueries({
           queryKey: catalogImportQueryKeys.details(batchId),
         }),
@@ -235,6 +246,12 @@ export function CatalogImportRowEditor({
       ...currentValues,
       [characteristicId]: value,
     }));
+
+    setConfirmedSpans((currentSpans) => {
+      const nextSpans = { ...currentSpans };
+      delete nextSpans[characteristicId];
+      return nextSpans;
+    });
 
     setFormErrors([]);
     saveMutation.reset();
@@ -296,6 +313,7 @@ export function CatalogImportRowEditor({
       price: parsedPrice.value,
       stockQuantity: parsedStockQuantity.value,
       characteristics: requestCharacteristics,
+      confirmedSpans,
     };
 
     setFormErrors([]);
@@ -356,6 +374,7 @@ export function CatalogImportRowEditor({
             rows={3}
             onChange={(event) => {
               setName(event.target.value);
+              setConfirmedSpans({});
               setFormErrors([]);
               saveMutation.reset();
             }}
@@ -393,6 +412,7 @@ export function CatalogImportRowEditor({
             disabled={isBusy}
             onChange={(value) => {
               setManufacturerId(value);
+              setConfirmedSpans({});
               setFormErrors([]);
               saveMutation.reset();
             }}
@@ -427,6 +447,7 @@ export function CatalogImportRowEditor({
             onChange={(value) => {
               setProductTypeId(value);
               setCharacteristicValues({});
+              setConfirmedSpans({});
               setFormErrors([]);
               saveMutation.reset();
             }}
@@ -515,6 +536,19 @@ export function CatalogImportRowEditor({
           </div>
         )}
       </section>
+
+      <CatalogImportConfirmedSpanEditor
+        batchId={batchId}
+        rowId={row.rowId}
+        productName={name}
+        manufacturerId={manufacturerId}
+        productTypeId={productTypeId}
+        characteristics={characteristics}
+        characteristicValues={characteristicValues}
+        drafts={confirmedSpans}
+        disabled={isBusy}
+        onChange={setConfirmedSpans}
+      />
 
       {formErrors.length > 0 && (
         <div className="rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-5">

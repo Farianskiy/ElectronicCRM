@@ -7,5 +7,8 @@ public interface ICatalogImportRecognitionFeedbackCollector
 {
     Task<Result<CatalogImportRecognitionFeedbackCollectionResult, DomainError>> CollectAsync(CatalogImportRecognitionFeedbackCollectionRequest request, CancellationToken cancellationToken = default);
 
-    Task<Result<int, DomainError>> RemovePendingForBatchAsync(Guid importBatchId, CancellationToken cancellationToken = default);
+    Task<Result<int, DomainError>> RemovePendingForBatchAsync(
+        Guid importBatchId,
+        IReadOnlyCollection<Guid> preservedRowIds,
+        CancellationToken cancellationToken = default);
 }

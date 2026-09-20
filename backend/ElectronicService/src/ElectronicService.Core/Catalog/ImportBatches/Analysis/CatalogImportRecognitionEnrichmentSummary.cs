@@ -13,6 +13,9 @@ public sealed record CatalogImportRecognitionEnrichmentSummary(
     bool AppliedValuesDetailsTruncated,
     IReadOnlyCollection<CatalogImportRecognitionAppliedValue> AppliedValues)
 {
+
+    public int PreservedManualRowsCount { get; init; }
+
     public static CatalogImportRecognitionEnrichmentSummary Empty { get; } = new(
         RowsAnalyzedCount: 0,
         FilledRowsCount: 0,
