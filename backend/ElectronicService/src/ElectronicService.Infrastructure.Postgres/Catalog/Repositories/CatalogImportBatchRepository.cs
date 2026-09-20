@@ -344,93 +344,95 @@ public sealed class CatalogImportBatchRepository
         }
     }
 
-    public async Task ReplaceAnalysisAsync(
-        CatalogImportBatch batch,
-        IReadOnlyCollection<CatalogImportColumn>
-            columns,
-        IReadOnlyCollection<CatalogImportRow>
-            rows,
-        CancellationToken cancellationToken =
-            default)
+    public async Task<bool> ReplaceAnalysisAsync(
+    CatalogImportBatch batch,
+    IReadOnlyCollection<CatalogImportColumn> columns,
+    IReadOnlyCollection<CatalogImportRow> rows,
+    CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(batch);
         ArgumentNullException.ThrowIfNull(columns);
         ArgumentNullException.ThrowIfNull(rows);
 
-        /*
-         * ExecuteDeleteAsync выполняется сразу,
-         * а не при SaveChanges.
-         *
-         * Поэтому все действия обязательно
-         * объединяем одной транзакцией.
-         */
-        await using var transaction =
-    await _dbContext.Database
-        .BeginTransactionAsync(
-            cancellationToken)
-        .ConfigureAwait(false);
-
-        /*
-         * До вызова ReplaceAnalysisAsync обработчик может:
-         *
-         * 1. пометить устаревшие Pending Feedback на удаление;
-         * 2. изменить статус и статистику CatalogImportBatch.
-         *
-         * ExecuteDeleteAsync выполняется непосредственно в PostgreSQL
-         * и не обрабатывает ожидающие изменения ChangeTracker.
-         *
-         * Поэтому сначала сохраняем отслеживаемые изменения внутри
-         * уже открытой транзакции. Если дальнейшая замена анализа
-         * завершится ошибкой, это сохранение также будет отменено.
-         */
-        await _dbContext
-            .SaveChangesAsync(cancellationToken)
+        await using var transaction = await _dbContext.Database
+            .BeginTransactionAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        /*
-         * Сначала удаляем строки.
-         * Затем колонки.
-         *
-         * Старый анализ полностью заменяется
-         * новым результатом.
-         *
-         * Pending Feedback уже удалены предыдущим SaveChangesAsync.
-         * Finalized Feedback не удаляются. PostgreSQL обнулит их
-         * ImportRowId через внешний ключ ON DELETE SET NULL,
-         * сохранив ImportBatchId как источник происхождения.
-         */
-        await _dbContext.CatalogImportRows
-                    .Where(row =>
-                row.BatchId == batch.Id)
-            .ExecuteDeleteAsync(
-                cancellationToken)
-            .ConfigureAwait(false);
+        try
+        {
+            var existingRowIds = await _dbContext.CatalogImportRows
+                .AsNoTracking()
+                .Where(row => row.BatchId == batch.Id)
+                .Select(row => row.Id)
+                .ToArrayAsync(cancellationToken)
+                .ConfigureAwait(false);
 
-        await _dbContext.CatalogImportColumns
-            .Where(column =>
-                column.BatchId == batch.Id)
-            .ExecuteDeleteAsync(
-                cancellationToken)
-            .ConfigureAwait(false);
+            var existingIds = existingRowIds.ToHashSet();
 
-        _dbContext.CatalogImportColumns
-            .AddRange(columns);
+            var retainedIds = rows
+                .Select(row => row.Id)
+                .Where(existingIds.Contains)
+                .ToArray();
 
-        _dbContext.CatalogImportRows
-            .AddRange(rows);
+            var newRows = rows
+                .Where(row => !existingIds.Contains(row.Id))
+                .ToArray();
 
-        /*
-         * Здесь также сохраняется новый статус
-         * отслеживаемого CatalogImportBatch.
-         */
-        await _dbContext
-            .SaveChangesAsync(
-                cancellationToken)
-            .ConfigureAwait(false);
+            // GetRowsAsync returns detached entities. Retained rows now also
+            // pass through recognition, so persist their new validation data.
+            var retainedRows = rows.Where(row => existingIds.Contains(row.Id)).ToArray();
+            _dbContext.CatalogImportRows.UpdateRange(retainedRows);
 
-        await transaction
-            .CommitAsync(cancellationToken)
-            .ConfigureAwait(false);
+            /*
+             * Сохраняем изменения пакета с проверкой его версии
+             * до удаления строк и колонок.
+             *
+             * Здесь также сохраняется удаление устаревшего
+             * Pending Feedback. Все операции входят в транзакцию.
+             */
+            await _dbContext
+                .SaveChangesAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            /*
+             * Исправленные строки сохраняются с прежними
+             * идентификаторами и связями Feedback.
+             * Только остальные строки заменяются новым анализом.
+             */
+            await _dbContext.CatalogImportRows
+                .Where(row =>
+                    row.BatchId == batch.Id &&
+                    !retainedIds.Contains(row.Id))
+                .ExecuteDeleteAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            await _dbContext.CatalogImportColumns
+                .Where(column => column.BatchId == batch.Id)
+                .ExecuteDeleteAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            _dbContext.CatalogImportColumns.AddRange(columns);
+            _dbContext.CatalogImportRows.AddRange(newRows);
+
+            await _dbContext
+                .SaveChangesAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            await transaction
+                .CommitAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            return true;
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            /*
+             * Не повторяем операцию автоматически.
+             * При выходе незавершённая транзакция откатывается.
+             * Обработчик должен завершить текущий запрос.
+             */
+            return false;
+        }
     }
 
     public async Task<IReadOnlyCollection<CatalogImportBatch>> GetByCreatorAsync(

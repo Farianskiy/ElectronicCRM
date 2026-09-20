@@ -1,7 +1,6 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
 import { useState } from "react";
@@ -40,9 +39,7 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#0f1115] px-4 text-slate-100">
       <section className="w-full max-w-md rounded-3xl border border-white/10 bg-white/[0.04] p-8 shadow-2xl">
-        <h1 className="text-2xl font-bold text-white">
-          Вход в Electronic CRM
-        </h1>
+        <h1 className="text-2xl font-bold text-white">Вход в Electronic CRM</h1>
 
         <p className="mt-2 text-sm text-slate-400">
           Войди, чтобы работать с каталогом и assistant-ом.
@@ -85,13 +82,6 @@ export default function LoginPage() {
             {loginMutation.isPending ? "Входим..." : "Войти"}
           </button>
         </form>
-
-        <p className="mt-5 text-sm text-slate-400">
-          Нет аккаунта?{" "}
-          <Link href="/register" className="font-medium text-teal-300">
-            Зарегистрироваться
-          </Link>
-        </p>
       </section>
     </main>
   );

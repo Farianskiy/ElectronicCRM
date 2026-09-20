@@ -18,7 +18,7 @@ export function RequireTechnicalUser({ children }: RequireTechnicalUserProps) {
         <h2 className="text-xl font-semibold">Недостаточно прав</h2>
 
         <p className="mt-2 text-sm text-amber-200">
-          Этот раздел доступен только техническому пользователю.
+          Этот раздел доступен техническому специалисту или администратору.
         </p>
 
         <Link

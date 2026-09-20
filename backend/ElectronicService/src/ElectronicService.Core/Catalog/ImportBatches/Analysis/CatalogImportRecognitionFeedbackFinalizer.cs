@@ -33,7 +33,7 @@ public sealed class CatalogImportRecognitionFeedbackFinalizer : ICatalogImportRe
             return Result.Failure<int, DomainError>(GeneralErrors.ValueIsInvalid(nameof(reviewedByUserId)));
         }
 
-        if (reviewerType != UserType.Technical)
+        if (reviewerType is not UserType.Technical and not UserType.SystemDeveloper)
         {
             return Result.Failure<int, DomainError>(GeneralErrors.ValueIsInvalid(nameof(reviewerType)));
         }

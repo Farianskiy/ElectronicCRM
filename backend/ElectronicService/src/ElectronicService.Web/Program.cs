@@ -4,8 +4,10 @@ using ElectronicService.Core.Abstractions;
 using ElectronicService.Infrastructure.Postgres;
 using ElectronicService.Infrastructure.Postgres.Catalog.Seeding;
 using ElectronicService.Infrastructure.Postgres.Data;
+using ElectronicService.Domain.Users.Enums;
 using ElectronicService.Web.Auth;
 using ElectronicService.Web.Users;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
@@ -50,6 +52,7 @@ if (string.IsNullOrWhiteSpace(jwtOptions.SecretKey) || jwtOptions.SecretKey.Leng
 }
 
 builder.Services.AddScoped<IJwtTokenProvider, JwtTokenProvider>();
+builder.Services.AddTransient<IClaimsTransformation, AdminRoleClaimsTransformation>();
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -74,7 +77,16 @@ builder.Services
         };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    foreach (var permission in Enum.GetValues<UserPermissionCode>().Where(permission => permission != UserPermissionCode.None))
+    {
+        options.AddPolicy(PermissionPolicy.For(permission), policy => policy.RequireAuthenticatedUser().RequireClaim(PermissionClaimTypes.Permission, permission.ToString()));
+    }
+
+    var catalogImportAccessPermissions = new[] { UserPermissionCode.CatalogImportsCreate, UserPermissionCode.CatalogImportsReview };
+    options.AddPolicy(PermissionPolicy.ForAny(catalogImportAccessPermissions), policy => policy.RequireAuthenticatedUser().RequireAssertion(context => catalogImportAccessPermissions.Any(permission => context.User.HasClaim(PermissionClaimTypes.Permission, permission.ToString()))));
+});
 
 var frontendOrigins = builder.Configuration
     .GetSection("Cors:AllowedOrigins")

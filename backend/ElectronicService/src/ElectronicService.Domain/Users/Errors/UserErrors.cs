@@ -66,4 +66,18 @@ public static class UserErrors
             "user.already_manager",
             "Пользователь уже является менеджером.");
     }
+
+    public static DomainError ProtectedSystemDeveloper()
+    {
+        return new DomainError(
+            "user.protected_system_developer",
+            "Учётную запись разработчика системы нельзя изменять.");
+    }
+
+    public static DomainError AdministratorRoleRequiresSystemDeveloper()
+    {
+        return new DomainError(
+            "user.administrator_role_requires_system_developer",
+            "Назначать роль администратора может только разработчик системы.");
+    }
 }

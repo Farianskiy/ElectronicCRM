@@ -1,3 +1,4 @@
+using ElectronicService.Core.Catalog.Characteristics.Normalization;
 using System.Globalization;
 using System.Text.RegularExpressions;
 using ElectronicService.Core.Catalog.Recognition.Abstractions;
@@ -39,19 +40,9 @@ public sealed partial class PoleCountRecognitionStrategy : ICatalogCharacteristi
 
     private static string NormalizePoleCount(Match match)
     {
-        var normalizedValue = CatalogRecognitionTextNormalizer.NormalizeValue(match.Groups["value"].Value);
-
-        if (!match.Groups["neutral"].Success)
-        {
-            return normalizedValue;
-        }
-
-        if (!int.TryParse(normalizedValue, NumberStyles.None, CultureInfo.InvariantCulture, out var poleCount))
-        {
-            return normalizedValue;
-        }
-
-        return (poleCount + 1).ToString(CultureInfo.InvariantCulture);
+        return CatalogPoleConfigurationNormalizer.TryNormalize(match.Value, out var normalizedValue)
+            ? normalizedValue
+            : CatalogRecognitionTextNormalizer.NormalizeValue(match.Value);
     }
 
     [GeneratedRegex(

@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ElectronicService.Web.Controllers.Catalog
     .ProductTypes.RemoveCharacteristic;
 
-[Authorize(Roles = "Technical")]
+[PermissionAuthorize(UserPermissionCode.DictionariesManage)]
 [ApiController]
 [Route(
     "api/catalog/product-types/{productTypeCode}/" +

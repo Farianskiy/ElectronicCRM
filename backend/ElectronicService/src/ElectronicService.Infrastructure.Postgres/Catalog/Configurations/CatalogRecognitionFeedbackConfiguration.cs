@@ -70,6 +70,10 @@ internal sealed class CatalogRecognitionFeedbackConfiguration : IEntityTypeConfi
                     "\"span_start\" + \"span_length\" <= char_length(\"product_name\"))");
 
                 table.HasCheckConstraint(
+                "ck_catalog_recognition_feedback_confirmed_span",
+                "(\"confirmed_raw_value\" IS NULL AND \"confirmed_span_start\" IS NULL AND \"confirmed_span_length\" IS NULL) OR (\"confirmed_raw_value\" IS NOT NULL AND char_length(btrim(\"confirmed_raw_value\")) > 0 AND \"confirmed_span_start\" IS NOT NULL AND \"confirmed_span_start\" >= 0 AND \"confirmed_span_length\" IS NOT NULL AND \"confirmed_span_length\" > 0 AND \"final_normalized_value\" IS NOT NULL AND \"feedback_type\" IN ('Accepted', 'Corrected', 'AddedManually', 'ConflictResolved'))");
+
+                table.HasCheckConstraint(
                     "ck_catalog_recognition_feedback_import_links",
                     "\"import_row_id\" IS NULL OR \"import_batch_id\" IS NOT NULL");
 
@@ -126,6 +130,12 @@ internal sealed class CatalogRecognitionFeedbackConfiguration : IEntityTypeConfi
                     "ck_catalog_recognition_feedback_finalized_date",
                     "\"finalized_at_utc\" IS NULL OR \"finalized_at_utc\" >= \"created_at_utc\"");
             });
+
+        builder.Property(feedback => feedback.ConfirmedRawValue).HasColumnName("confirmed_raw_value").HasMaxLength(CatalogRecognitionFeedback.ProductNameMaxLength);
+
+        builder.Property(feedback => feedback.ConfirmedSpanStart).HasColumnName("confirmed_span_start");
+
+        builder.Property(feedback => feedback.ConfirmedSpanLength).HasColumnName("confirmed_span_length");
 
         builder.HasKey(feedback => feedback.Id);
 

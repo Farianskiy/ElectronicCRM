@@ -2,7 +2,7 @@ const ACCESS_TOKEN_KEY = "electronic_service_access_token";
 const AUTH_SESSION_KEY = "electronic_service_auth_session";
 const AUTH_SESSION_CHANGED_EVENT = "electronic_service_auth_session_changed";
 
-export type UserType = "Regular" | "Technical" | string;
+export type UserType = "Regular" | "Manager" | "Technical" | "SystemDeveloper" | "Administrator" | "Admin";
 
 export interface AuthSession {
   accessToken: string;
@@ -86,7 +86,23 @@ export function clearAuthSession(): void {
 }
 
 export function isTechnicalUser(session: AuthSession | null): boolean {
-  return session?.userType === "Technical";
+  return session?.userType === "Technical" || session?.userType === "SystemDeveloper" || session?.userType === "Admin";
+}
+
+export function getUserTypeLabel(userType: UserType | undefined): string {
+  if (userType === "SystemDeveloper" || userType === "Admin") return "Разработчик системы";
+  if (userType === "Administrator") return "Администратор";
+  if (userType === "Technical") return "Технический специалист";
+  if (userType === "Manager") return "Менеджер";
+  return "Пользователь";
+}
+
+export function isAdministrator(session: AuthSession | null): boolean {
+  return session?.userType === "Administrator" || isSystemDeveloper(session);
+}
+
+export function isSystemDeveloper(session: AuthSession | null): boolean {
+  return session?.userType === "SystemDeveloper" || session?.userType === "Admin";
 }
 
 export function isRegularUser(session: AuthSession | null): boolean {

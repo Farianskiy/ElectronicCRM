@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ElectronicService.Web.Controllers.Catalog.ImportBatches.GetRowExplanations;
 
 [ApiController]
-[Authorize(Roles = "Regular,Manager,Technical")]
+[PermissionAnyAuthorize(UserPermissionCode.CatalogImportsCreate, UserPermissionCode.CatalogImportsReview)]
 [Route("api/catalog/import-batches")]
 public sealed class GetCatalogImportRowExplanationsController : ControllerBase
 {

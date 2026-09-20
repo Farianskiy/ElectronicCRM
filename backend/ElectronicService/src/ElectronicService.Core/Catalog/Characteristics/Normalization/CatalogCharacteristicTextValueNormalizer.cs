@@ -19,6 +19,11 @@ public static class CatalogCharacteristicTextValueNormalizer
             return false;
         }
 
+        if (string.Equals(NormalizeCharacteristicCode(characteristicCode), CatalogPoleConfigurationNormalizer.CharacteristicCode, StringComparison.Ordinal))
+        {
+            return CatalogPoleConfigurationNormalizer.TryNormalize(rawValue, out normalizedValue);
+        }
+
         normalizedValue = rawValue.Trim();
 
         if (!string.Equals(

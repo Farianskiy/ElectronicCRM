@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ElectronicService.Web.Controllers.Catalog.ImportBatches.AnalyzeCatalogImportBatch;
 
 [ApiController]
-[Authorize(Roles = "Regular,Manager,Technical")]
+[PermissionAnyAuthorize(UserPermissionCode.CatalogImportsCreate, UserPermissionCode.CatalogImportsReview)]
 [Route("api/catalog/import-batches")]
 public sealed class AnalyzeCatalogImportBatchController : ControllerBase
 {
@@ -333,7 +333,11 @@ public sealed class AnalyzeCatalogImportBatchController : ControllerBase
                     value.SpanLength,
                     value.Priority,
                     value.RecognizerKey))
-                .ToArray());
+                .ToArray())
+        {
+            PreservedManualRowsCount =
+                result.Value.RecognitionEnrichment.PreservedManualRowsCount
+        };
 
         return Ok(
             new AnalyzeCatalogImportBatchResponse(

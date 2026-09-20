@@ -1,22 +1,27 @@
 "use client";
 
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import Link from "next/link";
 import type { FormEvent } from "react";
 import { useState } from "react";
 import { askCatalogAssistant } from "@/features/catalogAssistant/api/askCatalogAssistant";
 import { createDictionarySuggestion } from "@/features/catalogAssistant/api/createDictionarySuggestion";
+import { previewCatalogAssistantBatch } from "@/features/catalogAssistant/api/previewCatalogAssistantBatch";
 import type {
   AskCatalogAssistantResponse,
   CatalogAssistantClarification,
   CatalogAssistantProduct,
   CatalogAssistantReplacement,
 } from "@/features/catalogAssistant/model/types";
-import { useAuthSession } from "@/features/auth/model/useAuthSession";
-import { isTechnicalUser } from "@/shared/api/authToken";
+import { CatalogAssistantBatchPreview } from "@/features/catalogAssistant/ui/CatalogAssistantBatchPreview";
+import { useCurrentUserAccess } from "@/features/auth/model/CurrentUserAccessContext";
+import { applyCatalogPriceCalculationImport } from "@/features/catalogPriceCalculations/api/catalogPriceCalculationEditorApi";
+import { getMyCatalogPriceCalculations } from "@/features/catalogPriceCalculations/api/getMyCatalogPriceCalculations";
+import { catalogPriceCalculationQueryKeys } from "@/features/catalogPriceCalculations/model/queryKeys";
 import { formatPercent, formatPrice } from "@/shared/lib/formatters";
 import { PageHeader } from "@/shared/ui/PageHeader";
+import { VoiceInputButton } from "@/shared/ui/VoiceInputButton";
 
 function getErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
@@ -36,6 +41,19 @@ function getErrorMessage(error: unknown): string {
   }
 
   return "Произошла неизвестная ошибка.";
+}
+
+function isBatchRequest(message: string): boolean {
+  const hasQuantity =
+    /\d+(?:[.,]\d+)?\s*(?:шт(?:\.|ук(?:а|и)?)?|ед(?:\.|иниц(?:а|ы)?)?|in)(?![а-яa-z0-9])/iu.test(
+      message,
+    );
+  const explicitSegments = message
+    .split(/\r?\n|[;/]/u)
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+
+  return hasQuantity || explicitSegments.length >= 2;
 }
 
 function ProductCard({
@@ -257,16 +275,51 @@ function TechnicalParsedRequestBlock({
 }
 
 export default function CatalogAssistantPage() {
-  const session = useAuthSession();
-  const technical = isTechnicalUser(session);
+  const { hasPermission } = useCurrentUserAccess();
+  const canViewTechnicalDetails = hasPermission("DictionariesManage");
+  const canManageCalculations = hasPermission("PriceCalculationsManage");
 
-  const [message, setMessage] = useState("найди автомат чент 1п 16а");
+  const [message, setMessage] = useState("");
   const [onlyInStock, setOnlyInStock] = useState(false);
   const [minimumScore, setMinimumScore] = useState(70);
   const [pageSize, setPageSize] = useState(20);
+  const [selectedCalculationId, setSelectedCalculationId] = useState("");
+  const [selectedBatchProducts, setSelectedBatchProducts] = useState<
+    Record<number, string>
+  >({});
+
+  const calculationsQuery = useQuery({
+    queryKey: catalogPriceCalculationQueryKeys.list("Draft", 1, 100),
+    queryFn: () =>
+      getMyCatalogPriceCalculations({
+        status: "Draft",
+        page: 1,
+        pageSize: 100,
+      }),
+    enabled: canManageCalculations,
+  });
 
   const assistantMutation = useMutation({
     mutationFn: askCatalogAssistant,
+  });
+
+  const batchMutation = useMutation({
+    mutationFn: previewCatalogAssistantBatch,
+    onSuccess: (preview) => {
+      setSelectedBatchProducts(
+        Object.fromEntries(
+          preview.lines
+            .filter(
+              (line) => line.status === "Matched" && line.products.length === 1,
+            )
+            .map((line) => [line.lineNumber, line.products[0].id]),
+        ),
+      );
+    },
+  });
+
+  const applyBatchMutation = useMutation({
+    mutationFn: applyCatalogPriceCalculationImport,
   });
 
   const suggestionMutation = useMutation({
@@ -292,6 +345,7 @@ export default function CatalogAssistantPage() {
     selectedManufacturer: string | null,
   ) {
     suggestionMutation.reset();
+    batchMutation.reset();
 
     assistantMutation.mutate({
       message: requestMessage,
@@ -306,7 +360,61 @@ export default function CatalogAssistantPage() {
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    if (isBatchRequest(message)) {
+      handleBatchPreview();
+      return;
+    }
+
     submitAssistant(message, null);
+  }
+
+  function handleBatchPreview() {
+    assistantMutation.reset();
+    suggestionMutation.reset();
+    applyBatchMutation.reset();
+
+    batchMutation.mutate({
+      message,
+      onlyInStock,
+      matchesPerLine: 5,
+    });
+  }
+
+  function handleBatchProductSelect(lineNumber: number, productId: string) {
+    applyBatchMutation.reset();
+
+    setSelectedBatchProducts((current) => ({
+      ...current,
+      [lineNumber]: productId,
+    }));
+  }
+
+  function handleApplyBatch() {
+    if (!batchMutation.data || !selectedCalculationId) {
+      return;
+    }
+
+    const rows = batchMutation.data.lines.flatMap((line) => {
+      const productId = selectedBatchProducts[line.lineNumber];
+
+      return productId && line.quantity !== null && line.quantity > 0
+        ? [
+            {
+              productId,
+              quantity: line.quantity,
+            },
+          ]
+        : [];
+    });
+
+    if (rows.length === 0) {
+      return;
+    }
+
+    applyBatchMutation.mutate({
+      calculationId: selectedCalculationId,
+      rows,
+    });
   }
 
   function handleSelectManufacturer(manufacturerName: string) {
@@ -344,17 +452,33 @@ export default function CatalogAssistantPage() {
 
       <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
         <form onSubmit={handleSubmit} className="grid gap-4">
-          <label className="grid gap-2">
-            <span className="text-sm font-medium text-slate-300">
+          <div className="grid gap-2">
+            <label
+              htmlFor="assistant-message"
+              className="text-sm font-medium text-slate-300"
+            >
               Что нужно найти?
-            </span>
+            </label>
 
-            <textarea
-              value={message}
-              onChange={(event) => setMessage(event.target.value)}
-              className="min-h-28 rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-slate-100 outline-none placeholder:text-slate-600 focus:border-teal-400"
-            />
-          </label>
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+              <textarea
+                id="assistant-message"
+                value={message}
+                onChange={(event) => setMessage(event.target.value)}
+                placeholder="Напишите или произнесите запрос"
+                className="min-h-28 rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-slate-100 outline-none placeholder:text-slate-600 focus:border-teal-400"
+              />
+
+              <VoiceInputButton
+                disabled={
+                  assistantMutation.isPending || batchMutation.isPending
+                }
+                onTranscript={(transcript) => {
+                  setMessage(transcript);
+                }}
+              />
+            </div>
+          </div>
 
           <div className="grid gap-4 md:grid-cols-3">
             <label className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
@@ -397,21 +521,50 @@ export default function CatalogAssistantPage() {
             </label>
           </div>
 
-          {assistantMutation.isError && (
+          {(assistantMutation.isError || batchMutation.isError) && (
             <p className="rounded-2xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
-              {getErrorMessage(assistantMutation.error)}
+              {getErrorMessage(assistantMutation.error ?? batchMutation.error)}
             </p>
           )}
 
           <button
             type="submit"
-            disabled={assistantMutation.isPending}
+            disabled={
+              assistantMutation.isPending ||
+              batchMutation.isPending ||
+              message.trim().length === 0
+            }
             className="w-fit rounded-2xl bg-teal-500 px-5 py-3 text-sm font-medium text-white disabled:opacity-60"
           >
-            {assistantMutation.isPending ? "Ищем..." : "Найти"}
+            {assistantMutation.isPending || batchMutation.isPending
+              ? "Ищем..."
+              : "Найти"}
           </button>
         </form>
       </section>
+
+      {batchMutation.data && (
+        <CatalogAssistantBatchPreview
+          preview={batchMutation.data}
+          calculations={calculationsQuery.data?.items ?? []}
+          selectedCalculationId={selectedCalculationId}
+          selectedProducts={selectedBatchProducts}
+          onCalculationChange={(calculationId) => {
+            setSelectedCalculationId(calculationId);
+            applyBatchMutation.reset();
+          }}
+          onProductSelect={handleBatchProductSelect}
+          onApply={handleApplyBatch}
+          isApplying={applyBatchMutation.isPending}
+          isApplied={applyBatchMutation.isSuccess}
+          applyErrorMessage={
+            applyBatchMutation.error
+              ? getErrorMessage(applyBatchMutation.error)
+              : null
+          }
+          canManageCalculations={canManageCalculations}
+        />
+      )}
 
       {response && clarification && (
         <ClarificationBlock
@@ -479,7 +632,7 @@ export default function CatalogAssistantPage() {
           </section>
         )}
 
-      {response && technical && (
+      {response && canViewTechnicalDetails && (
         <TechnicalParsedRequestBlock response={response} />
       )}
     </div>

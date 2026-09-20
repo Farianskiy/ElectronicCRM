@@ -80,6 +80,24 @@ export function CatalogImportRecognitionEnrichmentPanel({
         </p>
       </div>
 
+      {(recognitionEnrichment.preservedManualRowsCount ?? 0) > 0 && (
+        <div
+          role="status"
+          className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/[0.06] p-4"
+        >
+          <p className="font-medium text-amber-100">
+            Сохранено без пересчёта:{" "}
+            {recognitionEnrichment.preservedManualRowsCount} строк.
+          </p>
+          <p className="mt-2 text-sm text-amber-200/80">
+            Эти строки содержат ручные исправления. Их значения и разметка
+            сохранены целиком. Активные правила к ним повторно не применялись.
+            Счётчики проверки и автозаполнения ниже относятся к остальным
+            обработанным строкам.
+          </p>
+        </div>
+      )}
+
       <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <EnrichmentMetric
           label="Проверено строк"

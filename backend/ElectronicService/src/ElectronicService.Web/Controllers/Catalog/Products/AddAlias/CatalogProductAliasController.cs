@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ElectronicService.Web.Controllers.Catalog.Products.AddAlias;
 
-[Authorize(Roles = "Technical")]
+[PermissionAuthorize(UserPermissionCode.ProductsEdit)]
 [ApiController]
 [Route("api/catalog/products/{id:guid}/aliases")]
 public sealed class CatalogProductAliasController : ControllerBase

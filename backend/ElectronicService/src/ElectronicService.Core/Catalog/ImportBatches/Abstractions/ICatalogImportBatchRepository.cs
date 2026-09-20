@@ -32,7 +32,7 @@ public interface ICatalogImportBatchRepository
 
     Task<int> CountReviewQueueAsync(CatalogImportBatchStatus? status, CancellationToken cancellationToken = default);
 
-    Task ReplaceAnalysisAsync(CatalogImportBatch batch, IReadOnlyCollection<CatalogImportColumn> columns, IReadOnlyCollection<CatalogImportRow> rows, CancellationToken cancellationToken = default);
+    Task<bool> ReplaceAnalysisAsync(CatalogImportBatch batch, IReadOnlyCollection<CatalogImportColumn> columns, IReadOnlyCollection<CatalogImportRow> rows, CancellationToken cancellationToken = default);
 
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 

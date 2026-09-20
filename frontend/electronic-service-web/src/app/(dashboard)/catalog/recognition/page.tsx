@@ -3,7 +3,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type { FormEvent } from "react";
 import { useState } from "react";
-import { RequireTechnicalUser } from "@/features/auth/ui/RequireTechnicalUser";
+import { RequirePermission } from "@/features/auth/ui/RequirePermission";
 import { getCatalogProductTypes } from "@/features/catalogMetadata/api/getCatalogProductTypes";
 import { previewCatalogProductNameRecognition } from "@/features/catalogRecognition/api/previewCatalogProductNameRecognition";
 import type {
@@ -48,9 +48,9 @@ const recognitionExamples: RecognitionExample[] = [
 
 export default function CatalogRecognitionPage() {
   return (
-    <RequireTechnicalUser>
+    <RequirePermission permission="DictionariesManage">
       <CatalogRecognitionContent />
-    </RequireTechnicalUser>
+    </RequirePermission>
   );
 }
 

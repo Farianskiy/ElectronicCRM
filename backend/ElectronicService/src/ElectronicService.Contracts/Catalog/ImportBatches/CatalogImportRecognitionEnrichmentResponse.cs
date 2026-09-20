@@ -11,7 +11,10 @@ public sealed record CatalogImportRecognitionEnrichmentResponse(
     int BlockedByInvalidRecognizedValueCount,
     int FailedRecognitionRowsCount,
     bool AppliedValuesDetailsTruncated,
-    IReadOnlyCollection<CatalogImportRecognitionAppliedValueResponse> AppliedValues);
+    IReadOnlyCollection<CatalogImportRecognitionAppliedValueResponse> AppliedValues)
+{
+    public int PreservedManualRowsCount { get; init; }
+}
 
 public sealed record CatalogImportRecognitionAppliedValueResponse(
     int RowNumber,

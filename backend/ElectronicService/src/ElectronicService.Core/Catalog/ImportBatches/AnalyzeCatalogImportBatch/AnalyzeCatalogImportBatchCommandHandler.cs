@@ -181,6 +181,30 @@ public sealed class AnalyzeCatalogImportBatchCommandHandler
                             batch.Status));
         }
 
+        var preservedResult = await LoadPreservedRowsAsync(
+            batch.Id,
+            cancellationToken)
+            .ConfigureAwait(false);
+
+        if (preservedResult.IsFailure)
+        {
+            return Result.Failure<
+                AnalyzeCatalogImportBatchResult,
+                DomainError>(preservedResult.Error);
+        }
+
+        var preservedRows = preservedResult.Value;
+
+        if (preservedRows.Count > 0 &&
+            command.ProductTypeId.HasValue &&
+            command.ProductTypeId != batch.ProductTypeId)
+        {
+            return new DomainError(
+                "catalog_import.reanalysis_scope_changed",
+                "Нельзя одновременно менять общий тип товара и повторно "
+                + "анализировать пакет с ручными исправлениями.");
+        }
+
         ProductType? productType = null;
 
         var effectiveProductTypeId =
@@ -288,6 +312,34 @@ public sealed class AnalyzeCatalogImportBatchCommandHandler
 
         var analysis = analysisResult.Value;
 
+        if (preservedRows.Count > 0)
+        {
+            if (analysis.MappingRequired)
+            {
+                return new DomainError(
+                    "catalog_import.reanalysis_mapping_required",
+                    "Повторный анализ требует настройки колонок. "
+                    + "Пакет с ручными исправлениями не изменён.");
+            }
+
+            var preparedRows = CatalogImportReanalysisRows.Prepare(analysis.Rows, preservedRows);
+            if (preparedRows.IsFailure)
+            {
+                return preparedRows.Error;
+            }
+
+            var rowsToAnalyze = preparedRows.Value;
+
+            analysis = analysis with
+            {
+                Rows = rowsToAnalyze,
+                ValidRowsCount = rowsToAnalyze.Count(
+                    row => row.Status == CatalogImportRowStatus.Valid),
+                ErrorRowsCount = rowsToAnalyze.Count(
+                    row => row.Status == CatalogImportRowStatus.Error)
+            };
+        }
+
         var productTypeAssignmentResult =
             await _productTypeAssignmentService
                 .AssignAsync(
@@ -320,11 +372,18 @@ public sealed class AnalyzeCatalogImportBatchCommandHandler
                     cancellationToken)
                 .ConfigureAwait(false);
 
+        if (!analysis.MappingRequired)
+        {
+            await _recognitionEnrichmentService
+                .PrepareRunAsync(cancellationToken)
+                .ConfigureAwait(false);
+        }
+
         CatalogImportRecognitionShadowResult? recognitionShadow = null;
         var recognitionEnrichment = CatalogImportRecognitionEnrichmentSummary.Empty;
         var effectiveAnalysis = analysis;
 
-        if (productType is not null && definitions.Count > 0)
+        if (productType is not null && definitions.Count > 0 && preservedRows.Count == 0)
         {
             recognitionShadow = await _recognitionShadowService
                 .AnalyzeAsync(
@@ -351,7 +410,7 @@ public sealed class AnalyzeCatalogImportBatchCommandHandler
             effectiveAnalysis = enrichmentResult.Value.Analysis;
             recognitionEnrichment = enrichmentResult.Value.Summary;
         }
-        else if (productType is null && !analysis.MappingRequired)
+        else if (!analysis.MappingRequired)
         {
             var enrichmentResult = await EnrichRowsByProductTypeAsync(
                     analysis,
@@ -376,6 +435,11 @@ public sealed class AnalyzeCatalogImportBatchCommandHandler
                 recognitionShadow,
                 cancellationToken);
 
+        recognitionEnrichment = recognitionEnrichment with
+        {
+            PreservedManualRowsCount = preservedRows.Count
+        };
+
         var registerResult = batch.RegisterAnalysisResult(
                 effectiveAnalysis.Rows.Count,
                 effectiveAnalysis.ValidRowsCount,
@@ -391,7 +455,10 @@ public sealed class AnalyzeCatalogImportBatchCommandHandler
         }
 
         var pendingFeedbackRemovalResult = await _recognitionFeedbackCollector
-            .RemovePendingForBatchAsync(batch.Id, cancellationToken)
+            .RemovePendingForBatchAsync(
+                batch.Id,
+                preservedRows.Select(row => row.Id).ToArray(),
+                cancellationToken)
             .ConfigureAwait(false);
 
         if (pendingFeedbackRemovalResult.IsFailure)
@@ -402,13 +469,21 @@ public sealed class AnalyzeCatalogImportBatchCommandHandler
                     pendingFeedbackRemovalResult.Error);
         }
 
-        await _importBatchRepository
+        var saved = await _importBatchRepository
             .ReplaceAnalysisAsync(
                 batch,
                 effectiveAnalysis.Columns,
                 effectiveAnalysis.Rows,
                 cancellationToken)
             .ConfigureAwait(false);
+
+        if (!saved)
+        {
+            return Result.Failure<
+                AnalyzeCatalogImportBatchResult,
+                DomainError>(
+                CatalogImportErrors.BatchConcurrencyConflict());
+        }
 
         return Result.Success<AnalyzeCatalogImportBatchResult, DomainError>(
             new AnalyzeCatalogImportBatchResult(
@@ -562,5 +637,85 @@ public sealed class AnalyzeCatalogImportBatchCommandHandler
             summaries.Any(summary => summary.AppliedValuesDetailsTruncated)
                 || totalAppliedValueDetails > appliedValues.Length,
             appliedValues);
+    }
+
+    private async Task<Result<
+    IReadOnlyCollection<CatalogImportRow>,
+    DomainError>> LoadPreservedRowsAsync(
+        Guid batchId,
+        CancellationToken cancellationToken)
+    {
+        const int pageSize = 250;
+        var skip = 0;
+        var preserved = new List<CatalogImportRow>();
+
+        while (true)
+        {
+            var rows = await _importBatchRepository.GetRowsAsync(
+                batchId,
+                status: null,
+                search: null,
+                issueCode: null,
+                problemKind: null,
+                manufacturerGroupKey: null,
+                skip: skip,
+                take: pageSize,
+                cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+
+            foreach (var row in rows)
+            {
+                CatalogImportNormalizedRowData? data;
+
+                try
+                {
+                    data = JsonSerializer.Deserialize<
+                        CatalogImportNormalizedRowData>(
+                        row.NormalizedDataJson,
+                        JsonOptions);
+                }
+                catch (JsonException)
+                {
+                    return CatalogImportErrors.InvalidNormalizedRow(
+                        row.RowNumber);
+                }
+
+                if (data is null)
+                {
+                    return CatalogImportErrors.InvalidNormalizedRow(
+                        row.RowNumber);
+                }
+
+                var hasManualScope =
+                    string.Equals(
+                        data.ProductTypeResolutionSource,
+                        "Manual",
+                        StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(
+                        data.ManufacturerResolutionSource,
+                        "Manual",
+                        StringComparison.OrdinalIgnoreCase);
+
+                var hasManualCharacteristics =
+                    data.CharacteristicOrigins?.Values.Any(
+                        origin => origin.Source
+                            == CatalogImportCharacteristicValueSource.Manual)
+                    ?? false;
+
+                if (hasManualScope || hasManualCharacteristics)
+                {
+                    preserved.Add(row);
+                }
+            }
+
+            if (rows.Count < pageSize)
+            {
+                return Result.Success<
+                    IReadOnlyCollection<CatalogImportRow>,
+                    DomainError>(preserved);
+            }
+
+            skip += rows.Count;
+        }
     }
 }

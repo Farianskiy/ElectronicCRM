@@ -8,6 +8,7 @@ namespace ElectronicService.Web.Controllers.Catalog.Products.SearchReplacements;
 
 [ApiController]
 [Route("api/catalog/products/replacements/search")]
+[PermissionAuthorize(UserPermissionCode.ProductsView)]
 public sealed class CatalogProductReplacementSearchController : ControllerBase
 {
     private readonly SearchProductReplacementsQueryHandler _handler;

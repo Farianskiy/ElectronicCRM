@@ -1,0 +1,35 @@
+"use client";
+
+import Link from "next/link";
+import type { ReactNode } from "react";
+import { isAdministrator } from "@/shared/api/authToken";
+import { useAuthSession } from "../model/useAuthSession";
+
+interface RequireAdministratorProps {
+  children: ReactNode;
+}
+
+export function RequireAdministrator({ children }: RequireAdministratorProps) {
+  const session = useAuthSession();
+
+  if (!isAdministrator(session)) {
+    return (
+      <section className="rounded-3xl border border-amber-500/30 bg-amber-500/10 p-6 text-amber-100">
+        <h2 className="text-xl font-semibold">Недостаточно прав</h2>
+
+        <p className="mt-2 text-sm text-amber-200">
+          Управлять учётными записями может только администратор.
+        </p>
+
+        <Link
+          href="/"
+          className="mt-4 inline-flex rounded-xl bg-amber-500 px-4 py-2 text-sm font-medium text-slate-950"
+        >
+          На главную
+        </Link>
+      </section>
+    );
+  }
+
+  return children;
+}

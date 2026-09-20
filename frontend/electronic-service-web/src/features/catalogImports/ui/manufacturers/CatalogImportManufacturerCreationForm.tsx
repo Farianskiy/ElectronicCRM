@@ -2,11 +2,10 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
-import { useAuthSession } from "@/features/auth/model/useAuthSession";
 import { createManufacturerFromUnresolvedPhrase } from "@/features/catalogManufacturers/api/createManufacturerFromUnresolvedPhrase";
 import type { CreateManufacturerFromUnresolvedPhraseResponse } from "@/features/catalogManufacturers/model/types";
 import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
-import { isTechnicalUser } from "@/shared/api/authToken";
+import { useCurrentUserAccess } from "@/features/auth/model/CurrentUserAccessContext";
 import { analyzeCatalogImportBatch } from "../../api/analyzeCatalogImportBatch";
 import { catalogImportQueryKeys } from "../../model/queryKeys";
 import type {
@@ -28,8 +27,8 @@ export function CatalogImportManufacturerCreationForm({
   onAnalysisChange,
 }: CatalogImportManufacturerCreationFormProps) {
   const queryClient = useQueryClient();
-  const session = useAuthSession();
-  const canManageManufacturers = isTechnicalUser(session);
+  const { hasPermission } = useCurrentUserAccess();
+  const canManageManufacturers = hasPermission("DictionariesManage");
 
   const [canonicalName, setCanonicalName] = useState(group.sourceValue);
   const [changeConfirmed, setChangeConfirmed] = useState(false);

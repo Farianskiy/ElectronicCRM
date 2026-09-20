@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ElectronicService.Web.Controllers.Catalog.Products.SetCharacteristic;
 
-[Authorize(Roles = "Technical")]
+[PermissionAuthorize(UserPermissionCode.ProductsEdit)]
 [ApiController]
 [Route("api/catalog/products/{id:guid}/characteristics")]
 public sealed class CatalogProductCharacteristicController : ControllerBase

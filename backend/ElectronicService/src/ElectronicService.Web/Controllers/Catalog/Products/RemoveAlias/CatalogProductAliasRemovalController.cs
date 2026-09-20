@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ElectronicService.Web.Controllers.Catalog.Products.RemoveAlias;
 
-[Authorize(Roles = "Technical")]
+[PermissionAuthorize(UserPermissionCode.ProductsEdit)]
 [ApiController]
 [Route("api/catalog/products/{id:guid}/aliases/{aliasId:guid}")]
 public sealed class CatalogProductAliasRemovalController

@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ElectronicService.Web.Controllers.Catalog.Manufacturers.MarkPhraseAsNoise;
 
-[Authorize(Roles = "Technical")]
+[PermissionAuthorize(UserPermissionCode.DictionariesManage)]
 [ApiController]
 [Route("api/catalog/manufacturer-noise-phrases")]
 public sealed class MarkManufacturerPhraseAsNoiseController : ControllerBase

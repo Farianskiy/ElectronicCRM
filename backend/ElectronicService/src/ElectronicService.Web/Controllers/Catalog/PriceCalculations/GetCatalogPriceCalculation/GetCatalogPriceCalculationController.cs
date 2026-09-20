@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ElectronicService.Web.Controllers.Catalog.PriceCalculations.GetCatalogPriceCalculation;
 
 [ApiController]
-[Authorize]
+[PermissionAuthorize(UserPermissionCode.PriceCalculationsManage)]
 [Route("api/catalog/price-calculations")]
 public sealed class GetCatalogPriceCalculationController
     : ControllerBase
@@ -84,6 +84,8 @@ public sealed class GetCatalogPriceCalculationController
                             line.Name,
                             line.Unit,
                             line.Quantity,
+                            line.StockQuantity,
+                            line.ShortageQuantity,
                             line.BasePriceAmount,
                             line.MrcPriceAmount,
                             line.DiscountPercent,
@@ -112,6 +114,12 @@ public sealed class GetCatalogPriceCalculationController
                 value.CreatedByUserId,
                 value.Title,
                 value.Currency,
+                value.CustomerName,
+                value.ObjectName,
+                value.ProjectNumber,
+                value.ResponsibleName,
+                value.Comment,
+                value.ValidUntil,
                 value.Status.ToString(),
                 value.TotalAmount,
                 value.CreatedAtUtc,

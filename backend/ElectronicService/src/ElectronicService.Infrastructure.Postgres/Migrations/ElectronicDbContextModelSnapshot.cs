@@ -983,6 +983,11 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("archived_at_utc");
 
+                    b.Property<string>("Comment")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("comment");
+
                     b.Property<DateTime?>("CompletedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("completed_at_utc");
@@ -1001,6 +1006,26 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         .HasColumnType("character(3)")
                         .HasColumnName("currency")
                         .IsFixedLength();
+
+                    b.Property<string>("CustomerName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("customer_name");
+
+                    b.Property<string>("ObjectName")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("object_name");
+
+                    b.Property<string>("ProjectNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("project_number");
+
+                    b.Property<string>("ResponsibleName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("responsible_name");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -1022,6 +1047,10 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                     b.Property<DateTime?>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at_utc");
+
+                    b.Property<DateOnly?>("ValidUntil")
+                        .HasColumnType("date")
+                        .HasColumnName("valid_until");
 
                     b.Property<uint>("Version")
                         .IsConcurrencyToken()
@@ -1968,6 +1997,19 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("characteristic_definition_id");
 
+                    b.Property<string>("ConfirmedRawValue")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("confirmed_raw_value");
+
+                    b.Property<int?>("ConfirmedSpanLength")
+                        .HasColumnType("integer")
+                        .HasColumnName("confirmed_span_length");
+
+                    b.Property<int?>("ConfirmedSpanStart")
+                        .HasColumnType("integer")
+                        .HasColumnName("confirmed_span_start");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
@@ -2134,6 +2176,8 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
 
                             t.HasCheckConstraint("ck_catalog_recognition_feedback_confidence_evidence", "\"suggested_confidence\" IS NULL OR \"suggested_normalized_value\" IS NOT NULL");
 
+                            t.HasCheckConstraint("ck_catalog_recognition_feedback_confirmed_span", "(\"confirmed_raw_value\" IS NULL AND \"confirmed_span_start\" IS NULL AND \"confirmed_span_length\" IS NULL) OR (\"confirmed_raw_value\" IS NOT NULL AND char_length(btrim(\"confirmed_raw_value\")) > 0 AND \"confirmed_span_start\" IS NOT NULL AND \"confirmed_span_start\" >= 0 AND \"confirmed_span_length\" IS NOT NULL AND \"confirmed_span_length\" > 0 AND \"final_normalized_value\" IS NOT NULL AND \"feedback_type\" IN ('Accepted', 'Corrected', 'AddedManually', 'ConflictResolved'))");
+
                             t.HasCheckConstraint("ck_catalog_recognition_feedback_corrected_value", "\"feedback_type\" <> 'Corrected' OR (\"suggested_normalized_value\" IS NOT NULL AND \"final_normalized_value\" <> \"suggested_normalized_value\")");
 
                             t.HasCheckConstraint("ck_catalog_recognition_feedback_final_value", "(\"feedback_type\" IN ('None', 'Rejected') AND \"final_normalized_value\" IS NULL) OR (\"feedback_type\" IN ('Accepted', 'Corrected', 'AddedManually', 'ConflictResolved') AND \"final_normalized_value\" IS NOT NULL AND char_length(btrim(\"final_normalized_value\")) > 0)");
@@ -2165,6 +2209,661 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                             t.HasCheckConstraint("ck_catalog_recognition_feedback_training_quality", "\"is_training_eligible\" = FALSE OR (\"status\" = 'Finalized' AND \"label_quality\" IN ('Medium', 'Strong'))");
 
                             t.HasCheckConstraint("ck_catalog_recognition_feedback_type", "\"feedback_type\" IN ('None', 'Accepted', 'Corrected', 'Rejected', 'AddedManually', 'ConflictResolved')");
+                        });
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionIntegerDraft", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CharacteristicDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("characteristic_definition_id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<int>("DistinctValueCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("distinct_value_count");
+
+                    b.Property<string>("GeneratorVersion")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("generator_version");
+
+                    b.Property<Guid>("ManufacturerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("manufacturer_id");
+
+                    b.Property<int>("MatchedNameCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("matched_name_count");
+
+                    b.Property<string>("Prefix")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("prefix");
+
+                    b.Property<Guid>("ProductTypeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_type_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ManufacturerId", "ProductTypeId", "CharacteristicDefinitionId", "CreatedAtUtc")
+                        .HasDatabaseName("ix_integer_draft_scope");
+
+                    b.ToTable("catalog_recognition_integer_drafts", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_integer_draft_distinct_values", "\"distinct_value_count\" >= 2 AND \"distinct_value_count\" <= \"matched_name_count\"");
+
+                            t.HasCheckConstraint("ck_integer_draft_generator", "char_length(btrim(\"generator_version\")) > 0");
+
+                            t.HasCheckConstraint("ck_integer_draft_matched_names", "\"matched_name_count\" >= 2");
+                        });
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionIntegerDraftEvidence", b =>
+                {
+                    b.Property<Guid>("DraftId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("draft_id");
+
+                    b.Property<Guid>("TrainingExampleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("training_example_id");
+
+                    b.Property<bool>("IsSupporting")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_supporting");
+
+                    b.HasKey("DraftId", "TrainingExampleId");
+
+                    b.HasIndex("TrainingExampleId")
+                        .HasDatabaseName("ix_integer_draft_evidence_example");
+
+                    b.ToTable("catalog_recognition_integer_draft_evidence", (string)null);
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionIntegerDraftSuffix", b =>
+                {
+                    b.Property<Guid>("DraftId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("draft_id");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("text");
+
+                    b.HasKey("DraftId", "Position");
+
+                    b.ToTable("catalog_recognition_integer_draft_suffixes", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_integer_draft_suffix_position", "\"position\" >= 0 AND \"position\" < 16");
+                        });
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionLiteralDraft", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CharacteristicDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("characteristic_definition_id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<string>("GeneratorVersion")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("generator_version");
+
+                    b.Property<string>("Literal")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("literal");
+
+                    b.Property<Guid>("ManufacturerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("manufacturer_id");
+
+                    b.Property<int>("MatchedNameCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("matched_name_count");
+
+                    b.Property<string>("NormalizedValue")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("normalized_value");
+
+                    b.Property<Guid>("ProductTypeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_type_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ManufacturerId", "ProductTypeId", "CharacteristicDefinitionId", "CreatedAtUtc")
+                        .HasDatabaseName("ix_literal_draft_scope");
+
+                    b.ToTable("catalog_recognition_literal_drafts", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_literal_draft_generator", "char_length(btrim(\"generator_version\")) > 0");
+
+                            t.HasCheckConstraint("ck_literal_draft_literal", "char_length(btrim(\"literal\")) > 0");
+
+                            t.HasCheckConstraint("ck_literal_draft_matched_names", "\"matched_name_count\" > 0");
+
+                            t.HasCheckConstraint("ck_literal_draft_value", "char_length(btrim(\"normalized_value\")) > 0");
+                        });
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionLiteralDraftEvidence", b =>
+                {
+                    b.Property<Guid>("DraftId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("draft_id");
+
+                    b.Property<Guid>("TrainingExampleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("training_example_id");
+
+                    b.Property<bool>("IsSupporting")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_supporting");
+
+                    b.HasKey("DraftId", "TrainingExampleId");
+
+                    b.HasIndex("TrainingExampleId")
+                        .HasDatabaseName("ix_literal_draft_evidence_example");
+
+                    b.ToTable("catalog_recognition_literal_draft_evidence", (string)null);
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionMultiIntegerDraft", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<string>("GeneratorVersion")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("generator_version");
+
+                    b.Property<Guid>("ManufacturerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("manufacturer_id");
+
+                    b.Property<int>("MatchedNameCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("matched_name_count");
+
+                    b.Property<Guid>("ProductTypeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_type_id");
+
+                    b.Property<int>("SupportingNameCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("supporting_name_count");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ManufacturerId", "ProductTypeId", "CreatedAtUtc")
+                        .HasDatabaseName("ix_multi_integer_draft_scope");
+
+                    b.ToTable("catalog_recognition_multi_integer_drafts", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_multi_integer_draft_counts", "\"supporting_name_count\" >= 2 AND \"matched_name_count\" = \"supporting_name_count\" AND \"matched_name_count\" <= 200");
+
+                            t.HasCheckConstraint("ck_multi_integer_draft_generator", "char_length(btrim(\"generator_version\")) > 0");
+                        });
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionMultiIntegerDraftEvidence", b =>
+                {
+                    b.Property<Guid>("DraftId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("draft_id");
+
+                    b.Property<Guid>("TrainingExampleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("training_example_id");
+
+                    b.Property<bool>("IsSupporting")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_supporting");
+
+                    b.HasKey("DraftId", "TrainingExampleId");
+
+                    b.HasIndex("TrainingExampleId")
+                        .HasDatabaseName("ix_multi_integer_evidence_example");
+
+                    b.ToTable("catalog_recognition_multi_integer_draft_evidence", (string)null);
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionMultiIntegerDraftPart", b =>
+                {
+                    b.Property<Guid>("DraftId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("draft_id");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<Guid?>("CharacteristicDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("characteristic_definition_id");
+
+                    b.Property<int>("DistinctValueCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("distinct_value_count");
+
+                    b.Property<string>("Literal")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("literal");
+
+                    b.HasKey("DraftId", "Position");
+
+                    b.HasIndex("CharacteristicDefinitionId")
+                        .HasDatabaseName("ix_multi_integer_part_characteristic");
+
+                    b.HasIndex("DraftId", "CharacteristicDefinitionId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_multi_integer_part_characteristic")
+                        .HasFilter("\"characteristic_definition_id\" IS NOT NULL");
+
+                    b.ToTable("catalog_recognition_multi_integer_draft_parts", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_multi_integer_part_kind", "(\"characteristic_definition_id\" IS NULL AND \"literal\" IS NOT NULL AND char_length(\"literal\") > 0 AND \"distinct_value_count\" = 0) OR (\"characteristic_definition_id\" IS NOT NULL AND \"characteristic_definition_id\" <> '00000000-0000-0000-0000-000000000000'::uuid AND \"literal\" IS NULL AND \"distinct_value_count\" >= 2 AND \"distinct_value_count\" <= 200)");
+
+                            t.HasCheckConstraint("ck_multi_integer_part_position", "\"position\" >= 0 AND \"position\" < 256");
+                        });
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionRuleSetEntry", b =>
+                {
+                    b.Property<Guid>("VersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("version_id");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<Guid?>("IntegerDraftId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("integer_draft_id");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid?>("LiteralDraftId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("literal_draft_id");
+
+                    b.Property<Guid?>("MultiIntegerDraftId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("multi_integer_draft_id");
+
+                    b.HasKey("VersionId", "Position");
+
+                    b.HasIndex("IntegerDraftId")
+                        .HasDatabaseName("ix_rule_set_entry_integer");
+
+                    b.HasIndex("LiteralDraftId")
+                        .HasDatabaseName("ix_rule_set_entry_literal");
+
+                    b.HasIndex("MultiIntegerDraftId")
+                        .HasDatabaseName("ix_rule_set_entry_multi_integer");
+
+                    b.HasIndex("VersionId", "IntegerDraftId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_rule_set_entry_integer")
+                        .HasFilter("\"integer_draft_id\" IS NOT NULL");
+
+                    b.HasIndex("VersionId", "LiteralDraftId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_rule_set_entry_literal")
+                        .HasFilter("\"literal_draft_id\" IS NOT NULL");
+
+                    b.HasIndex("VersionId", "MultiIntegerDraftId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_rule_set_entry_multi_integer")
+                        .HasFilter("\"multi_integer_draft_id\" IS NOT NULL");
+
+                    b.ToTable("catalog_recognition_rule_set_entries", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_rule_set_entry_kind", "(\r\n    \"kind\" = 1\r\n    AND \"literal_draft_id\" IS NOT NULL\r\n    AND \"integer_draft_id\" IS NULL\r\n    AND \"multi_integer_draft_id\" IS NULL\r\n)\r\nOR\r\n(\r\n    \"kind\" = 2\r\n    AND \"literal_draft_id\" IS NULL\r\n    AND \"integer_draft_id\" IS NOT NULL\r\n    AND \"multi_integer_draft_id\" IS NULL\r\n)\r\nOR\r\n(\r\n    \"kind\" = 3\r\n    AND \"literal_draft_id\" IS NULL\r\n    AND \"integer_draft_id\" IS NULL\r\n    AND \"multi_integer_draft_id\" IS NOT NULL\r\n)");
+
+                            t.HasCheckConstraint("ck_rule_set_entry_position", "\"position\" >= 0 AND \"position\" < 100");
+                        });
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionRuleSetReport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BatchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("batch_id");
+
+                    b.Property<long>("BatchVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("batch_version");
+
+                    b.Property<DateTime>("CompletedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at_utc");
+
+                    b.Property<int>("ConflictRowsCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("conflict_rows_count");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<string>("EvaluatorVersion")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("evaluator_version");
+
+                    b.Property<int>("NoMatchRowsCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("no_match_rows_count");
+
+                    b.Property<int>("OutsideScopeRowsCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("outside_scope_rows_count");
+
+                    b.Property<int>("ProposedRowsCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("proposed_rows_count");
+
+                    b.Property<Guid>("RuleSetVersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("rule_set_version_id");
+
+                    b.Property<int>("SnapshotFormatVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("snapshot_format_version");
+
+                    b.Property<string>("SnapshotJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("snapshot_json");
+
+                    b.Property<DateTime>("StartedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at_utc");
+
+                    b.Property<int>("TotalRowsCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_rows_count");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RuleSetVersionId", "BatchId", "CompletedAtUtc")
+                        .HasDatabaseName("ix_rule_set_report_version_batch_time");
+
+                    b.ToTable("catalog_recognition_rule_set_reports", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_rule_set_report_batch_version", "\"batch_version\" BETWEEN 0 AND 4294967295");
+
+                            t.HasCheckConstraint("ck_rule_set_report_counts", "\"total_rows_count\" > 0\r\nAND \"proposed_rows_count\" >= 0\r\nAND \"conflict_rows_count\" >= 0\r\nAND \"no_match_rows_count\" >= 0\r\nAND \"outside_scope_rows_count\" >= 0\r\nAND \"total_rows_count\"::bigint =\r\n    \"proposed_rows_count\"::bigint +\r\n    \"conflict_rows_count\"::bigint +\r\n    \"no_match_rows_count\"::bigint +\r\n    \"outside_scope_rows_count\"::bigint");
+
+                            t.HasCheckConstraint("ck_rule_set_report_format", "\"snapshot_format_version\" > 0");
+
+                            t.HasCheckConstraint("ck_rule_set_report_snapshot", "jsonb_typeof(\"snapshot_json\") = 'array'");
+
+                            t.HasCheckConstraint("ck_rule_set_report_time", "\"completed_at_utc\" >= \"started_at_utc\"");
+                        });
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionRuleSetSwitch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<Guid>("ManufacturerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("manufacturer_id");
+
+                    b.Property<Guid?>("NewVersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("new_version_id");
+
+                    b.Property<Guid?>("PreviousVersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("previous_version_id");
+
+                    b.Property<Guid>("ProductTypeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_type_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("reason");
+
+                    b.Property<Guid?>("ReportId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("report_id");
+
+                    b.Property<long>("SequenceNumber")
+                        .HasColumnType("bigint")
+                        .HasColumnName("sequence_number");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NewVersionId");
+
+                    b.HasIndex("PreviousVersionId");
+
+                    b.HasIndex("ReportId");
+
+                    b.HasIndex("ManufacturerId", "ProductTypeId", "SequenceNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ux_rule_set_switch_scope_sequence");
+
+                    b.ToTable("catalog_recognition_rule_set_switches", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_rule_set_switch_change", "\"previous_version_id\" IS DISTINCT FROM \"new_version_id\"");
+
+                            t.HasCheckConstraint("ck_rule_set_switch_first", "\"sequence_number\" <> 1 OR \"previous_version_id\" IS NULL");
+
+                            t.HasCheckConstraint("ck_rule_set_switch_reason", "char_length(btrim(\"reason\")) > 0");
+
+                            t.HasCheckConstraint("ck_rule_set_switch_report", "(\"new_version_id\" IS NULL AND \"report_id\" IS NULL)\r\nOR\r\n(\"new_version_id\" IS NOT NULL AND \"report_id\" IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_rule_set_switch_sequence", "\"sequence_number\" > 0");
+                        });
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionRuleSetVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<Guid>("ManufacturerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("manufacturer_id");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("ProductTypeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_type_id");
+
+                    b.Property<int>("VersionNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("version_number");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ManufacturerId", "ProductTypeId", "VersionNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ux_rule_set_version_scope_number");
+
+                    b.ToTable("catalog_recognition_rule_set_versions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_rule_set_version_name", "char_length(btrim(\"name\")) > 0");
+
+                            t.HasCheckConstraint("ck_rule_set_version_number", "\"version_number\" > 0");
+                        });
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionTrainingExample", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CharacteristicDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("characteristic_definition_id");
+
+                    b.Property<DateTime>("ConfirmedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("confirmed_at_utc");
+
+                    b.Property<Guid>("ConfirmedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("confirmed_by_user_id");
+
+                    b.Property<Guid>("ManufacturerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("manufacturer_id");
+
+                    b.Property<string>("NormalizedValue")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("normalized_value");
+
+                    b.Property<string>("ProductName")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("product_name");
+
+                    b.Property<Guid>("ProductTypeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_type_id");
+
+                    b.Property<string>("RawValue")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("raw_value");
+
+                    b.Property<DateTime?>("RevokedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at_utc");
+
+                    b.Property<Guid?>("RevokedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("revoked_by_user_id");
+
+                    b.Property<Guid>("SourceFeedbackId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_feedback_id");
+
+                    b.Property<int>("SpanLength")
+                        .HasColumnType("integer")
+                        .HasColumnName("span_length");
+
+                    b.Property<int>("SpanStart")
+                        .HasColumnType("integer")
+                        .HasColumnName("span_start");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SourceFeedbackId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_recognition_training_example_active_source")
+                        .HasFilter("\"revoked_at_utc\" IS NULL");
+
+                    b.HasIndex("ManufacturerId", "ProductTypeId", "CharacteristicDefinitionId", "ConfirmedAtUtc")
+                        .HasDatabaseName("ix_recognition_training_example_scope")
+                        .HasFilter("\"revoked_at_utc\" IS NULL");
+
+                    b.ToTable("catalog_recognition_training_examples", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_recognition_training_example_name", "char_length(btrim(\"product_name\")) > 0");
+
+                            t.HasCheckConstraint("ck_recognition_training_example_raw", "char_length(btrim(\"raw_value\")) > 0");
+
+                            t.HasCheckConstraint("ck_recognition_training_example_revocation", "(\"revoked_at_utc\" IS NULL AND \"revoked_by_user_id\" IS NULL) OR (\"revoked_at_utc\" IS NOT NULL AND \"revoked_by_user_id\" IS NOT NULL AND \"revoked_at_utc\" >= \"confirmed_at_utc\")");
+
+                            t.HasCheckConstraint("ck_recognition_training_example_span", "\"span_start\" >= 0 AND \"span_length\" > 0");
+
+                            t.HasCheckConstraint("ck_recognition_training_example_value", "char_length(btrim(\"normalized_value\")) > 0");
                         });
                 });
 
@@ -2221,6 +2920,26 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
 
                             t.HasCheckConstraint("ck_users_type_not_none", "\"type\" <> 'None'");
                         });
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Users.UserPermissionOverride", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("PermissionCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("permission_code");
+
+                    b.Property<bool>("IsAllowed")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_allowed");
+
+                    b.HasKey("UserId", "PermissionCode");
+
+                    b.ToTable("user_permission_overrides", (string)null);
                 });
 
             modelBuilder.Entity("ElectronicService.Domain.Catalog.Dictionaries.CatalogAssistantDictionarySuggestion", b =>
@@ -2782,6 +3501,134 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
                 });
 
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionIntegerDraftEvidence", b =>
+                {
+                    b.HasOne("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionIntegerDraft", null)
+                        .WithMany("Evidence")
+                        .HasForeignKey("DraftId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionTrainingExample", null)
+                        .WithMany()
+                        .HasForeignKey("TrainingExampleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_catalog_recognition_integer_draft_evidence_catalog_recogni~1");
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionIntegerDraftSuffix", b =>
+                {
+                    b.HasOne("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionIntegerDraft", null)
+                        .WithMany("Suffixes")
+                        .HasForeignKey("DraftId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionLiteralDraftEvidence", b =>
+                {
+                    b.HasOne("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionLiteralDraft", null)
+                        .WithMany("Evidence")
+                        .HasForeignKey("DraftId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionTrainingExample", null)
+                        .WithMany()
+                        .HasForeignKey("TrainingExampleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_catalog_recognition_literal_draft_evidence_catalog_recogni~1");
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionMultiIntegerDraftEvidence", b =>
+                {
+                    b.HasOne("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionMultiIntegerDraft", null)
+                        .WithMany("Evidence")
+                        .HasForeignKey("DraftId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionTrainingExample", null)
+                        .WithMany()
+                        .HasForeignKey("TrainingExampleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_catalog_recognition_multi_integer_draft_evidence_catalog_r~1");
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionMultiIntegerDraftPart", b =>
+                {
+                    b.HasOne("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionMultiIntegerDraft", null)
+                        .WithMany("Parts")
+                        .HasForeignKey("DraftId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionRuleSetEntry", b =>
+                {
+                    b.HasOne("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionIntegerDraft", null)
+                        .WithMany()
+                        .HasForeignKey("IntegerDraftId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionLiteralDraft", null)
+                        .WithMany()
+                        .HasForeignKey("LiteralDraftId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionMultiIntegerDraft", null)
+                        .WithMany()
+                        .HasForeignKey("MultiIntegerDraftId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionRuleSetVersion", null)
+                        .WithMany("Entries")
+                        .HasForeignKey("VersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionRuleSetReport", b =>
+                {
+                    b.HasOne("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionRuleSetVersion", null)
+                        .WithMany()
+                        .HasForeignKey("RuleSetVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionRuleSetSwitch", b =>
+                {
+                    b.HasOne("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionRuleSetVersion", null)
+                        .WithMany()
+                        .HasForeignKey("NewVersionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionRuleSetVersion", null)
+                        .WithMany()
+                        .HasForeignKey("PreviousVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_catalog_recognition_rule_set_switches_catalog_recognition_~1");
+
+                    b.HasOne("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionRuleSetReport", null)
+                        .WithMany()
+                        .HasForeignKey("ReportId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_catalog_recognition_rule_set_switches_catalog_recognition_~2");
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Users.UserPermissionOverride", b =>
+                {
+                    b.HasOne("ElectronicService.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("ElectronicService.Domain.Catalog.ImportBatches.CatalogImportBatch", b =>
                 {
                     b.Navigation("File")
@@ -2811,6 +3658,30 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                     b.Navigation("Aliases");
 
                     b.Navigation("Characteristics");
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionIntegerDraft", b =>
+                {
+                    b.Navigation("Evidence");
+
+                    b.Navigation("Suffixes");
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionLiteralDraft", b =>
+                {
+                    b.Navigation("Evidence");
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionMultiIntegerDraft", b =>
+                {
+                    b.Navigation("Evidence");
+
+                    b.Navigation("Parts");
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionRuleSetVersion", b =>
+                {
+                    b.Navigation("Entries");
                 });
 #pragma warning restore 612, 618
         }

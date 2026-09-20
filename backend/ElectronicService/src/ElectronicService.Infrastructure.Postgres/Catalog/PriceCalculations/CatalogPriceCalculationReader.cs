@@ -58,6 +58,12 @@ public sealed class CatalogPriceCalculationReader
                             calculation.CreatedByUserId,
                             calculation.Title,
                             calculation.Currency,
+                            calculation.CustomerName,
+                            calculation.ObjectName,
+                            calculation.ProjectNumber,
+                            calculation.ResponsibleName,
+                            calculation.Comment,
+                            calculation.ValidUntil,
                             calculation.Status,
                             calculation.TotalAmount,
                             calculation.CreatedAtUtc,
@@ -73,35 +79,37 @@ public sealed class CatalogPriceCalculationReader
         }
 
         var lines =
-            await _dbContext.CatalogPriceCalculationLines
-                .AsNoTracking()
-                .Where(
-                    line =>
-                        line.CalculationId == calculationId)
-                .OrderBy(line =>
-                    line.CreatedAtUtc)
-                .ThenBy(line =>
-                    line.Id)
-                .Select(
-                    line =>
-                        new CatalogPriceCalculationLineDetails(
-                            line.Id,
-                            line.ProductId,
-                            line.ManufacturerId,
-                            line.ManufacturerName,
-                            line.PriceListId,
-                            line.PriceListRowId,
-                            line.Article,
-                            line.Name,
-                            line.Unit,
-                            line.Quantity,
-                            line.BasePriceAmount,
-                            line.MrcPriceAmount,
-                            line.DiscountPercent,
-                            line.ProjectPriceAmount,
-                            line.TotalAmount,
-                            line.CreatedAtUtc,
-                            line.UpdatedAtUtc))
+            await (
+                from line in
+                    _dbContext.CatalogPriceCalculationLines
+                        .AsNoTracking()
+                join product in
+                    _dbContext.Products.AsNoTracking()
+                    on line.ProductId equals product.Id
+                where line.CalculationId == calculationId
+                orderby line.CreatedAtUtc, line.Id
+                select new CatalogPriceCalculationLineDetails(
+                    line.Id,
+                    line.ProductId,
+                    line.ManufacturerId,
+                    line.ManufacturerName,
+                    line.PriceListId,
+                    line.PriceListRowId,
+                    line.Article,
+                    line.Name,
+                    line.Unit,
+                    line.Quantity,
+                    product.StockQuantity.Value,
+                    line.Quantity > product.StockQuantity.Value
+                        ? line.Quantity - product.StockQuantity.Value
+                        : 0m,
+                    line.BasePriceAmount,
+                    line.MrcPriceAmount,
+                    line.DiscountPercent,
+                    line.ProjectPriceAmount,
+                    line.TotalAmount,
+                    line.CreatedAtUtc,
+                    line.UpdatedAtUtc))
                 .ToArrayAsync(cancellationToken)
                 .ConfigureAwait(false);
 
@@ -133,6 +141,12 @@ public sealed class CatalogPriceCalculationReader
             header.CreatedByUserId,
             header.Title,
             header.Currency,
+            header.CustomerName,
+            header.ObjectName,
+            header.ProjectNumber,
+            header.ResponsibleName,
+            header.Comment,
+            header.ValidUntil,
             header.Status,
             header.TotalAmount,
             header.CreatedAtUtc,
@@ -226,6 +240,12 @@ public sealed class CatalogPriceCalculationReader
         Guid CreatedByUserId,
         string Title,
         string Currency,
+        string? CustomerName,
+        string? ObjectName,
+        string? ProjectNumber,
+        string? ResponsibleName,
+        string? Comment,
+        DateOnly? ValidUntil,
         CatalogPriceCalculationStatus Status,
         decimal TotalAmount,
         DateTime CreatedAtUtc,

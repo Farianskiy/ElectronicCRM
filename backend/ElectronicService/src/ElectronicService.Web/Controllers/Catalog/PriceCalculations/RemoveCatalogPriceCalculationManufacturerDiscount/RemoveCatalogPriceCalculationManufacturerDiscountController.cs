@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ElectronicService.Web.Controllers.Catalog.PriceCalculations.RemoveCatalogPriceCalculationManufacturerDiscount;
 
 [ApiController]
-[Authorize]
+[PermissionAuthorize(UserPermissionCode.PriceCalculationsManage)]
 [Route("api/catalog/price-calculations")]
 public sealed class RemoveCatalogPriceCalculationManufacturerDiscountController
     : ControllerBase

@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ElectronicService.Web.Controllers.Catalog.Products
     .UpdateGeneralInformation;
 
-[Authorize(Roles = "Technical")]
+[PermissionAuthorize(UserPermissionCode.ProductsEdit)]
 [ApiController]
 [Route("api/catalog/products/{id:guid}/general-information")]
 public sealed class CatalogProductGeneralInformationController

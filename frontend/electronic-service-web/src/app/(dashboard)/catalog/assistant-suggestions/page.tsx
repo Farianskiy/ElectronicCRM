@@ -12,7 +12,7 @@ import type {
   AssistantDictionarySuggestion,
   DictionarySuggestionStatusFilter,
 } from "@/features/dictionarySuggestions/model/types";
-import { RequireTechnicalUser } from "@/features/auth/ui/RequireTechnicalUser";
+import { RequirePermission } from "@/features/auth/ui/RequirePermission";
 import { formatDate, formatPercent } from "@/shared/lib/formatters";
 import { PageHeader } from "@/shared/ui/PageHeader";
 
@@ -149,9 +149,9 @@ function getSourcePresentation(source: string): {
 
 export default function CatalogAssistantSuggestionsPage() {
   return (
-    <RequireTechnicalUser>
+    <RequirePermission permission="DictionariesManage">
       <DictionarySuggestionsContent />
-    </RequireTechnicalUser>
+    </RequirePermission>
   );
 }
 

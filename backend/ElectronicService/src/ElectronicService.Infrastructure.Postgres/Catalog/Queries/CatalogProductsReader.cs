@@ -1,9 +1,11 @@
 using System.Globalization;
+using ElectronicService.Core.Catalog.Characteristics.Normalization;
 using ElectronicService.Core.Catalog.Products.Abstractions;
 using ElectronicService.Core.Catalog.Products.GetProductById;
 using ElectronicService.Core.Catalog.Products.GetProducts;
 using ElectronicService.Core.Catalog.Products.SearchProducts;
 using ElectronicService.Domain.Catalog.Characteristics;
+using ElectronicService.Domain.Catalog.PriceLists;
 using ElectronicService.Infrastructure.Postgres.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -83,12 +85,12 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
             .CountAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        var items = await productsQuery
+        var storedItems = await productsQuery
             .OrderBy(item => item.Product.Name.NormalizedValue)
             .ThenBy(item => item.Product.Article.Value)
             .Skip((normalizedPage - 1) * normalizedPageSize)
             .Take(normalizedPageSize)
-            .Select(item => new CatalogProductListItemResult(
+            .Select(item => new StoredCatalogProductListItem(
                 item.Product.Id,
                 item.Product.Article.Value,
                 item.Product.Name.Value,
@@ -100,6 +102,36 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
                 item.Product.StockQuantity.Value))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
+
+        var activePrices =
+            await LoadActivePricesAsync(
+                    storedItems
+                        .Select(item => item.Id)
+                        .ToArray(),
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+        var items = storedItems
+            .Select(item =>
+            {
+                activePrices.TryGetValue(
+                    item.Id,
+                    out var activePrice);
+
+                return new CatalogProductListItemResult(
+                    item.Id,
+                    item.Article,
+                    item.Name,
+                    item.ProductTypeCode,
+                    item.ProductTypeName,
+                    item.ManufacturerName,
+                    activePrice?.Amount
+                        ?? item.PriceAmount,
+                    activePrice?.Currency
+                        ?? item.PriceCurrency,
+                    item.StockQuantity);
+            })
+            .ToList();
 
         return new CatalogProductsPageResult(
             items,
@@ -143,6 +175,16 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
         {
             return null;
         }
+
+        var activePrices =
+            await LoadActivePricesAsync(
+                    [product.Id],
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+        activePrices.TryGetValue(
+            product.Id,
+            out var activePrice);
 
         var rawCharacteristics = await (
             from productCharacteristic in _dbContext.ProductCharacteristics.AsNoTracking()
@@ -198,8 +240,10 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
             product.ManufacturerId,
             product.ManufacturerName,
 
-            product.PriceAmount,
-            product.PriceCurrency,
+            activePrice?.Amount
+                ?? product.PriceAmount,
+            activePrice?.Currency
+                ?? product.PriceCurrency,
             product.StockQuantity,
             characteristics,
             aliases);
@@ -340,6 +384,26 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
 
                 if (characteristicDefinition.DataType == CharacteristicDataType.Text)
                 {
+                    if (string.Equals(characteristicCode, CatalogPoleConfigurationNormalizer.CharacteristicCode, StringComparison.Ordinal))
+                    {
+                        var poleConfigurations = CatalogPoleConfigurationNormalizer.ExpandForSearch(rawValue).ToArray();
+
+                        if (poleConfigurations.Length == 0)
+                        {
+                            productsQuery = productsQuery.Where(_ => false);
+                            break;
+                        }
+
+                        productsQuery = productsQuery.Where(item =>
+                            _dbContext.ProductCharacteristics.AsNoTracking().Any(characteristic =>
+                                characteristic.ProductId == item.Product.Id
+                                && characteristic.CharacteristicDefinitionId == characteristicDefinition.Id
+                                && characteristic.Value.TextValue != null
+                                && poleConfigurations.Contains(characteristic.Value.TextValue)));
+
+                        continue;
+                    }
+
                     var normalizedTextValue = NormalizeText(rawValue);
                     var textValuePattern = CreateLikePattern(normalizedTextValue);
 
@@ -385,12 +449,12 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
             .CountAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        var items = await productsQuery
+        var storedItems = await productsQuery
             .OrderBy(item => item.Product.Name.NormalizedValue)
             .ThenBy(item => item.Product.Article.Value)
             .Skip((normalizedPage - 1) * normalizedPageSize)
             .Take(normalizedPageSize)
-            .Select(item => new CatalogProductListItemResult(
+            .Select(item => new StoredCatalogProductListItem(
                 item.Product.Id,
                 item.Product.Article.Value,
                 item.Product.Name.Value,
@@ -403,11 +467,105 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
+        var activePrices =
+            await LoadActivePricesAsync(
+                    storedItems
+                        .Select(item => item.Id)
+                        .ToArray(),
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+        var items = storedItems
+            .Select(item =>
+            {
+                activePrices.TryGetValue(
+                    item.Id,
+                    out var activePrice);
+
+                return new CatalogProductListItemResult(
+                    item.Id,
+                    item.Article,
+                    item.Name,
+                    item.ProductTypeCode,
+                    item.ProductTypeName,
+                    item.ManufacturerName,
+                    activePrice?.Amount
+                        ?? item.PriceAmount,
+                    activePrice?.Currency
+                        ?? item.PriceCurrency,
+                    item.StockQuantity);
+            })
+            .ToList();
+
         return new CatalogProductsPageResult(
             items,
             normalizedPage,
             normalizedPageSize,
             totalCount);
+    }
+
+    private async Task<
+        IReadOnlyDictionary<Guid, ActiveCatalogPrice>>
+        LoadActivePricesAsync(
+            Guid[] productIds,
+            CancellationToken cancellationToken)
+    {
+        if (productIds.Length == 0)
+        {
+            return new Dictionary<Guid, ActiveCatalogPrice>();
+        }
+
+        var nullableProductIds =
+            productIds
+                .Select(productId =>
+                    (Guid?)productId)
+                .ToArray();
+
+        var storedPrices =
+            await (
+                    from row in
+                        _dbContext.CatalogPriceListRows
+                            .AsNoTracking()
+                    join priceList in
+                        _dbContext.CatalogPriceLists
+                            .AsNoTracking()
+                        on row.PriceListId equals priceList.Id
+                    where priceList.Status
+                              == CatalogPriceListStatus.Active
+                          && row.Status
+                              == CatalogPriceListRowStatus.Valid
+                          && row.ProductId.HasValue
+                          && row.BasePriceAmount.HasValue
+                          && nullableProductIds.Contains(
+                              row.ProductId)
+                    orderby row.RowNumber
+                    select new
+                    {
+                        ProductId =
+                            row.ProductId,
+                        Amount =
+                            row.BasePriceAmount,
+                        priceList.Currency,
+                        row.RowNumber
+                    })
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+        return storedPrices
+            .GroupBy(price =>
+                price.ProductId.GetValueOrDefault())
+            .ToDictionary(
+                group => group.Key,
+                group =>
+                {
+                    var price = group.First();
+
+                    return new ActiveCatalogPrice(
+                        price.ProductId.GetValueOrDefault(),
+                        price.Amount.GetValueOrDefault(),
+                        price.Currency,
+                        price.RowNumber);
+                });
     }
 
     private static string FormatCharacteristicValue(
@@ -491,4 +649,21 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
         result = false;
         return false;
     }
+
+    private sealed record ActiveCatalogPrice(
+        Guid ProductId,
+        decimal Amount,
+        string Currency,
+        int RowNumber);
+
+    private sealed record StoredCatalogProductListItem(
+        Guid Id,
+        string Article,
+        string Name,
+        string ProductTypeCode,
+        string ProductTypeName,
+        string ManufacturerName,
+        decimal PriceAmount,
+        string PriceCurrency,
+        decimal StockQuantity);
 }

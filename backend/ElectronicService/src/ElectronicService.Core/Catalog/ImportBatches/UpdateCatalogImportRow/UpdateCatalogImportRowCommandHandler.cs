@@ -190,7 +190,8 @@ public sealed class UpdateCatalogImportRowCommandHandler
             productType,
             characteristicDefinitions,
             previousData,
-            validationResult.Data);
+            validationResult.Data,
+            ConfirmedSpans: command.ConfirmedSpans);
 
         var feedbackCollectionResult = await _recognitionFeedbackCollector
             .CollectAsync(feedbackCollectionRequest, cancellationToken)

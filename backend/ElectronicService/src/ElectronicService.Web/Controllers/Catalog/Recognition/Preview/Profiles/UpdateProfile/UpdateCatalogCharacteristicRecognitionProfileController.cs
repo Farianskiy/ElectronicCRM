@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ElectronicService.Web.Controllers.Catalog.Recognition.Profiles.UpdateProfile;
 
-[Authorize(Roles = "Technical")]
+[PermissionAuthorize(UserPermissionCode.DictionariesManage)]
 [ApiController]
 [Route("api/catalog/recognition/profiles/{profileId:guid}")]
 public sealed class UpdateCatalogCharacteristicRecognitionProfileController : ControllerBase

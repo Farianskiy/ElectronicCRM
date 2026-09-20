@@ -112,7 +112,8 @@ public sealed class CatalogImportPipelineTests
 
         var enrichmentResult = await new CatalogImportRecognitionEnrichmentService(
                 new FakeRecognitionService(CreateRecognizedCharacteristic(definition.Code)),
-                new CatalogImportRowValidator())
+                new CatalogImportRowValidator(),
+                new FakeActiveRuleSetReader())
             .EnrichAsync(
                 assignmentResult.Value,
                 productType,
@@ -181,7 +182,8 @@ public sealed class CatalogImportPipelineTests
 
         var result = await new CatalogImportRecognitionEnrichmentService(
                 new FakeRecognitionService(CreateRecognizedCharacteristic(definition.Code)),
-                new CatalogImportRowValidator())
+                new CatalogImportRowValidator(),
+                new FakeActiveRuleSetReader())
             .EnrichAsync(
                 analysis,
                 productType,

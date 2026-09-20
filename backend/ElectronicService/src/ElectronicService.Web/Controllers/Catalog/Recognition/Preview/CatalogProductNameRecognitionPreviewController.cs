@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ElectronicService.Web.Controllers.Catalog.Recognition.Preview;
 
-[Authorize(Roles = "Technical")]
+[PermissionAuthorize(UserPermissionCode.DictionariesManage)]
 [ApiController]
 [Route("api/catalog/recognition/preview")]
 public sealed class CatalogProductNameRecognitionPreviewController : ControllerBase

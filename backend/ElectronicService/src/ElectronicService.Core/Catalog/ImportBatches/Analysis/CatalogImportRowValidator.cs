@@ -75,6 +75,18 @@ public sealed class CatalogImportRowValidator : ICatalogImportRowValidator
             normalizedCharacteristics,
             data.CharacteristicOrigins);
 
+        // An explicit manual clear is also a decision. Keep its marker even
+        // though the normalized values dictionary omits empty fields.
+        foreach (var characteristicId in productType.Characteristics.Select(item => item.CharacteristicDefinitionId.ToString()))
+        {
+            if (data.CharacteristicOrigins is not null
+                && data.CharacteristicOrigins.TryGetValue(characteristicId, out var origin)
+                && origin.Source == CatalogImportCharacteristicValueSource.Manual)
+            {
+                normalizedCharacteristicOrigins[characteristicId] = origin;
+            }
+        }
+
         var status = issues.Count == 0
             ? CatalogImportRowStatus.Valid
             : CatalogImportRowStatus.Error;

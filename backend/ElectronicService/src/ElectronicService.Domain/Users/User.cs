@@ -47,6 +47,10 @@ public sealed class User : AggregateRoot
 
     public bool IsManager => Type == UserType.Manager;
 
+    public bool IsSystemDeveloper => Type == UserType.SystemDeveloper;
+
+    public bool IsAdministrator => Type == UserType.Administrator;
+
     public bool IsActive => Status == UserStatus.Active;
 
     public bool IsBlocked => Status == UserStatus.Blocked;
@@ -87,37 +91,37 @@ public sealed class User : AggregateRoot
 
     public bool CanUpdateProductPrice()
     {
-        return IsActive && IsTechnical;
+        return IsActive && CanPerformTechnicalOperations();
     }
 
     public bool CanManageCatalogPriceLists()
     {
-        return IsActive && IsTechnical;
+        return IsActive && CanPerformTechnicalOperations();
     }
 
     public bool CanUpdateStockBalance()
     {
-        return IsActive && IsTechnical;
+        return IsActive && CanPerformTechnicalOperations();
     }
 
     public bool CanApproveProductCorrections()
     {
-        return IsActive && IsTechnical;
+        return IsActive && CanPerformTechnicalOperations();
     }
 
     public bool CanManageProductSynonyms()
     {
-        return IsActive && IsTechnical;
+        return IsActive && CanPerformTechnicalOperations();
     }
 
     public bool CanManageCatalogRecognitionProfiles()
     {
-        return IsActive && IsTechnical;
+        return IsActive && CanPerformTechnicalOperations();
     }
 
     public bool CanManageManufacturers()
     {
-        return IsActive && IsTechnical;
+        return IsActive && CanPerformTechnicalOperations();
     }
 
     public bool CanCreateCatalogImport()
@@ -127,16 +131,18 @@ public sealed class User : AggregateRoot
                 IsRegular
                 || IsManager
                 || IsTechnical
+                || IsAdministrator
+                || IsSystemDeveloper
             );
     }
 
     public bool CanEditCatalogImport()
     {
         return IsActive
-            && (
-                IsRegular
+            && (IsRegular
                 || IsManager
                 || IsTechnical
+                || IsSystemDeveloper
             );
     }
 
@@ -148,7 +154,7 @@ public sealed class User : AggregateRoot
     public bool CanDeleteOwnCatalogImport()
     {
         return IsActive
-            && (IsRegular || IsManager || IsTechnical);
+            && (IsRegular || IsManager || IsSystemDeveloper);
     }
 
     public bool CanSubmitCatalogImportForReview()
@@ -160,13 +166,13 @@ public sealed class User : AggregateRoot
     public bool CanReviewCatalogImports()
     {
         return IsActive
-            && IsTechnical;
+            && CanPerformTechnicalOperations();
     }
 
     public bool CanApplyCatalogImport()
     {
         return IsActive
-            && IsTechnical;
+            && CanPerformTechnicalOperations();
     }
 
     public static Result<User, DomainError> CreateRegular(
@@ -256,6 +262,25 @@ public sealed class User : AggregateRoot
             emailResult.Value,
             UserType.Manager,
             NormalizePasswordHash(passwordHash));
+    }
+
+    public static Result<User, DomainError> CreateAdministrator(string displayName, string email, string? passwordHash = null)
+    {
+        var displayNameResult = UserDisplayName.Create(displayName);
+
+        if (displayNameResult.IsFailure)
+        {
+            return displayNameResult.Error;
+        }
+
+        var emailResult = Email.Create(email);
+
+        if (emailResult.IsFailure)
+        {
+            return emailResult.Error;
+        }
+
+        return new User(Guid.CreateVersion7(), displayNameResult.Value, emailResult.Value, UserType.Administrator, NormalizePasswordHash(passwordHash));
     }
 
     public UnitResult<DomainError> ChangeDisplayName(string displayName)
@@ -372,6 +397,24 @@ public sealed class User : AggregateRoot
         return UnitResult.Success<DomainError>();
     }
 
+    public UnitResult<DomainError> ChangeType(UserType type)
+    {
+        if (IsBlocked)
+        {
+            return UnitResult.Failure(UserErrors.BlockedUserCannotBeChanged());
+        }
+
+        if (IsSystemDeveloper || type is UserType.None or UserType.SystemDeveloper)
+        {
+            return UnitResult.Failure(UserErrors.ProtectedSystemDeveloper());
+        }
+
+        Type = type;
+        UpdatedAtUtc = DateTime.UtcNow;
+
+        return UnitResult.Success<DomainError>();
+    }
+
     public UnitResult<DomainError> Block()
     {
         if (IsBlocked)
@@ -424,5 +467,10 @@ public sealed class User : AggregateRoot
         }
 
         return passwordHash.Trim();
+    }
+
+    private bool CanPerformTechnicalOperations()
+    {
+        return IsTechnical || IsSystemDeveloper;
     }
 }

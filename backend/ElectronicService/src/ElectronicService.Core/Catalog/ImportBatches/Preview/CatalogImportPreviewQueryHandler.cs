@@ -227,7 +227,7 @@ public sealed class CatalogImportPreviewQueryHandler
          * Technical видит любой batch.
          * Manager — только созданный им.
          */
-        return user.IsTechnical
+        return user.IsTechnical || user.IsSystemDeveloper
             || user.IsManager
             && batch.CreatedByUserId
                 == user.Id;

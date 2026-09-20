@@ -8,8 +8,7 @@ using ElectronicService.Web.Controllers.Catalog.ImportBatches.Common;
 namespace ElectronicService.Web.Controllers.Catalog.ImportBatches.GetCatalogImportBatch;
 
 [ApiController]
-[Authorize(Roles =
-    "Regular,Manager,Technical")]
+[PermissionAnyAuthorize(UserPermissionCode.CatalogImportsCreate, UserPermissionCode.CatalogImportsReview)]
 [Route("api/catalog/import-batches")]
 public sealed class
     GetCatalogImportBatchController

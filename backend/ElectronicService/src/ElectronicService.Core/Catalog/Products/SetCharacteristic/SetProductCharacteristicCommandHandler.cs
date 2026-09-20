@@ -1,5 +1,6 @@
 using System.Globalization;
 using CSharpFunctionalExtensions;
+using ElectronicService.Core.Catalog.Characteristics.Normalization;
 using ElectronicService.Core.Catalog.Products.Abstractions;
 using ElectronicService.Core.Catalog.Products.Audit;
 using ElectronicService.Domain.Catalog.Audit;
@@ -120,6 +121,7 @@ public sealed class SetProductCharacteristicCommandHandler
          */
         var characteristicValueResult =
             CreateCharacteristicValue(
+                definition.Code,
                 definition.DataType,
                 command.Value);
 
@@ -215,13 +217,15 @@ public sealed class SetProductCharacteristicCommandHandler
     private static Result<
         CharacteristicValue,
         DomainError> CreateCharacteristicValue(
+            string characteristicCode,
             CharacteristicDataType dataType,
             string value)
     {
         return dataType switch
         {
             CharacteristicDataType.Text =>
-                CharacteristicValue.CreateText(
+                CreateTextCharacteristicValue(
+                    characteristicCode,
                     value),
 
             CharacteristicDataType.Number =>
@@ -235,6 +239,18 @@ public sealed class SetProductCharacteristicCommandHandler
             _ => GeneralErrors.ValueIsInvalid(
                 nameof(dataType))
         };
+    }
+
+    private static Result<CharacteristicValue, DomainError> CreateTextCharacteristicValue(string characteristicCode, string value)
+    {
+        if (string.Equals(characteristicCode, CatalogPoleConfigurationNormalizer.CharacteristicCode, StringComparison.Ordinal))
+        {
+            return CatalogPoleConfigurationNormalizer.TryNormalize(value, out var normalizedValue)
+                ? CharacteristicValue.CreateText(normalizedValue)
+                : GeneralErrors.ValueIsInvalid(nameof(value));
+        }
+
+        return CharacteristicValue.CreateText(value);
     }
 
     private static Result<

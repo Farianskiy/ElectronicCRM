@@ -7,6 +7,11 @@ public interface ICatalogActiveProductPriceReader
             Guid productId,
             int take,
             CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<CatalogActiveProductPriceSource>>
+        FindByProductIdsAsync(
+            IReadOnlyCollection<Guid> productIds,
+            CancellationToken cancellationToken = default);
 }
 
 public sealed record CatalogActiveProductPriceSource(

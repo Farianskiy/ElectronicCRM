@@ -7,6 +7,7 @@ namespace ElectronicService.Web.Controllers.Catalog.Products;
 
 [ApiController]
 [Route("api/catalog/products/search")]
+[PermissionAuthorize(UserPermissionCode.ProductsView)]
 public sealed class CatalogProductSearchController : ControllerBase
 {
     private readonly SearchProductsQueryHandler

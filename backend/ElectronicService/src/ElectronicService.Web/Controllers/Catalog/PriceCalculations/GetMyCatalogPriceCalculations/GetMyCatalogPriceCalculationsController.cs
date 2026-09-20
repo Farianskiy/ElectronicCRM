@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ElectronicService.Web.Controllers.Catalog.PriceCalculations.GetMyCatalogPriceCalculations;
 
 [ApiController]
-[Authorize]
+[PermissionAuthorize(UserPermissionCode.PriceCalculationsManage)]
 [Route("api/catalog/price-calculations")]
 public sealed class GetMyCatalogPriceCalculationsController
     : ControllerBase

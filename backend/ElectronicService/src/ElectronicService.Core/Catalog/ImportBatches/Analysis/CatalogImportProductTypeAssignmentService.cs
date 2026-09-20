@@ -79,6 +79,11 @@ public sealed class CatalogImportProductTypeAssignmentService
                 continue;
             }
 
+            if (string.Equals(data.ProductTypeResolutionSource, "Manual", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
             Guid productTypeId;
             string resolutionSource;
             decimal resolutionConfidence;

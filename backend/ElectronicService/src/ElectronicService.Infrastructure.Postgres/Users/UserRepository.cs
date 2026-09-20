@@ -1,5 +1,6 @@
 using ElectronicService.Core.Users;
 using ElectronicService.Domain.Users;
+using ElectronicService.Domain.Users.Enums;
 using ElectronicService.Domain.Users.ValueObjects;
 using ElectronicService.Infrastructure.Postgres.Data;
 using Microsoft.EntityFrameworkCore;
@@ -61,6 +62,59 @@ public sealed class UserRepository : IUserRepository
             .AnyAsync(
                 user => user.Email == email,
                 cancellationToken);
+    }
+
+    public async Task<(IReadOnlyCollection<User> Items, int TotalCount)> GetPageAsync(
+        string? search,
+        UserType? type,
+        UserStatus? status,
+        bool includeSystemDeveloper,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        IQueryable<User> query;
+
+        if (string.IsNullOrWhiteSpace(search))
+        {
+            query = _dbContext.Users.AsNoTracking();
+        }
+        else
+        {
+            var searchPattern = $"%{search.Trim()}%";
+
+            query = _dbContext.Users
+                .FromSqlInterpolated($"SELECT * FROM users WHERE display_name ILIKE {searchPattern} OR email ILIKE {searchPattern}")
+                .AsNoTracking();
+        }
+
+        if (type.HasValue)
+        {
+            query = query.Where(user => user.Type == type.Value);
+        }
+
+        if (status.HasValue)
+        {
+            query = query.Where(user => user.Status == status.Value);
+        }
+
+        if (!includeSystemDeveloper)
+        {
+            query = query.Where(
+                user => user.Type != UserType.SystemDeveloper);
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken).ConfigureAwait(false);
+
+        var items = await query
+            .OrderByDescending(user => user.CreatedAtUtc)
+            .ThenBy(user => user.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return (items, totalCount);
     }
 
     public void Add(User user)

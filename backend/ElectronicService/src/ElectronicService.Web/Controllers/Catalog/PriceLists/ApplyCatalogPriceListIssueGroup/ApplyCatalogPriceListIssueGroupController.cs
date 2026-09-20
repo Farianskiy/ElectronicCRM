@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ElectronicService.Web.Controllers.Catalog.PriceLists.ApplyCatalogPriceListIssueGroup;
 
 [ApiController]
-[Authorize(Roles = "Technical")]
+[PermissionAuthorize(UserPermissionCode.PriceListsManage)]
 [Route("api/catalog/price-lists")]
 public sealed class ApplyCatalogPriceListIssueGroupController
     : ControllerBase

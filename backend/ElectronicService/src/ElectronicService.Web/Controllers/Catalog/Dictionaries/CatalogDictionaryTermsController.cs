@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ElectronicService.Web.Controllers.Catalog.Dictionaries.GetTerms;
 
-[Authorize(Roles = "Technical")]
+[PermissionAuthorize(UserPermissionCode.DictionariesManage)]
 [ApiController]
 [Route("api/catalog/dictionary/terms")]
 public sealed class CatalogDictionaryTermsController : ControllerBase

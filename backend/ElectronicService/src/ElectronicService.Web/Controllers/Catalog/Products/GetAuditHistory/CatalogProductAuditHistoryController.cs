@@ -9,7 +9,7 @@ namespace ElectronicService.Web.Controllers.Catalog
     .Products.GetAuditHistory;
 
 [ApiController]
-[Authorize(Roles = "Technical")]
+[PermissionAuthorize(UserPermissionCode.ProductsEdit)]
 [Route(
     "api/catalog/products/" +
     "{productId:guid}/audit-history")]

@@ -2,12 +2,11 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
-import { useAuthSession } from "@/features/auth/model/useAuthSession";
 import { createApprovedManufacturerAlias } from "@/features/catalogManufacturers/api/createApprovedManufacturerAlias";
 import type { CreateApprovedManufacturerAliasResponse } from "@/features/catalogManufacturers/model/types";
 import { getCatalogManufacturers } from "@/features/catalogMetadata/api/getCatalogManufacturers";
 import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
-import { isTechnicalUser } from "@/shared/api/authToken";
+import { useCurrentUserAccess } from "@/features/auth/model/CurrentUserAccessContext";
 import { AppSelect } from "@/shared/ui/AppSelect";
 import { analyzeCatalogImportBatch } from "../../api/analyzeCatalogImportBatch";
 import { catalogImportQueryKeys } from "../../model/queryKeys";
@@ -30,8 +29,8 @@ export function CatalogImportManufacturerAliasCreationForm({
   onAnalysisChange,
 }: CatalogImportManufacturerAliasCreationFormProps) {
   const queryClient = useQueryClient();
-  const session = useAuthSession();
-  const canManageManufacturers = isTechnicalUser(session);
+  const { hasPermission } = useCurrentUserAccess();
+  const canManageManufacturers = hasPermission("DictionariesManage");
 
   const [selectedManufacturerId, setSelectedManufacturerId] = useState("");
   const [changeConfirmed, setChangeConfirmed] = useState(false);

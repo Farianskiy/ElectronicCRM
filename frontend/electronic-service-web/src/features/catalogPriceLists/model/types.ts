@@ -95,6 +95,9 @@ export interface CatalogPriceListDetails {
   rowsCount: number;
   validRowsCount: number;
   errorRowsCount: number;
+  estimatedRowsCount: number;
+  readRowsCount: number;
+  savedRowsCount: number;
   createdAtUtc: string;
   updatedAtUtc?: string | null;
   processedAtUtc?: string | null;

@@ -6,6 +6,7 @@ namespace ElectronicService.Web.Controllers.Catalog.Metadata.Manufacturers;
 
 [ApiController]
 [Route("api/catalog/metadata/manufacturers")]
+[PermissionAuthorize(UserPermissionCode.ProductsView)]
 public sealed class CatalogManufacturersController : ControllerBase
 {
     private readonly GetCatalogManufacturersQueryHandler _handler;

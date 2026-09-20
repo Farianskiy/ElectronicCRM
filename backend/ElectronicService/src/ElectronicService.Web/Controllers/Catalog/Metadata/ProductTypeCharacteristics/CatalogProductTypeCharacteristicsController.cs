@@ -6,6 +6,7 @@ namespace ElectronicService.Web.Controllers.Catalog.Metadata.ProductTypeCharacte
 
 [ApiController]
 [Route("api/catalog/metadata/product-types/{code}/characteristics")]
+[PermissionAuthorize(UserPermissionCode.ProductsView)]
 public sealed class CatalogProductTypeCharacteristicsController : ControllerBase
 {
     private readonly GetCatalogProductTypeCharacteristicsQueryHandler _handler;

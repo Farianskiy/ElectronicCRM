@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ElectronicService.Web.Controllers.Catalog.Recognition.Profiles.SetProfileActive;
 
-[Authorize(Roles = "Technical")]
+[PermissionAuthorize(UserPermissionCode.DictionariesManage)]
 [ApiController]
 [Route("api/catalog/recognition/profiles/{profileId:guid}/active")]
 public sealed class SetCatalogCharacteristicRecognitionProfileActiveController : ControllerBase

@@ -1,3 +1,5 @@
+using ElectronicService.Core.Catalog.ImportBatches.Analysis;
+
 namespace ElectronicService.Core.Catalog.ImportBatches.UpdateCatalogImportRow;
 
 public sealed record UpdateCatalogImportRowCommand(
@@ -10,4 +12,5 @@ public sealed record UpdateCatalogImportRowCommand(
     Guid? ManufacturerId,
     decimal? Price,
     int? StockQuantity,
-    IReadOnlyDictionary<string, string> Characteristics);
+    IReadOnlyDictionary<string, string> Characteristics,
+    IReadOnlyDictionary<Guid, CatalogImportConfirmedSpan>? ConfirmedSpans = null);

@@ -60,6 +60,8 @@ export interface CatalogPriceCalculationLine {
   name: string;
   unit?: string | null;
   quantity: number;
+  stockQuantity: number;
+  shortageQuantity: number;
   basePriceAmount: number;
   mrcPriceAmount?: number | null;
   discountPercent: number;
@@ -83,6 +85,12 @@ export interface CatalogPriceCalculationDetails {
   createdByUserId: string;
   title: string;
   currency: string;
+  customerName?: string | null;
+  objectName?: string | null;
+  projectNumber?: string | null;
+  responsibleName?: string | null;
+  comment?: string | null;
+  validUntil?: string | null;
   status: CatalogPriceCalculationStatus;
   totalAmount: number;
   createdAtUtc: string;
@@ -91,6 +99,27 @@ export interface CatalogPriceCalculationDetails {
   archivedAtUtc?: string | null;
   lines: CatalogPriceCalculationLine[];
   manufacturerDiscounts: CatalogPriceCalculationManufacturerDiscount[];
+}
+
+export interface UpdateCatalogPriceCalculationCardRequest {
+  calculationId: string;
+  customerName: string | null;
+  objectName: string | null;
+  projectNumber: string | null;
+  responsibleName: string | null;
+  comment: string | null;
+  validUntil: string | null;
+}
+
+export interface UpdateCatalogPriceCalculationCardResponse {
+  calculationId: string;
+  customerName: string | null;
+  objectName: string | null;
+  projectNumber: string | null;
+  responsibleName: string | null;
+  comment: string | null;
+  validUntil: string | null;
+  updatedAtUtc: string | null;
 }
 
 export interface CatalogPriceCalculationProductSearchItem {
@@ -120,4 +149,63 @@ export interface SearchCatalogPriceCalculationProductsResponse {
   totalCount: number;
   totalPages: number;
   items: CatalogPriceCalculationProductSearchItem[];
+}
+
+export const catalogPriceCalculationImportRowStatuses = [
+  "Matched",
+  "Invalid",
+  "ProductNotFound",
+  "ProductAmbiguous",
+  "ActivePriceNotFound",
+  "ActivePriceAmbiguous",
+] as const;
+
+export type CatalogPriceCalculationImportRowStatus =
+  (typeof catalogPriceCalculationImportRowStatuses)[number];
+
+export interface CatalogPriceCalculationImportPreviewRow {
+  rowNumber: number;
+  article: string;
+  sourceName: string | null;
+  sourceManufacturer: string | null;
+  quantity: number | null;
+  status: CatalogPriceCalculationImportRowStatus;
+  message: string | null;
+  productId: string | null;
+  productArticle: string | null;
+  productName: string | null;
+  manufacturerId: string | null;
+  manufacturerName: string | null;
+  stockQuantity: number | null;
+  shortageQuantity: number | null;
+  priceListId: string | null;
+  priceListRowId: string | null;
+  basePriceAmount: number | null;
+  mrcPriceAmount: number | null;
+}
+
+export interface PreviewCatalogPriceCalculationImportRequest {
+  calculationId: string;
+  file: File;
+}
+
+export interface PreviewCatalogPriceCalculationImportResponse {
+  readRowsCount: number;
+  matchedRowsCount: number;
+  skippedRowsCount: number;
+  rows: CatalogPriceCalculationImportPreviewRow[];
+}
+
+export interface ApplyCatalogPriceCalculationImportRequest {
+  calculationId: string;
+  rows: Array<{
+    productId: string;
+    quantity: number;
+  }>;
+}
+
+export interface ApplyCatalogPriceCalculationImportResponse {
+  calculationId: string;
+  addedLinesCount: number;
+  calculationTotalAmount: number;
 }
