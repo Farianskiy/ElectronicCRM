@@ -142,6 +142,7 @@ public sealed class User : AggregateRoot
             && (IsRegular
                 || IsManager
                 || IsTechnical
+                || IsAdministrator
                 || IsSystemDeveloper
             );
     }
