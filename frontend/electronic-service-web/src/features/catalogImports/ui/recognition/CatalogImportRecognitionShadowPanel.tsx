@@ -507,7 +507,7 @@ export function CatalogImportRecognitionShadowPanel({
     return (
       <section className="rounded-3xl border border-sky-500/20 bg-sky-500/[0.04] p-6">
         <h2 className="text-xl font-semibold text-white">
-          Shadow Mode распознавания
+          Распознавание действующей конфигурацией
         </h2>
 
         <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-400">
@@ -523,9 +523,8 @@ export function CatalogImportRecognitionShadowPanel({
           </p>
 
           <p className="mt-2 text-sm leading-6 text-green-200/80">
-            Recognition Engine работает параллельно существующему импорту. Он
-            только измеряет качество распознавания и показывает будущие
-            возможности автоматического заполнения.
+            Здесь показывается результат правил, использованных при анализе импорта.
+            Сохранение товаров выполняется при применении пакета.
           </p>
         </div>
       </section>
@@ -549,13 +548,13 @@ export function CatalogImportRecognitionShadowPanel({
     <section className="rounded-3xl border border-sky-500/25 bg-sky-500/[0.04] p-6">
       <div>
         <h2 className="text-xl font-semibold text-white">
-          Shadow Mode распознавания
+          Распознавание действующей конфигурацией
         </h2>
 
         <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-400">
-          Сначала Shadow Mode сравнивает явные значения Excel с результатами
-          Recognition Engine. Затем RecognitionEnrichment может безопасно
-          заполнить только отсутствующие значения, прошедшие все проверки.
+          Сравнение построено по тому же результату распознавания, который использован
+          для автозаполнения, включая активную версию правил. Исходные значения
+          сравниваются до автозаполнения; ручные исправления сохраняются.
         </p>
       </div>
 
@@ -569,7 +568,7 @@ export function CatalogImportRecognitionShadowPanel({
         </p>
 
         <p className="mt-2 text-sm leading-6 text-green-200/80">
-          Recognition Engine сейчас работает параллельно и не перезаписывает
+          Распознанные значения не перезаписывают ручные исправления и явные значения
           Excel. Если подтверждение в наименовании не найдено, корректное
           значение Excel всё равно будет использовано. Красным отмечается только
           настоящий конфликт, когда Excel и наименование предлагают разные

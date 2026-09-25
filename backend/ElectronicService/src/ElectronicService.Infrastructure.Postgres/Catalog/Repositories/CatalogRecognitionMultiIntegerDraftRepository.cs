@@ -1,4 +1,5 @@
 using System.Data;
+using ElectronicService.Infrastructure.Postgres.Catalog.Queries;
 using CSharpFunctionalExtensions;
 using ElectronicService.Core.Catalog.Recognition.Abstractions;
 using ElectronicService.Domain.Catalog.Recognition;
@@ -13,11 +14,13 @@ public sealed class CatalogRecognitionMultiIntegerDraftRepository
     : ICatalogRecognitionMultiIntegerDraftRepository
 {
     private readonly ElectronicDbContext _dbContext;
+    private readonly IRecognitionMutationGate _gate;
 
-    public CatalogRecognitionMultiIntegerDraftRepository(ElectronicDbContext dbContext)
+    public CatalogRecognitionMultiIntegerDraftRepository(ElectronicDbContext dbContext, IRecognitionMutationGate gate)
     {
         ArgumentNullException.ThrowIfNull(dbContext);
         _dbContext = dbContext;
+        _gate = gate;
     }
 
     public async Task<Result<Guid, DomainError>> SaveAsync(
@@ -50,13 +53,14 @@ public sealed class CatalogRecognitionMultiIntegerDraftRepository
             .Select(part => part.CharacteristicDefinitionId.GetValueOrDefault())
             .ToArray();
 
+        await using var mutation = await _gate.EnterAsync(cancellationToken).ConfigureAwait(false);
         await using var transaction = await _dbContext.Database
             .BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)
             .ConfigureAwait(false);
 
         try
         {
-            var currentExamples = await _dbContext.CatalogRecognitionTrainingExamples
+            var currentExamples = await _dbContext.CatalogRecognitionTrainingExamples.ConfirmedExamples(_dbContext.CatalogRecognitionFeedbackEntries).Where(x => !x.IsEvaluationOnly)
                 .AsNoTracking()
                 .Where(example =>
                     example.RevokedAtUtc == null &&

@@ -16,6 +16,6 @@ public interface ICatalogRecognitionActiveRuleSetReader
         Guid productTypeId,
         CancellationToken cancellationToken = default);
 
-    Task CaptureForRunAsync(
+    Task<IReadOnlyCollection<CatalogRecognitionRuleSetState>> CaptureForRunAsync(
         CancellationToken cancellationToken = default);
 }

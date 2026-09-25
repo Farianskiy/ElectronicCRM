@@ -1,4 +1,5 @@
 using System.Data;
+using ElectronicService.Infrastructure.Postgres.Catalog.Queries;
 using CSharpFunctionalExtensions;
 using ElectronicService.Core.Catalog.Recognition.Abstractions;
 using ElectronicService.Domain.Catalog.Recognition;
@@ -12,22 +13,25 @@ namespace ElectronicService.Infrastructure.Postgres.Catalog.Repositories;
 public sealed class CatalogRecognitionLiteralDraftRepository : ICatalogRecognitionLiteralDraftRepository
 {
     private readonly ElectronicDbContext _dbContext;
+    private readonly IRecognitionMutationGate _gate;
 
-    public CatalogRecognitionLiteralDraftRepository(ElectronicDbContext dbContext)
+    public CatalogRecognitionLiteralDraftRepository(ElectronicDbContext dbContext, IRecognitionMutationGate gate)
     {
         ArgumentNullException.ThrowIfNull(dbContext);
         _dbContext = dbContext;
+        _gate = gate;
     }
 
     public async Task<Result<Guid, DomainError>> SaveAsync(CatalogRecognitionLiteralDraft draft, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(draft);
 
+        await using var mutation = await _gate.EnterAsync(cancellationToken).ConfigureAwait(false);
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken).ConfigureAwait(false);
 
         try
         {
-            var currentIds = await _dbContext.CatalogRecognitionTrainingExamples.AsNoTracking()
+            var currentIds = await _dbContext.CatalogRecognitionTrainingExamples.ConfirmedExamples(_dbContext.CatalogRecognitionFeedbackEntries).Where(x => !x.IsEvaluationOnly).AsNoTracking()
                 .Where(example => example.RevokedAtUtc == null && example.ManufacturerId == draft.ManufacturerId && example.ProductTypeId == draft.ProductTypeId && example.CharacteristicDefinitionId == draft.CharacteristicDefinitionId)
                 .OrderBy(example => example.Id)
                 .Select(example => example.Id)

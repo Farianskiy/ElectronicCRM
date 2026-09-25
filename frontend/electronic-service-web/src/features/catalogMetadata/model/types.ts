@@ -4,6 +4,17 @@ export interface CatalogProductTypeMetadata {
   name: string;
 }
 
+export interface CreateCatalogProductTypeRequest {
+  code: string;
+  name: string;
+}
+
+export interface CreateCatalogProductTypeResponse {
+  id: string;
+  code: string;
+  name: string;
+}
+
 export interface CatalogManufacturerMetadata {
   id: string;
   name: string;

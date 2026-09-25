@@ -5,4 +5,6 @@ public sealed record CatalogRecognitionCandidateSuggestionPromotionResult(
     int EligibleCandidateCount,
     int CreatedSuggestionCount,
     int AttachedExistingSuggestionCount,
-    int DeferredCandidateCount);
+    int DeferredCandidateCount,
+    int MissingAuthorCount,
+    Guid? NextCursor);

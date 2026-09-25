@@ -1,3 +1,4 @@
+using ElectronicService.Infrastructure.Postgres.Catalog.Recognition.Learning;
 using ElectronicService.Core.Abstractions;
 using ElectronicService.Core.Abstractions.Data;
 using ElectronicService.Core.Catalog.Assistant.Abstractions;
@@ -52,6 +53,9 @@ public static class DependencyInjectionExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        services.AddScoped<ElectronicService.Core.Catalog.Recognition.Training.ICatalogTrainingExampleManagement, CatalogTrainingExampleManagement>();
+        services.AddScoped<ElectronicService.Core.Catalog.Recognition.Training.ILearningProvenance, LearningProvenanceService>();
+        services.AddScoped<ElectronicService.Core.Catalog.Recognition.Abstractions.IRecognitionMutationGate, ElectronicService.Infrastructure.Postgres.Catalog.Recognition.Learning.RecognitionMutationGate>();
         services.AddDbContextPool<ElectronicDbContext>((serviceProvider, options) =>
         {
             string connectionString = configuration.GetConnectionString("Database")
@@ -92,6 +96,16 @@ public static class DependencyInjectionExtensions
                 "CatalogImportCleanup:BatchSize must be between 1 and 5000.")
             .ValidateOnStart();
 
+        services.AddOptions<CatalogRecognitionLearningOptions>()
+            .Bind(configuration.GetSection(CatalogRecognitionLearningOptions.SectionName))
+            .Validate(options => options.PollInterval >= TimeSpan.FromSeconds(1)
+                && options.PollInterval <= TimeSpan.FromDays(1),
+                "CatalogRecognitionLearning:PollInterval must be between 00:00:01 and 1.00:00:00.")
+            .Validate(options => options.BatchSize is >= 1 and <= 5000,
+                "CatalogRecognitionLearning:BatchSize must be between 1 and 5000.")
+            .ValidateOnStart();
+        services.AddHostedService<CatalogRecognitionLearningHostedService>();
+
         services.AddScoped<CatalogImportCleanupService>();
         services.AddHostedService<CatalogImportCleanupHostedService>();
 
@@ -114,6 +128,7 @@ public static class DependencyInjectionExtensions
         services.AddScoped<IPasswordHasher, PasswordHasher>();
         services.AddScoped<ICatalogProductTypeSchemaReader, CatalogProductTypeSchemaReader>();
         services.AddScoped<IProductTypeSchemaRepository, ProductTypeSchemaRepository>();
+        services.AddScoped<IProductTypeManagementRepository, ProductTypeManagementRepository>();
         services.AddScoped<ICatalogCharacteristicDefinitionsReader, CatalogCharacteristicDefinitionsReader>();
         services.AddScoped<ICharacteristicDefinitionRepository, CharacteristicDefinitionRepository>();
         services.AddScoped<IProductAuditRepository, ProductAuditRepository>();
@@ -147,6 +162,18 @@ public static class DependencyInjectionExtensions
         services.AddScoped<ICatalogRecognitionRuleSetReportCreator, CatalogRecognitionRuleSetReportCreator>();
         services.AddScoped<ICatalogRecognitionRuleSetReportReader, CatalogRecognitionRuleSetReportReader>();
         services.AddScoped<CatalogRecognitionRuleSetActivationValidator>();
+        services.AddScoped<RecognitionEvaluationAccess>();
+        services.AddScoped<LearningWorkspaceReader>();
+        services.AddScoped<DictionaryEvaluationCapture>();
+        services.AddScoped<ElectronicService.Core.Catalog.Recognition.Evaluation.IDictionaryEvaluationReports, DictionaryEvaluationReports>();
+        services.AddScoped<ElectronicService.Core.Catalog.Recognition.Evaluation.IRecognitionReleaseSession, RecognitionReleaseSession>();
+        services.AddScoped<RecognitionEvaluationCapture>();
+        services.AddScoped<RecognitionEvaluationService>();
+        services.AddScoped<ElectronicService.Core.Catalog.Recognition.Evaluation.RecognitionComparisonEvaluator>();
+        services.AddScoped<ElectronicService.Core.Catalog.Recognition.Evaluation.IRecognitionEvaluationReports, RecognitionEvaluationReports>();
+        services.AddOptions<ElectronicService.Core.Catalog.Recognition.Evaluation.RecognitionEvaluationOptions>()
+            .Bind(configuration.GetSection(ElectronicService.Core.Catalog.Recognition.Evaluation.RecognitionEvaluationOptions.SectionName))
+            .Validate(x => x.IsValid(), "Некорректные пределы RecognitionEvaluation.").ValidateOnStart();
         services.AddScoped<ICatalogRecognitionRuleSetSwitcher, CatalogRecognitionRuleSetSwitcher>();
         services.AddScoped<ICatalogRecognitionActiveRuleSetReader, CatalogRecognitionActiveRuleSetReader>();
         services.AddScoped<ICatalogRecognitionMultiIntegerDraftReader, CatalogRecognitionMultiIntegerDraftReader>();

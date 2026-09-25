@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import Link from "next/link";
+import { LearningContextLink as Link, LearningReturnLink } from "@/features/catalogRecognition/ui/LearningContextLink";
 import { useState } from "react";
 import { deleteCatalogImportBatch } from "@/features/catalogImports/api/deleteCatalogImportBatch";
 import { getMyCatalogImportBatches } from "@/features/catalogImports/api/getMyCatalogImportBatches";
@@ -166,6 +166,8 @@ export default function CatalogImportsPage() {
   }
 
   return (
+    <>
+    <LearningReturnLink />
     <PageWorkspace
       eyebrow="Работа с каталогом"
       title="Импорт каталога"
@@ -393,5 +395,6 @@ export default function CatalogImportsPage() {
         </nav>
       </section>
     </PageWorkspace>
+    </>
   );
 }

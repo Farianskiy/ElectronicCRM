@@ -1,3 +1,4 @@
+using ElectronicService.Core.Catalog.Recognition.Effective;
 using ElectronicService.Core.Auth.Login;
 using ElectronicService.Core.Catalog.Assistant.Abstractions;
 using ElectronicService.Core.Catalog.Assistant.AskCatalogAssistant;
@@ -87,6 +88,7 @@ using ElectronicService.Core.Catalog.Products.UpdateGeneralInformation;
 using ElectronicService.Core.Catalog.Products.UpdatePrice;
 using ElectronicService.Core.Catalog.Products.UpdateStock;
 using ElectronicService.Core.Catalog.ProductTypes.AddOptionalCharacteristic;
+using ElectronicService.Core.Catalog.ProductTypes.CreateProductType;
 using ElectronicService.Core.Catalog.ProductTypes.GetAvailableCharacteristicDefinitions;
 using ElectronicService.Core.Catalog.ProductTypes.GetCharacteristicSchema;
 using ElectronicService.Core.Catalog.ProductTypes.RemoveCharacteristic;
@@ -154,6 +156,7 @@ public static class DependencyInjectionExtensions
         services.AddScoped<ICatalogCharacteristicRecognitionStrategy, IpRatingRecognitionStrategy>();
         services.AddScoped<ICatalogCharacteristicRecognitionStrategy, BooleanAliasRecognitionStrategy>();
         services.AddScoped<ICatalogProductNameRecognitionService, CatalogProductNameRecognitionService>();
+        services.AddScoped<ICatalogEffectiveRecognitionService, CatalogEffectiveRecognitionService>();
         services.AddSingleton<ICatalogProductNameEvidenceCoverageService, CatalogProductNameEvidenceCoverageService>();
         services.AddScoped<ICatalogImportProductNameExplanationService, CatalogImportProductNameExplanationService>();
         services.AddScoped<ICatalogImportManufacturerRecognitionShadowService, CatalogImportManufacturerRecognitionShadowService>();
@@ -180,6 +183,7 @@ public static class DependencyInjectionExtensions
         services.AddScoped<GetCatalogProductTypeCharacteristicSchemaQueryHandler>();
         services.AddScoped<GetAvailableCharacteristicDefinitionsQueryHandler>();
         services.AddScoped<AddOptionalCharacteristicToProductTypeCommandHandler>();
+        services.AddScoped<CreateProductTypeCommandHandler>();
         services.AddScoped<SetProductTypeCharacteristicRequiredCommandHandler>();
         services.AddScoped<RemoveCharacteristicFromProductTypeCommandHandler>();
         services.AddScoped<GetCatalogCharacteristicDefinitionsQueryHandler>();

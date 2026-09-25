@@ -147,11 +147,11 @@ export function CatalogRecognitionIntegerDraftList({
                 draftId={draft.id}
               />
 
-              <CatalogRecognitionIntegerDraftBatchPreviewPanel
+              {batchId && (<CatalogRecognitionIntegerDraftBatchPreviewPanel
                 key={`integer-batch-preview-${draft.id}-${batchId}`}
                 draftId={draft.id}
                 batchId={batchId}
-              />
+              />)}
             </article>
           ))}
         </>

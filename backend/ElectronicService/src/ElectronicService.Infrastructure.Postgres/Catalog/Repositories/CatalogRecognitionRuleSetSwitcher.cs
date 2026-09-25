@@ -69,6 +69,8 @@ public sealed class CatalogRecognitionRuleSetSwitcher
                 "Необходимо войти в систему.");
         }
 
+        await using var mutation = await scope.ServiceProvider.GetRequiredService<IRecognitionMutationGate>()
+            .EnterAsync(cancellationToken).ConfigureAwait(false);
         await using var transaction = await dbContext.Database
             .BeginTransactionAsync(
                 IsolationLevel.Serializable,

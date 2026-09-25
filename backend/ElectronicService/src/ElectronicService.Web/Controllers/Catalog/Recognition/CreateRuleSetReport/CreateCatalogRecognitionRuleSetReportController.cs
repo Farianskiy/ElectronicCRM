@@ -39,7 +39,7 @@ public sealed class CreateCatalogRecognitionRuleSetReportController
             "training.scope_mismatch" => StatusCodes.Status409Conflict,
             "training.invalid_data" => StatusCodes.Status422UnprocessableEntity,
             "training.invalid_report" => StatusCodes.Status422UnprocessableEntity,
-            "training.selection_too_large" => StatusCodes.Status422UnprocessableEntity,
+            "evaluation.timeout" or "evaluation.invalid_label" or "evaluation.invalid_snapshot" or "evaluation.selection_too_large" or "training.selection_too_large" => StatusCodes.Status422UnprocessableEntity,
             _ => StatusCodes.Status400BadRequest
         };
 

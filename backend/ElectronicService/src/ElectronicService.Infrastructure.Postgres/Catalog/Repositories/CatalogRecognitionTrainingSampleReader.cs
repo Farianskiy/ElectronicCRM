@@ -2,6 +2,7 @@ using ElectronicService.Core.Catalog.Recognition.Abstractions;
 using ElectronicService.Core.Catalog.Recognition.Training;
 using ElectronicService.Infrastructure.Postgres.Data;
 using Microsoft.EntityFrameworkCore;
+using ElectronicService.Infrastructure.Postgres.Catalog.Queries;
 
 namespace ElectronicService.Infrastructure.Postgres.Catalog.Repositories;
 
@@ -39,7 +40,8 @@ public sealed class CatalogRecognitionTrainingSampleReader : ICatalogRecognition
 
         var samples = await _dbContext.CatalogRecognitionTrainingExamples
             .AsNoTracking()
-            .Where(example => example.RevokedAtUtc == null && example.ManufacturerId == scope.ManufacturerId && example.ProductTypeId == scope.ProductTypeId && example.CharacteristicDefinitionId == scope.CharacteristicDefinitionId)
+            .ConfirmedExamples(_dbContext.CatalogRecognitionFeedbackEntries).Where(x => !x.IsEvaluationOnly)
+            .InScope(scope.ManufacturerId, scope.ProductTypeId, scope.CharacteristicDefinitionId)
             .OrderBy(example => example.ConfirmedAtUtc)
             .ThenBy(example => example.Id)
             .Select(example => new CatalogRecognitionTrainingSample(

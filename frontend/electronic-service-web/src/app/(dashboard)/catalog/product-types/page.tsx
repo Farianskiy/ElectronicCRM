@@ -12,6 +12,7 @@ import { AppSelect } from "@/shared/ui/AppSelect";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { ProductTypeCharacteristicRequirednessControl } from "@/features/catalogProductTypes/ui/ProductTypeCharacteristicRequirednessControl";
 import { ProductTypeCharacteristicRemovalControl } from "@/features/catalogProductTypes/ui/ProductTypeCharacteristicRemovalControl";
+import { CreateCatalogProductTypeForm } from "@/features/catalogProductTypes/ui/CreateCatalogProductTypeForm";
 
 function getErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
@@ -161,6 +162,15 @@ function CatalogProductTypesContent() {
       <PageHeader
         title="Схемы типов товаров"
         description="Анализ характеристик, обязательности и заполненности данных для каждого типа товара."
+      />
+
+      <CreateCatalogProductTypeForm
+        onCreated={(code, name) => {
+          setSelectedProductTypeCode(code);
+          setSchemaSuccessMessage(
+            `Тип товара «${name}» выбран. Добавьте характеристики в его схему.`,
+          );
+        }}
       />
 
       <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">

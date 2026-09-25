@@ -1,3 +1,4 @@
+using ElectronicService.Core.Catalog.Recognition.Effective;
 using CSharpFunctionalExtensions;
 using ElectronicService.Core.Catalog.Recognition.Abstractions;
 using ElectronicService.Core.Catalog.Recognition.Training;
@@ -6,12 +7,28 @@ using ElectronicService.Domain.Common;
 namespace ElectronicService.CatalogImport.UnitTests;
 
 internal sealed class FakeActiveRuleSetReader(CatalogRecognitionRuleSetExecutionSnapshot? snapshot = null)
-    : ICatalogRecognitionActiveRuleSetReader
+    : ICatalogRecognitionActiveRuleSetReader, ICatalogRecognitionRuleSetExecutionReader
 {
-    public Task CaptureForRunAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyCollection<CatalogRecognitionRuleSetState>> CaptureForRunAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return Task.CompletedTask;
+        IReadOnlyCollection<CatalogRecognitionRuleSetState> states = snapshot is null ? [] :
+            [new(snapshot.ManufacturerId, snapshot.ProductTypeId, 1, null, snapshot.VersionId, null, null)];
+        return Task.FromResult(states);
+    }
+
+    public Task<Result<CatalogRecognitionRuleSetExecutionSnapshot, DomainError>> ReadAsync(Guid versionId, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(snapshot is not null && snapshot.VersionId == versionId
+            ? Result.Success<CatalogRecognitionRuleSetExecutionSnapshot, DomainError>(snapshot)
+            : Result.Failure<CatalogRecognitionRuleSetExecutionSnapshot, DomainError>(new DomainError("training.not_found", "Missing test version")));
+    }
+
+    public static CatalogEffectiveRecognitionService Effective(ICatalogProductNameRecognitionService baseline, CatalogRecognitionRuleSetExecutionSnapshot? rules = null)
+    {
+        var reader = new FakeActiveRuleSetReader(rules);
+        return new CatalogEffectiveRecognitionService(baseline, reader, reader);
     }
 
     public Task<Result<CatalogRecognitionRuleSetState, DomainError>> GetStateAsync(

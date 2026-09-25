@@ -16,11 +16,12 @@ public sealed class CatalogRecognitionCandidateSuggestionPromoter : ICatalogReco
     private readonly ICatalogRecognitionCandidateRepository _candidateRepository;
     private readonly ICatalogAssistantDictionarySuggestionRepository _suggestionRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IRecognitionMutationGate _gate;
 
     public CatalogRecognitionCandidateSuggestionPromoter(
         ICatalogRecognitionCandidateRepository candidateRepository,
         ICatalogAssistantDictionarySuggestionRepository suggestionRepository,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork, IRecognitionMutationGate gate)
     {
         ArgumentNullException.ThrowIfNull(candidateRepository);
         ArgumentNullException.ThrowIfNull(suggestionRepository);
@@ -29,29 +30,28 @@ public sealed class CatalogRecognitionCandidateSuggestionPromoter : ICatalogReco
         _candidateRepository = candidateRepository;
         _suggestionRepository = suggestionRepository;
         _unitOfWork = unitOfWork;
+        _gate = gate;
     }
 
-    public async Task<Result<CatalogRecognitionCandidateSuggestionPromotionResult, DomainError>> PromoteEligibleAsync(Guid createdByUserId, int batchSize = 500, CancellationToken cancellationToken = default)
+    public async Task<Result<CatalogRecognitionCandidateSuggestionPromotionResult, DomainError>> PromoteEligibleAsync(Guid upperId, Guid? after = null, int batchSize = 500, CancellationToken cancellationToken = default)
     {
-        if (createdByUserId == Guid.Empty)
-        {
-            return Result.Failure<CatalogRecognitionCandidateSuggestionPromotionResult, DomainError>(GeneralErrors.ValueIsInvalid(nameof(createdByUserId)));
-        }
-
         if (batchSize is < MinimumBatchSize or > MaximumBatchSize)
         {
             return Result.Failure<CatalogRecognitionCandidateSuggestionPromotionResult, DomainError>(GeneralErrors.ValueIsInvalid(nameof(batchSize)));
         }
 
-        var candidates = await _candidateRepository.GetAccumulatingCandidatesAsync(batchSize, cancellationToken).ConfigureAwait(false);
+        await using var mutation = await _gate.EnterAsync(cancellationToken).ConfigureAwait(false);
+        var candidates = await _candidateRepository.GetAccumulatingCandidatesAsync(upperId, after, batchSize, cancellationToken).ConfigureAwait(false);
 
         var eligibleCandidateCount = 0;
         var createdSuggestionCount = 0;
         var attachedExistingSuggestionCount = 0;
         var deferredCandidateCount = 0;
+        var missingAuthorCount = 0;
 
         foreach (var candidate in candidates)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!CatalogRecognitionCandidateSuggestionPolicy.IsEligible(candidate))
             {
                 deferredCandidateCount++;
@@ -60,12 +60,20 @@ public sealed class CatalogRecognitionCandidateSuggestionPromoter : ICatalogReco
 
             eligibleCandidateCount++;
 
+            var createdByUserId = await _candidateRepository.GetOriginatingReviewerAsync(candidate.Id, cancellationToken).ConfigureAwait(false);
+            if (createdByUserId is null)
+            {
+                missingAuthorCount++;
+                deferredCandidateCount++;
+                continue;
+            }
+
             var confidence = CatalogRecognitionCandidateSuggestionPolicy.CalculateConfidence(candidate);
 
             var suggestionResult = CatalogAssistantDictionarySuggestion.CreateFromRecognitionCandidate(
                 candidate,
                 confidence,
-                createdByUserId);
+                createdByUserId.Value);
 
             if (suggestionResult.IsFailure)
             {
@@ -121,6 +129,8 @@ public sealed class CatalogRecognitionCandidateSuggestionPromoter : ICatalogReco
                 eligibleCandidateCount,
                 createdSuggestionCount,
                 attachedExistingSuggestionCount,
-                deferredCandidateCount));
+                deferredCandidateCount,
+                missingAuthorCount,
+                candidates.LastOrDefault()?.Id));
     }
 }

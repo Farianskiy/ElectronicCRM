@@ -20,6 +20,13 @@ public static class CatalogErrors
             $"Характеристика с кодом '{code}' уже существует.");
     }
 
+    public static DomainError ProductTypeAlreadyExists(string code)
+    {
+        return new DomainError(
+            "catalog.product_type.already_exists",
+            $"Тип товара с кодом '{code}' уже существует.");
+    }
+
     public static DomainError CharacteristicAlreadyAddedToProductType(string code)
     {
         return new DomainError(

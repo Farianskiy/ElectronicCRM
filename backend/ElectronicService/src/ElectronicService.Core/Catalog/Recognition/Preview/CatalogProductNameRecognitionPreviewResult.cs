@@ -8,4 +8,9 @@ public sealed record CatalogProductNameRecognitionPreviewResult(
     string? ProductTypeName,
     IReadOnlyCollection<string>? AllowedCharacteristicCodes,
     IReadOnlyCollection<CatalogCharacteristicRecognitionProfileResult> RecognitionProfiles,
-    CatalogProductNameRecognitionResult RecognitionResult);
+    CatalogProductNameRecognitionResult RecognitionResult,
+    Guid? ManufacturerId,
+    string? ManufacturerName,
+    bool HasCompleteScope,
+    Guid? ActiveRuleSetVersionId,
+    long? ActiveRuleSetSequenceNumber);

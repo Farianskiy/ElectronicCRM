@@ -17,6 +17,8 @@ public sealed class CatalogRecognitionRuleSetActivationValidator
         new(JsonSerializerDefaults.Web);
 
     private readonly ElectronicDbContext _dbContext;
+    private readonly RecognitionEvaluationService _evaluation;
+    private readonly RecognitionEvaluationAccess _access;
     private readonly ICurrentUserProvider _currentUserProvider;
     private readonly ICatalogImportBatchRepository _batchRepository;
     private readonly CatalogRecognitionRuleSetBatchPreviewService _previewService;
@@ -27,9 +29,11 @@ public sealed class CatalogRecognitionRuleSetActivationValidator
         ICurrentUserProvider currentUserProvider,
         ICatalogImportBatchRepository batchRepository,
         CatalogRecognitionRuleSetBatchPreviewService previewService,
-        CatalogRecognitionRuleSetTrainingCheckService trainingService)
+        CatalogRecognitionRuleSetTrainingCheckService trainingService, RecognitionEvaluationService evaluation, RecognitionEvaluationAccess access)
     {
         _dbContext = dbContext;
+        _evaluation = evaluation;
+        _access = access;
         _currentUserProvider = currentUserProvider;
         _batchRepository = batchRepository;
         _previewService = previewService;
@@ -60,6 +64,9 @@ public sealed class CatalogRecognitionRuleSetActivationValidator
                 "Необходимо войти в систему.");
         }
 
+        var authorization = await _access.AuthorizeAsync(cancellationToken).ConfigureAwait(false);
+        if (authorization.IsFailure) return UnitResult.Failure(authorization.Error);
+
         if (versionId == Guid.Empty || reportId == Guid.Empty)
         {
             return Fail(
@@ -88,6 +95,9 @@ public sealed class CatalogRecognitionRuleSetActivationValidator
                 "training.conflict",
                 "Отчёт относится к другой версии правил.");
         }
+
+        var comparison = await _evaluation.ValidateAsync(report, userId, cancellationToken).ConfigureAwait(false);
+        if (comparison.IsFailure) return comparison;
 
         if (report.SnapshotFormatVersion != 1 ||
             !string.Equals(
@@ -143,6 +153,8 @@ public sealed class CatalogRecognitionRuleSetActivationValidator
 
         if (firstPage.IsFailure)
         {
+            if (string.Equals(firstPage.Error.Code, "training.not_found", StringComparison.Ordinal))
+                return Fail("evaluation.stale", "Пакет проверки удалён или недоступен. Для включения требуется новая оценка на доступном импорте.");
             return UnitResult.Failure(firstPage.Error);
         }
 

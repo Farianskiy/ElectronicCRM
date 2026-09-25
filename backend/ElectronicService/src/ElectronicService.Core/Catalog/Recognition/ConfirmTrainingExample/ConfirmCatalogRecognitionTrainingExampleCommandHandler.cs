@@ -24,6 +24,7 @@ public sealed class ConfirmCatalogRecognitionTrainingExampleCommandHandler
     private readonly ICatalogProductMetadataRepository _metadataRepository;
     private readonly ICatalogRecognitionFeedbackRepository _feedbackRepository;
     private readonly ICatalogRecognitionTrainingExampleRepository _exampleRepository;
+    private readonly IRecognitionMutationGate _gate;
 
     public ConfirmCatalogRecognitionTrainingExampleCommandHandler(
         ICurrentUserProvider currentUserProvider,
@@ -32,7 +33,7 @@ public sealed class ConfirmCatalogRecognitionTrainingExampleCommandHandler
         ICatalogImportBatchRepository batchRepository,
         ICatalogProductMetadataRepository metadataRepository,
         ICatalogRecognitionFeedbackRepository feedbackRepository,
-        ICatalogRecognitionTrainingExampleRepository exampleRepository)
+        ICatalogRecognitionTrainingExampleRepository exampleRepository, IRecognitionMutationGate gate)
     {
         _currentUserProvider = currentUserProvider;
         _userRepository = userRepository;
@@ -41,11 +42,13 @@ public sealed class ConfirmCatalogRecognitionTrainingExampleCommandHandler
         _metadataRepository = metadataRepository;
         _feedbackRepository = feedbackRepository;
         _exampleRepository = exampleRepository;
+        _gate = gate;
     }
 
     public async Task<Result<Guid, DomainError>> Handle(ConfirmCatalogRecognitionTrainingExampleCommand command, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command);
+        await using var mutation = await _gate.EnterAsync(cancellationToken).ConfigureAwait(false);
 
         if (_currentUserProvider.UserId is not Guid userId || userId == Guid.Empty)
         {

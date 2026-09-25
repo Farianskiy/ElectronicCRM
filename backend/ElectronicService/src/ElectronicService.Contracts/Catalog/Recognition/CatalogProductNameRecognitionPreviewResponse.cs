@@ -11,4 +11,9 @@ public sealed record CatalogProductNameRecognitionPreviewResponse(
     string NormalizedProductName,
     IReadOnlyCollection<CatalogRecognizedCharacteristicResponse> Characteristics,
     IReadOnlyCollection<CatalogRecognitionConflictResponse> Conflicts,
-    IReadOnlyCollection<CatalogRecognizedCharacteristicResponse> Candidates);
+    IReadOnlyCollection<CatalogRecognizedCharacteristicResponse> Candidates,
+    Guid? ManufacturerId,
+    string? ManufacturerName,
+    bool HasCompleteScope,
+    Guid? ActiveRuleSetVersionId,
+    long? ActiveRuleSetSequenceNumber);

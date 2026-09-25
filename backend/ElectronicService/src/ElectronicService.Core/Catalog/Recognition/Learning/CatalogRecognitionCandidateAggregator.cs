@@ -13,42 +13,26 @@ public sealed class CatalogRecognitionCandidateAggregator : ICatalogRecognitionC
     public const int MaximumBatchSize = 5000;
 
     private readonly ICatalogRecognitionCandidateRepository _candidateRepository;
+    private readonly IRecognitionMutationGate _gate;
 
-    public CatalogRecognitionCandidateAggregator(ICatalogRecognitionCandidateRepository candidateRepository)
+    public CatalogRecognitionCandidateAggregator(ICatalogRecognitionCandidateRepository candidateRepository, IRecognitionMutationGate gate)
     {
         ArgumentNullException.ThrowIfNull(candidateRepository);
 
         _candidateRepository = candidateRepository;
+        _gate = gate;
     }
 
-    public async Task<Result<CatalogRecognitionCandidateAggregationResult, DomainError>> AggregateAsync(int batchSize = 500, CancellationToken cancellationToken = default)
+    public async Task<Result<CatalogRecognitionCandidateAggregationResult, DomainError>> AggregateAsync(CatalogRecognitionFeedbackType feedbackType, DateTime cutoffUtc, CatalogRecognitionFeedbackCursor? after = null, int batchSize = 500, CancellationToken cancellationToken = default)
     {
         if (batchSize is < MinimumBatchSize or > MaximumBatchSize)
         {
             return Result.Failure<CatalogRecognitionCandidateAggregationResult, DomainError>(GeneralErrors.ValueIsInvalid(nameof(batchSize)));
         }
 
-        var correctedFeedback = await _candidateRepository.GetUnprocessedFinalizedFeedbackAsync(
-            CatalogRecognitionFeedbackType.Corrected,
-            batchSize,
-            cancellationToken).ConfigureAwait(false);
-
-        var acceptedFeedback = await _candidateRepository.GetUnprocessedFinalizedFeedbackAsync(
-            CatalogRecognitionFeedbackType.Accepted,
-            batchSize,
-            cancellationToken).ConfigureAwait(false);
-
-        var rejectedFeedback = await _candidateRepository.GetUnprocessedFinalizedFeedbackAsync(
-            CatalogRecognitionFeedbackType.Rejected,
-            batchSize,
-            cancellationToken).ConfigureAwait(false);
-
-        var feedbackEntries = new List<CatalogRecognitionFeedback>(
-            correctedFeedback.Count + acceptedFeedback.Count + rejectedFeedback.Count);
-
-        feedbackEntries.AddRange(correctedFeedback);
-        feedbackEntries.AddRange(acceptedFeedback);
-        feedbackEntries.AddRange(rejectedFeedback);
+        await using var mutation = await _gate.EnterAsync(cancellationToken).ConfigureAwait(false);
+        var feedbackEntries = await _candidateRepository.GetUnprocessedFinalizedFeedbackAsync(
+            feedbackType, cutoffUtc, after, batchSize, cancellationToken).ConfigureAwait(false);
 
         var createdCandidateCount = 0;
         var addedEvidenceCount = 0;
@@ -60,6 +44,7 @@ public sealed class CatalogRecognitionCandidateAggregator : ICatalogRecognitionC
 
         foreach (var feedback in feedbackEntries)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var identity = BuildCandidateIdentity(feedback);
 
             if (identity is null)
@@ -178,7 +163,9 @@ public sealed class CatalogRecognitionCandidateAggregator : ICatalogRecognitionC
             updatedCandidateIds.Count,
             addedEvidenceCount,
             alreadyProcessedFeedbackCount,
-            deferredFeedbackCount);
+            deferredFeedbackCount,
+            feedbackEntries.LastOrDefault() is { } last
+                ? new CatalogRecognitionFeedbackCursor(last.FinalizedAtUtc!.Value, last.Id) : null);
     }
 
     private static CandidateIdentity? BuildCandidateIdentity(CatalogRecognitionFeedback feedback)

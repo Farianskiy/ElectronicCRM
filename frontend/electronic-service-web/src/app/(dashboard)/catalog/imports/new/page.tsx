@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import Link from "next/link";
+import { LearningContextLink as Link, LearningReturnLink } from "@/features/catalogRecognition/ui/LearningContextLink";
 import { useRouter } from "next/navigation";
 import {
   useRef,
@@ -86,7 +86,9 @@ export default function NewCatalogImportPage() {
         queryKey: catalogImportQueryKeys.myRoot,
       });
 
-      router.push(`/catalog/imports/${analysisResult.batchId}`);
+      const returnTo = new URLSearchParams(window.location.search).get("learningReturn");
+      const context = returnTo?.startsWith("/catalog/recognition/learning?") ? `?learningReturn=${encodeURIComponent(returnTo)}` : "";
+      router.push(`/catalog/imports/${analysisResult.batchId}${context}`);
     },
 
     onError: () => {
@@ -189,6 +191,8 @@ export default function NewCatalogImportPage() {
   }
 
   return (
+    <>
+    <LearningReturnLink />
     <PageWorkspace
       eyebrow="Работа с каталогом"
       title="Загрузка Excel"
@@ -411,6 +415,7 @@ export default function NewCatalogImportPage() {
         </div>
       </form>
     </PageWorkspace>
+    </>
   );
 }
 

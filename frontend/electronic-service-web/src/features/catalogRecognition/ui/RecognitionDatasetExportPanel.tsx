@@ -101,12 +101,15 @@ export function RecognitionDatasetExportPanel() {
   return (
     <section className="rounded-3xl border border-cyan-500/25 bg-cyan-500/[0.05] p-6">
       <div>
-        <h2 className="text-xl font-semibold text-white">ML-датасет</h2>
+        <h2 className="text-xl font-semibold text-white">Экспорт: проверенная обратная связь</h2>
 
         <p className="mt-2 text-sm text-slate-400">
           Экспортирует только финализированные Feedback, которые разрешены для
           обучения. Одна строка JSONL соответствует одному человеческому
-          решению.
+          решению. Записи могут не иметь явно подтверждённого обучающего фрагмента.
+          Отзыв подтверждения примера не меняет этот источник. Для действующей явной
+          разметки используйте «Экспорт подтверждённых примеров» в разделе выше.
+          Уже скачанные файлы не изменяются после отзыва.
         </p>
       </div>
 

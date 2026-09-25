@@ -1,12 +1,17 @@
+using ElectronicService.Core.Catalog.Recognition.Learning;
 using ElectronicService.Domain.Catalog.Recognition;
 
 namespace ElectronicService.Core.Catalog.Recognition.Abstractions;
 
 public interface ICatalogRecognitionCandidateRepository
 {
-    Task<IReadOnlyCollection<CatalogRecognitionFeedback>> GetUnprocessedFinalizedFeedbackAsync(CatalogRecognitionFeedbackType feedbackType, int batchSize, CancellationToken cancellationToken = default);
+    Task<IReadOnlyCollection<CatalogRecognitionFeedback>> GetUnprocessedFinalizedFeedbackAsync(CatalogRecognitionFeedbackType feedbackType, DateTime cutoffUtc, CatalogRecognitionFeedbackCursor? after, int batchSize, CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyCollection<CatalogRecognitionCandidate>> GetAccumulatingCandidatesAsync(int batchSize, CancellationToken cancellationToken = default);
+    Task<IReadOnlyCollection<CatalogRecognitionCandidate>> GetAccumulatingCandidatesAsync(Guid upperId, Guid? after, int batchSize, CancellationToken cancellationToken = default);
+
+    Task<Guid?> GetAccumulatingUpperIdAsync(CancellationToken cancellationToken = default);
+
+    Task<Guid?> GetOriginatingReviewerAsync(Guid candidateId, CancellationToken cancellationToken = default);
 
     Task<CatalogRecognitionCandidate?> GetByCandidateKeyAsync(string candidateKey, CancellationToken cancellationToken = default);
 

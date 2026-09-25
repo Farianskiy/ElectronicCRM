@@ -6,4 +6,5 @@ public sealed record CatalogRecognitionCandidateAggregationResult(
     int UpdatedCandidateCount,
     int AddedEvidenceCount,
     int AlreadyProcessedFeedbackCount,
-    int DeferredFeedbackCount);
+    int DeferredFeedbackCount,
+    CatalogRecognitionFeedbackCursor? NextCursor);

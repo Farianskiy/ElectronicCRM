@@ -111,9 +111,8 @@ public sealed class CatalogImportPipelineTests
         Assert.True(assignmentResult.IsSuccess);
 
         var enrichmentResult = await new CatalogImportRecognitionEnrichmentService(
-                new FakeRecognitionService(CreateRecognizedCharacteristic(definition.Code)),
-                new CatalogImportRowValidator(),
-                new FakeActiveRuleSetReader())
+                FakeActiveRuleSetReader.Effective(new FakeRecognitionService(CreateRecognizedCharacteristic(definition.Code))),
+                new CatalogImportRowValidator())
             .EnrichAsync(
                 assignmentResult.Value,
                 productType,
@@ -181,9 +180,8 @@ public sealed class CatalogImportPipelineTests
                 []));
 
         var result = await new CatalogImportRecognitionEnrichmentService(
-                new FakeRecognitionService(CreateRecognizedCharacteristic(definition.Code)),
-                new CatalogImportRowValidator(),
-                new FakeActiveRuleSetReader())
+                FakeActiveRuleSetReader.Effective(new FakeRecognitionService(CreateRecognizedCharacteristic(definition.Code))),
+                new CatalogImportRowValidator())
             .EnrichAsync(
                 analysis,
                 productType,

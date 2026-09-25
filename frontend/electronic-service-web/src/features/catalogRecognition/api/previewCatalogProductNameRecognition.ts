@@ -13,6 +13,7 @@ export async function previewCatalogProductNameRecognition(
       {
         productName: parameters.productName,
         productTypeCode: parameters.productTypeCode,
+        manufacturerId: parameters.manufacturerId ?? null,
       },
     );
 

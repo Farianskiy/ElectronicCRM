@@ -15,6 +15,7 @@ import { CatalogRecognitionRuleSetVersionList } from "./CatalogRecognitionRuleSe
 import { CatalogRecognitionRuleSetVersionCreate } from "./CatalogRecognitionRuleSetVersionCreate";
 
 interface CatalogRecognitionMultiIntegerPreviewProps {
+  hideVersionManagement?: boolean;
   batchId: string;
   manufacturerId: string;
   productTypeId: string;
@@ -27,6 +28,7 @@ export function CatalogRecognitionMultiIntegerPreview({
   manufacturerId,
   productTypeId,
   characteristics,
+  hideVersionManagement = false,
   disabled,
 }: CatalogRecognitionMultiIntegerPreviewProps) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -298,7 +300,7 @@ export function CatalogRecognitionMultiIntegerPreview({
                 />
               )}
 
-              {proposal.passedExamples && mutation.variables && (
+              {batchId && proposal.passedExamples && mutation.variables && (
                 <CatalogRecognitionMultiIntegerBatchPreviewPanel
                   key={JSON.stringify([
                     "multi-integer-batch",
@@ -348,6 +350,7 @@ export function CatalogRecognitionMultiIntegerPreview({
         disabled={disabled}
       />
 
+      {!hideVersionManagement && <>
       <CatalogRecognitionRuleSetVersionCreate
         key={JSON.stringify([
           "create-recognition-rule-set-version",
@@ -372,6 +375,7 @@ export function CatalogRecognitionMultiIntegerPreview({
         productTypeId={productTypeId}
         disabled={disabled}
       />
+      </>}
     </section>
   );
 }

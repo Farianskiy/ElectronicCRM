@@ -112,6 +112,13 @@ public sealed class CatalogAssistantDictionarySuggestion : AggregateRoot
     public int? ApprovedPriority { get; private set; }
 
     public Guid? CreatedDictionaryTermId { get; private set; }
+    public Guid? EvaluationReportId { get; private set; }
+
+    public void RecordEvaluation(Guid reportId)
+    {
+        if (!IsApproved || reportId == Guid.Empty || EvaluationReportId.HasValue) throw new InvalidOperationException("Evaluation can only be attached once to an approved suggestion.");
+        EvaluationReportId = reportId;
+    }
 
     public CatalogAssistantDictionarySuggestionStatus Status { get; private set; }
 

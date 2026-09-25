@@ -89,7 +89,7 @@ public sealed class CatalogImportReanalysisTests
             Guid.NewGuid(), manufacturerId, productType.Id, 1,
             [new CatalogRecognitionLiteralExecutionRule(Guid.NewGuid(), definition.Id, "literal-v1", "х-ка D", "D")], [], []);
         var enrichment = await new CatalogImportRecognitionEnrichmentService(
-                new EmptyRecognition(), new CatalogImportRowValidator(), new FakeActiveRuleSetReader(snapshot))
+                FakeActiveRuleSetReader.Effective(new EmptyRecognition(), snapshot), new CatalogImportRowValidator())
             .EnrichAsync(assignment.Value, productType, [definition], TestContext.Current.CancellationToken);
         Assert.True(enrichment.IsSuccess);
         var row = Assert.Single(enrichment.Value.Analysis.Rows);
@@ -137,8 +137,8 @@ public sealed class CatalogImportReanalysisTests
             new CatalogImportManufacturerResolutionSummary(0, 0, 0, 0, 0, []));
         var candidate = new CatalogRecognizedCharacteristic(definition.Code, "16A", "16", 0.96m,
             CatalogRecognitionSource.Dictionary, 8, 3, 100, "test:dictionary");
-        var service = new CatalogImportRecognitionEnrichmentService(new EmptyRecognition(candidate),
-            new CatalogImportRowValidator(), new FakeActiveRuleSetReader());
+        var service = new CatalogImportRecognitionEnrichmentService(FakeActiveRuleSetReader.Effective(new EmptyRecognition(candidate)),
+            new CatalogImportRowValidator());
         var result = await service.EnrichAsync(analysis, productType, [definition], TestContext.Current.CancellationToken);
         Assert.True(result.IsSuccess);
         var actual = JsonSerializer.Deserialize<CatalogImportNormalizedRowData>(row.NormalizedDataJson, JsonOptions)!;
@@ -147,8 +147,8 @@ public sealed class CatalogImportReanalysisTests
         Assert.Contains("16", row.WarningsJson, StringComparison.Ordinal);
 
         var confidentService = new CatalogImportRecognitionEnrichmentService(
-            new EmptyRecognition(candidate with { Confidence = 0.99m }),
-            new CatalogImportRowValidator(), new FakeActiveRuleSetReader());
+            FakeActiveRuleSetReader.Effective(new EmptyRecognition(candidate with { Confidence = 0.99m })),
+            new CatalogImportRowValidator());
         var rerun = await confidentService.EnrichAsync(result.Value.Analysis, productType, [definition], TestContext.Current.CancellationToken);
         Assert.True(rerun.IsSuccess);
         actual = JsonSerializer.Deserialize<CatalogImportNormalizedRowData>(row.NormalizedDataJson, JsonOptions)!;

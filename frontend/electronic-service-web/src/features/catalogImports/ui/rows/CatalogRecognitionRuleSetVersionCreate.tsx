@@ -17,6 +17,7 @@ import { getRecognitionMultiIntegerDrafts } from "../../api/getRecognitionMultiI
 import { recognitionRuleSetVersionsQueryRoot } from "../../api/getRecognitionRuleSetVersions";
 
 interface CatalogRecognitionRuleSetVersionCreateProps {
+  onOpenVersion?: (id: string) => void;
   manufacturerId: string;
   productTypeId: string;
   characteristics: CatalogProductTypeCharacteristicMetadata[];
@@ -57,6 +58,7 @@ export function CatalogRecognitionRuleSetVersionCreate({
   productTypeId,
   characteristics,
   disabled,
+  onOpenVersion,
 }: CatalogRecognitionRuleSetVersionCreateProps) {
   const [name, setName] = useState("");
   const [kind, setKind] = useState<RuleKind>(3);
@@ -331,7 +333,18 @@ export function CatalogRecognitionRuleSetVersionCreate({
               <legend className="mb-2">Доступные черновики</legend>
 
               {drafts.data.items.length === 0 && (
-                <p>На этой странице нет сохранённых черновиков.</p>
+                <div className="rounded-xl border border-[var(--app-accent-border)] bg-[var(--app-accent-soft)] p-3">
+                  <p className="font-medium">
+                    Для выбранного вида сохранённых черновиков нет
+                  </p>
+
+                  <p className="mt-1 text-[var(--app-muted)]">
+                    Откройте шаг «1. Подготовить черновики», сгенерируйте и
+                    сохраните правило либо выберите здесь другой вид черновиков.
+                    Для точных и одиночных числовых правил необходимо также
+                    выбрать характеристику.
+                  </p>
+                </div>
               )}
 
               {drafts.data.items.map((draft) => {
@@ -429,6 +442,25 @@ export function CatalogRecognitionRuleSetVersionCreate({
         </p>
       )}
 
+      {selected.length === 0 && (
+        <p
+          role="status"
+          className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-3 text-[var(--app-muted)]"
+        >
+          Кнопка создания версии недоступна, потому что в состав не выбран ни
+          один черновик. Отметьте хотя бы один доступный черновик выше.
+        </p>
+      )}
+
+      {selected.length > 0 && name.trim().length === 0 && (
+        <p
+          role="status"
+          className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-3 text-[var(--app-muted)]"
+        >
+          Укажите название версии, чтобы завершить создание.
+        </p>
+      )}
+
       <AppButton
         type="button"
         variant="secondary"
@@ -463,6 +495,11 @@ export function CatalogRecognitionRuleSetVersionCreate({
           </p>
           <p className="break-all">Идентификатор: {creation.data.id}</p>
           <p>Версия не активирована. Данные импорта не изменены.</p>
+          {onOpenVersion && (
+            <AppButton onClick={() => onOpenVersion(creation.data.id)}>
+              Открыть созданную версию для оценки
+            </AppButton>
+          )}
         </div>
       )}
     </section>

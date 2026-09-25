@@ -382,17 +382,10 @@ public sealed class AnalyzeCatalogImportBatchCommandHandler
         CatalogImportRecognitionShadowResult? recognitionShadow = null;
         var recognitionEnrichment = CatalogImportRecognitionEnrichmentSummary.Empty;
         var effectiveAnalysis = analysis;
+        IReadOnlyDictionary<int, CatalogImportRowRecognition> recognitionResults = new Dictionary<int, CatalogImportRowRecognition>();
 
         if (productType is not null && definitions.Count > 0 && preservedRows.Count == 0)
         {
-            recognitionShadow = await _recognitionShadowService
-                .AnalyzeAsync(
-                    analysis,
-                    productType,
-                    definitions,
-                    cancellationToken)
-                .ConfigureAwait(false);
-
             var enrichmentResult = await _recognitionEnrichmentService
                 .EnrichAsync(
                     analysis,
@@ -409,6 +402,7 @@ public sealed class AnalyzeCatalogImportBatchCommandHandler
 
             effectiveAnalysis = enrichmentResult.Value.Analysis;
             recognitionEnrichment = enrichmentResult.Value.Summary;
+            recognitionResults = enrichmentResult.Value.RecognitionResults ?? recognitionResults;
         }
         else if (!analysis.MappingRequired)
         {
@@ -425,11 +419,17 @@ public sealed class AnalyzeCatalogImportBatchCommandHandler
 
             effectiveAnalysis = enrichmentResult.Value.Analysis;
             recognitionEnrichment = enrichmentResult.Value.Summary;
+            recognitionResults = enrichmentResult.Value.RecognitionResults ?? recognitionResults;
+        }
+
+        if (!analysis.MappingRequired)
+        {
+            recognitionShadow = _recognitionShadowService.Analyze(effectiveAnalysis, recognitionResults, cancellationToken);
         }
 
         var productNameExplanation =
             _productNameExplanationService.Analyze(
-                analysis,
+                effectiveAnalysis,
                 manufacturerRecognitionShadow,
                 productTypeSuggestionShadow,
                 recognitionShadow,
@@ -540,6 +540,7 @@ public sealed class AnalyzeCatalogImportBatchCommandHandler
         }
 
         var summaries = new List<CatalogImportRecognitionEnrichmentSummary>();
+        var recognitionResults = new Dictionary<int, CatalogImportRowRecognition>();
 
         foreach (var group in typedRows.GroupBy(item => item.ProductTypeId))
         {
@@ -592,6 +593,10 @@ public sealed class AnalyzeCatalogImportBatchCommandHandler
             }
 
             summaries.Add(enrichmentResult.Value.Summary);
+            foreach (var item in enrichmentResult.Value.RecognitionResults ?? new Dictionary<int, CatalogImportRowRecognition>())
+            {
+                recognitionResults.Add(item.Key, item.Value);
+            }
         }
 
         var effectiveAnalysis = analysis with
@@ -605,7 +610,8 @@ public sealed class AnalyzeCatalogImportBatchCommandHandler
         return Result.Success<CatalogImportRecognitionEnrichmentResult, DomainError>(
             new CatalogImportRecognitionEnrichmentResult(
                 effectiveAnalysis,
-                MergeEnrichmentSummaries(summaries)));
+                MergeEnrichmentSummaries(summaries),
+                recognitionResults));
     }
 
     private static CatalogImportRecognitionEnrichmentSummary MergeEnrichmentSummaries(

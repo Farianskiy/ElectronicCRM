@@ -10,7 +10,8 @@ using ElectronicService.Domain.Catalog.Characteristics;
 using ElectronicService.Domain.Catalog.ImportBatches;
 using ElectronicService.Domain.Catalog.ProductTypes;
 using ElectronicService.Domain.Common;
-using ElectronicService.Core.Catalog.Recognition.Training;
+using ElectronicService.Core.Catalog.Recognition.Effective;
+using static ElectronicService.Core.Catalog.Recognition.Effective.CatalogRecognitionCharacteristicValueNormalizer;
 
 namespace ElectronicService.Core.Catalog.ImportBatches.Analysis;
 
@@ -24,22 +25,19 @@ public sealed class CatalogImportRecognitionEnrichmentService : ICatalogImportRe
         PropertyNameCaseInsensitive = true
     };
 
-    private readonly ICatalogProductNameRecognitionService _recognitionService;
+    private readonly ICatalogEffectiveRecognitionService _recognitionService;
     private readonly ICatalogImportRowValidator _rowValidator;
-    private readonly ICatalogRecognitionActiveRuleSetReader _activeRuleSetReader;
+    private CatalogRecognitionRunContext? _runContext;
 
     public CatalogImportRecognitionEnrichmentService(
-        ICatalogProductNameRecognitionService recognitionService,
-        ICatalogImportRowValidator rowValidator,
-        ICatalogRecognitionActiveRuleSetReader activeRuleSetReader)
+        ICatalogEffectiveRecognitionService recognitionService,
+        ICatalogImportRowValidator rowValidator)
     {
         ArgumentNullException.ThrowIfNull(recognitionService);
         ArgumentNullException.ThrowIfNull(rowValidator);
-        ArgumentNullException.ThrowIfNull(activeRuleSetReader);
 
         _recognitionService = recognitionService;
         _rowValidator = rowValidator;
-        _activeRuleSetReader = activeRuleSetReader;
     }
 
     public async Task<Result<CatalogImportRecognitionEnrichmentResult, DomainError>> EnrichAsync(
@@ -62,8 +60,7 @@ public sealed class CatalogImportRecognitionEnrichmentService : ICatalogImportRe
 
         var definitionsByCode = GetDefinitionsByCode(productType, characteristicDefinitions);
 
-        var activeRuleSets =
-            new Dictionary<Guid, CatalogRecognitionActiveRuleSet>();
+        var recognitionResults = new Dictionary<int, CatalogImportRowRecognition>();
 
         var rowsAnalyzedCount = 0;
         var filledRowsCount = 0;
@@ -106,7 +103,6 @@ public sealed class CatalogImportRecognitionEnrichmentService : ICatalogImportRe
                         data,
                         productType,
                         definitionsByCode,
-                        activeRuleSets,
                         cancellationToken)
                     .ConfigureAwait(false);
 
@@ -115,7 +111,8 @@ public sealed class CatalogImportRecognitionEnrichmentService : ICatalogImportRe
                     return recognized.Error;
                 }
 
-                recognitionResult = recognized.Value;
+                recognitionResult = recognized.Value.Recognition;
+                recognitionResults.Add(row.RowNumber, new CatalogImportRowRecognition(data, definitionsByCode.Values.ToArray(), recognized.Value));
             }
             catch (RegexMatchTimeoutException)
             {
@@ -425,7 +422,8 @@ public sealed class CatalogImportRecognitionEnrichmentService : ICatalogImportRe
         return Result.Success<CatalogImportRecognitionEnrichmentResult, DomainError>(
             new CatalogImportRecognitionEnrichmentResult(
                 enrichedAnalysis,
-                summary));
+                summary,
+                recognitionResults));
     }
 
     private static bool HasCharacteristicValue(Dictionary<string, string> characteristics, string definitionKey)
@@ -483,40 +481,6 @@ public sealed class CatalogImportRecognitionEnrichmentService : ICatalogImportRe
                    StringComparison.Ordinal);
     }
 
-    private static bool TryNormalizeRecognizedValue(
-    CharacteristicDefinition definition,
-    string rawValue,
-    string? manufacturerName,
-    out string normalizedValue)
-    {
-        switch (definition.DataType)
-        {
-            case CharacteristicDataType.Text:
-                return CatalogCharacteristicTextValueNormalizer.TryNormalizeToString(
-                    definition.Code,
-                    rawValue,
-                    manufacturerName,
-                    out normalizedValue);
-
-            case CharacteristicDataType.Number:
-                return CatalogCharacteristicNumericValueNormalizer.TryNormalizeToString(
-                    definition.Code,
-                    rawValue,
-                    out normalizedValue);
-
-            case CharacteristicDataType.Boolean:
-                return CatalogCharacteristicBooleanValueNormalizer.TryNormalizeToString(
-                    definition.Code,
-                    rawValue,
-                    out normalizedValue);
-
-            default:
-                normalizedValue = string.Empty;
-
-                return false;
-        }
-    }
-
     private static CatalogImportNormalizedRowData? DeserializeNormalizedData(string normalizedDataJson)
     {
         try
@@ -553,307 +517,32 @@ public sealed class CatalogImportRecognitionEnrichmentService : ICatalogImportRe
         }
     }
 
-    private async Task<
-    Result<CatalogProductNameRecognitionResult, DomainError>>
-    MergeActiveRulesAsync(
-        CatalogImportNormalizedRowData data,
-        ProductType productType,
-        Dictionary<string, CharacteristicDefinition> definitionsByCode,
-        CatalogProductNameRecognitionResult recognition,
-        Dictionary<Guid, CatalogRecognitionActiveRuleSet> activeRuleSets,
-        CancellationToken cancellationToken)
-    {
-        if (data.ManufacturerId is not Guid manufacturerId ||
-            manufacturerId == Guid.Empty)
-        {
-            return recognition;
-        }
-
-        if (!activeRuleSets.TryGetValue(manufacturerId, out var active))
-        {
-            var loaded = await _activeRuleSetReader.LoadAsync(
-                manufacturerId,
-                productType.Id,
-                cancellationToken)
-                .ConfigureAwait(false);
-
-            if (loaded.IsFailure)
-            {
-                return loaded.Error;
-            }
-
-            active = loaded.Value;
-            activeRuleSets.Add(manufacturerId, active);
-        }
-
-        var snapshot = active.Snapshot;
-
-        if (snapshot is null)
-        {
-            return recognition;
-        }
-
-        var definitionsById = definitionsByCode.Values
-            .ToDictionary(definition => definition.Id);
-
-        var numericIds = snapshot.NumericRules
-            .Select(rule => rule.CharacteristicDefinitionId)
-            .Concat(
-                snapshot.MultiNumericRules.SelectMany(rule =>
-                    rule.Pattern.Parts
-                        .Where(part =>
-                            part.CharacteristicDefinitionId.HasValue)
-                        .Select(part =>
-                            part.CharacteristicDefinitionId
-                                .GetValueOrDefault())))
-            .ToHashSet();
-
-        var referencedIds = snapshot.LiteralRules
-            .Select(rule => rule.CharacteristicDefinitionId)
-            .Concat(numericIds)
-            .Distinct();
-
-        foreach (var characteristicId in referencedIds)
-        {
-            if (!definitionsById.TryGetValue(
-                    characteristicId,
-                    out var definition))
-            {
-                return new DomainError(
-                    "recognition.active_rule_invalid",
-                    $"Характеристика {characteristicId} активной версии "
-                    + "отсутствует среди доступных характеристик типа товара.");
-            }
-
-            if (numericIds.Contains(characteristicId) &&
-                definition.DataType != CharacteristicDataType.Number)
-            {
-                return new DomainError(
-                    "recognition.active_rule_invalid",
-                    $"Числовое правило активной версии ссылается "
-                    + $"на нечисловую характеристику '{definition.Name}'.");
-            }
-        }
-
-        var executed = CatalogRecognitionRuleSetRowExecutor.Execute(
-            snapshot,
-            manufacturerId,
-            productType.Id,
-            recognition.ProductName,
-            cancellationToken);
-
-        if (executed.IsFailure)
-        {
-            return executed.Error;
-        }
-
-        var activeCandidates =
-            new List<CatalogRecognizedCharacteristic>();
-
-        foreach (var candidate in executed.Value.Characteristics
-                     .SelectMany(item => item.Sources))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var definition =
-                definitionsById[candidate.CharacteristicDefinitionId];
-
-            if (!TryNormalizeRecognizedValue(
-                    definition,
-                    candidate.NormalizedValue,
-                    data.Manufacturer,
-                    out var normalizedValue))
-            {
-                return new DomainError(
-                    "recognition.active_rule_invalid",
-                    $"Активная версия вернула недопустимое значение "
-                    + $"характеристики '{definition.Name}'.");
-            }
-
-            activeCandidates.Add(new CatalogRecognizedCharacteristic(
-                CatalogRecognitionTextNormalizer.NormalizeCode(
-                    definition.Code),
-                candidate.RawValue,
-                normalizedValue,
-                Confidence: 1.0000m,
-                Source: CatalogRecognitionSource.Rule,
-                StartIndex: candidate.SpanStart,
-                Length: candidate.SpanLength,
-                Priority: 0,
-                RecognizerKey:
-                    $"active-rule-set:{snapshot.VersionId}"
-                    + $":draft:{candidate.DraftId}"));
-        }
-
-        return MergeRecognitionCandidates(
-            recognition,
-            activeCandidates,
-            definitionsByCode,
-            data.Manufacturer);
-    }
-
-    private static CatalogProductNameRecognitionResult
-        MergeRecognitionCandidates(
-            CatalogProductNameRecognitionResult recognition,
-            List<CatalogRecognizedCharacteristic> activeCandidates,
-            Dictionary<string, CharacteristicDefinition> definitionsByCode,
-            string? manufacturerName)
-    {
-        if (activeCandidates.Count == 0)
-        {
-            return recognition;
-        }
-
-        var characteristics = recognition.Characteristics.ToList();
-        var conflicts = recognition.Conflicts.ToList();
-
-        var existingConflictCodes = recognition.Conflicts
-            .Select(conflict =>
-                CatalogRecognitionTextNormalizer.NormalizeCode(
-                    conflict.CharacteristicCode))
-            .ToHashSet(StringComparer.Ordinal);
-
-        foreach (var group in activeCandidates.GroupBy(
-                     candidate => candidate.CharacteristicCode,
-                     StringComparer.Ordinal))
-        {
-            var code = group.Key;
-            var definition = definitionsByCode[code];
-
-            var previous = characteristics
-                .Where(candidate => string.Equals(
-                    CatalogRecognitionTextNormalizer.NormalizeCode(
-                        candidate.CharacteristicCode),
-                    code,
-                    StringComparison.Ordinal))
-                .ToArray();
-
-            characteristics.RemoveAll(candidate => string.Equals(
-                CatalogRecognitionTextNormalizer.NormalizeCode(
-                    candidate.CharacteristicCode),
-                code,
-                StringComparison.Ordinal));
-
-            var combined = group.Concat(previous)
-                .Select(candidate =>
-                {
-                    if (TryNormalizeRecognizedValue(
-                            definition,
-                            candidate.NormalizedValue,
-                            manufacturerName,
-                            out var normalizedValue))
-                    {
-                        return candidate with
-                        {
-                            NormalizedValue = normalizedValue
-                        };
-                    }
-
-                    return candidate;
-                })
-                .ToArray();
-
-            if (existingConflictCodes.Contains(code))
-            {
-                // Старый конфликт не снимается новым совпадением.
-                continue;
-            }
-
-            var values = combined
-                .Select(candidate => candidate.NormalizedValue)
-                .Distinct(StringComparer.Ordinal)
-                .Take(2)
-                .ToArray();
-
-            if (values.Length > 1)
-            {
-                conflicts.Add(new CatalogRecognitionConflict(
-                    code,
-                    combined));
-
-                continue;
-            }
-
-            // Первым идёт результат активной версии.
-            // Сохраняем его источник, а не источник старого распознавателя.
-            characteristics.Add(combined[0]);
-        }
-
-        return recognition with
-        {
-            Characteristics = characteristics.ToArray(),
-            Conflicts = conflicts.ToArray(),
-            Candidates = recognition.Candidates
-                .Concat(activeCandidates)
-                .ToArray()
-        };
-    }
-
-    public Task<Result<CatalogProductNameRecognitionResult, DomainError>> RecognizeRowAsync(
+    public async Task<Result<CatalogProductNameRecognitionResult, DomainError>> RecognizeRowAsync(
         CatalogImportNormalizedRowData data,
         ProductType productType,
         IReadOnlyCollection<CharacteristicDefinition> characteristicDefinitions,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(data);
-        ArgumentNullException.ThrowIfNull(productType);
-        ArgumentNullException.ThrowIfNull(characteristicDefinitions);
-
-        return RecognizeRowCoreAsync(
-            data,
-            productType,
-            GetDefinitionsByCode(productType, characteristicDefinitions),
-            new Dictionary<Guid, CatalogRecognitionActiveRuleSet>(),
-            cancellationToken);
+        var result = await RecognizeRowCoreAsync(data, productType,
+            GetDefinitionsByCode(productType, characteristicDefinitions), cancellationToken).ConfigureAwait(false);
+        return result.IsFailure ? result.Error : result.Value.Recognition;
     }
 
-    private async Task<Result<CatalogProductNameRecognitionResult, DomainError>> RecognizeRowCoreAsync(
+    private async Task<Result<CatalogEffectiveRecognitionResult, DomainError>> RecognizeRowCoreAsync(
         CatalogImportNormalizedRowData data,
         ProductType productType,
         Dictionary<string, CharacteristicDefinition> definitionsByCode,
-        Dictionary<Guid, CatalogRecognitionActiveRuleSet> activeRuleSets,
         CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        if (string.IsNullOrWhiteSpace(data.Name))
+        if (data.ProductTypeId.HasValue && data.ProductTypeId.Value != productType.Id)
         {
-            return new DomainError(
-                "recognition.name_required",
-                "Укажите наименование товара.");
+            return new DomainError("recognition.scope_mismatch", "Тип строки не совпадает с областью распознавания.");
         }
 
-        if (data.ProductTypeId.HasValue &&
-            data.ProductTypeId.Value != productType.Id)
-        {
-            return new DomainError(
-                "recognition.scope_mismatch",
-                "Тип строки не совпадает с областью распознавания.");
-        }
-
-        var baseline = definitionsByCode.Count == 0
-            ? new CatalogProductNameRecognitionResult(
-                data.Name,
-                CatalogRecognitionTextNormalizer.NormalizeText(data.Name),
-                [],
-                [],
-                [])
-            : await _recognitionService.RecognizeAsync(
-                new CatalogProductNameRecognitionRequest(
-                    data.Name,
-                    productType.Id,
-                    definitionsByCode.Keys.ToArray(),
-                    data.ManufacturerId),
-                cancellationToken).ConfigureAwait(false);
-
-        return await MergeActiveRulesAsync(
-            data,
-            productType,
-            definitionsByCode,
-            baseline,
-            activeRuleSets,
-            cancellationToken)
-            .ConfigureAwait(false);
+        _runContext ??= await _recognitionService.CreateRunAsync(cancellationToken).ConfigureAwait(false);
+        return await _recognitionService.RecognizeAsync(new CatalogEffectiveRecognitionRequest(
+            data.Name ?? string.Empty, data.ManufacturerId, data.Manufacturer, productType.Id,
+            definitionsByCode.Values.ToArray(), _runContext), cancellationToken).ConfigureAwait(false);
     }
 
     private static Dictionary<string, CharacteristicDefinition> GetDefinitionsByCode(
@@ -872,10 +561,8 @@ public sealed class CatalogImportRecognitionEnrichmentService : ICatalogImportRe
                 StringComparer.Ordinal);
     }
 
-    public Task PrepareRunAsync(
-        CancellationToken cancellationToken = default)
+    public async Task PrepareRunAsync(CancellationToken cancellationToken = default)
     {
-        return _activeRuleSetReader.CaptureForRunAsync(
-            cancellationToken);
+        _runContext = await _recognitionService.CreateRunAsync(cancellationToken).ConfigureAwait(false);
     }
 }

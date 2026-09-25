@@ -1,13 +1,8 @@
 using System.Globalization;
-using System.Text.Json;
-using System.Text.RegularExpressions;
-using ElectronicService.Core.Catalog.Recognition.Abstractions;
 using ElectronicService.Core.Catalog.Recognition.Models;
 using ElectronicService.Core.Catalog.Recognition.Normalization;
 using ElectronicService.Core.Catalog.ProductNames.Explanation;
 using ElectronicService.Domain.Catalog.Characteristics;
-using ElectronicService.Domain.Catalog.ImportBatches;
-using ElectronicService.Domain.Catalog.ProductTypes;
 using ElectronicService.Core.Catalog.Characteristics.Normalization;
 
 namespace ElectronicService.Core.Catalog.ImportBatches.Analysis;
@@ -19,33 +14,15 @@ public sealed class CatalogImportRecognitionShadowService
 
     private const int MaximumExamplesPerConflictGroup = 5;
 
-    private static readonly JsonSerializerOptions JsonOptions =
-        new(JsonSerializerDefaults.Web);
-
-    private readonly ICatalogProductNameRecognitionService _recognitionService;
-
-    public CatalogImportRecognitionShadowService(
-        ICatalogProductNameRecognitionService recognitionService)
-    {
-        ArgumentNullException.ThrowIfNull(recognitionService);
-
-        _recognitionService = recognitionService;
-    }
-
-    public async Task<CatalogImportRecognitionShadowResult> AnalyzeAsync(
+    public CatalogImportRecognitionShadowResult Analyze(
         CatalogImportWorkbookAnalysis analysis,
-        ProductType productType,
-        IReadOnlyCollection<CharacteristicDefinition> characteristicDefinitions,
+        IReadOnlyDictionary<int, CatalogImportRowRecognition> recognitionResults,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(analysis);
-        ArgumentNullException.ThrowIfNull(productType);
-        ArgumentNullException.ThrowIfNull(characteristicDefinitions);
-
-        var definitions = characteristicDefinitions
-            .Where(definition =>
-                productType.AllowsCharacteristic(definition.Id))
-            .ToArray();
+        ArgumentNullException.ThrowIfNull(recognitionResults);
+        var definitions = recognitionResults.Values.SelectMany(row => row.AllowedCharacteristics)
+            .DistinctBy(definition => definition.Id).ToArray();
 
         var definitionsByCode = definitions
             .GroupBy(
@@ -58,10 +35,6 @@ public sealed class CatalogImportRecognitionShadowService
                 group => group.Key,
                 group => group.Single(),
                 StringComparer.Ordinal);
-
-        var allowedCharacteristicCodes = definitionsByCode
-            .Keys
-            .ToArray();
 
         var statistics = definitionsByCode
             .Values
@@ -86,43 +59,24 @@ public sealed class CatalogImportRecognitionShadowService
 
         var rowsAnalyzed = 0;
         var rowsWithRecognition = 0;
-        var failedRowsCount = 0;
+        const int failedRowsCount = 0;
 
-        foreach (var row in analysis.Rows.OrderBy(
-                     row => row.RowNumber))
+        foreach (var rowNumber in analysis.Rows.OrderBy(row => row.RowNumber).Select(row => row.RowNumber))
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var data = DeserializeNormalizedData(row);
-
-            if (data is null ||
-                string.IsNullOrWhiteSpace(data.Name))
+            if (!recognitionResults.TryGetValue(rowNumber, out var recognized))
             {
                 continue;
             }
 
+            var data = recognized.Input;
+            if (string.IsNullOrWhiteSpace(data.Name))
+            {
+                continue;
+            }
+            var recognitionResult = recognized.Result.Recognition;
             rowsAnalyzed++;
-
-            CatalogProductNameRecognitionResult recognitionResult;
-
-            try
-            {
-                recognitionResult = await _recognitionService
-                    .RecognizeAsync(
-                        new CatalogProductNameRecognitionRequest(
-                            data.Name,
-                            productType.Id,
-                            allowedCharacteristicCodes,
-                            data.ManufacturerId),
-                        cancellationToken)
-                    .ConfigureAwait(false);
-            }
-            catch (RegexMatchTimeoutException)
-            {
-                failedRowsCount++;
-
-                continue;
-            }
 
             var rowEvidence = recognitionResult.Candidates
                 .Where(characteristic =>
@@ -136,7 +90,7 @@ public sealed class CatalogImportRecognitionShadowService
             {
                 evidenceRows.Add(
                     new CatalogImportProductNameEvidenceRow(
-                        row.RowNumber,
+                        rowNumber,
                         rowEvidence));
             }
 
@@ -197,7 +151,7 @@ public sealed class CatalogImportRecognitionShadowService
                     .AmbiguousCount++;
             }
 
-            foreach (var definitionItem in definitionsByCode)
+            foreach (var definitionItem in definitionsByCode.Where(item => recognized.AllowedCharacteristics.Any(definition => definition.Id == item.Value.Id)))
             {
                 var characteristicCode = definitionItem.Key;
                 var definition = definitionItem.Value;
@@ -257,7 +211,7 @@ public sealed class CatalogImportRecognitionShadowService
 
                         samples.Add(
                             new CatalogImportRecognitionShadowSample(
-                                row.RowNumber,
+                                rowNumber,
                                 CatalogImportRecognitionShadowSampleKind
                                     .Ambiguous,
                                 characteristicCode,
@@ -305,7 +259,7 @@ public sealed class CatalogImportRecognitionShadowService
                         {
                             samples.Add(
                                 new CatalogImportRecognitionShadowSample(
-                                    row.RowNumber,
+                                    rowNumber,
                                     CatalogImportRecognitionShadowSampleKind
                                         .NotRecognized,
                                     characteristicCode,
@@ -336,7 +290,7 @@ public sealed class CatalogImportRecognitionShadowService
                     {
                         samples.Add(
                             new CatalogImportRecognitionShadowSample(
-                                row.RowNumber,
+                                rowNumber,
                                 CatalogImportRecognitionShadowSampleKind
                                     .RecognitionWithoutExplicitValue,
                                 characteristicCode,
@@ -351,7 +305,7 @@ public sealed class CatalogImportRecognitionShadowService
                                 recognizedCharacteristic.StartIndex,
                                 recognizedCharacteristic.Length,
                                 recognizedCharacteristic.Priority,
-                                "Характеристика найдена в наименовании, но явного значения Excel нет. В Shadow Mode значение не применяется."));
+                                "Характеристика найдена в наименовании, но явного значения Excel нет. Результат действующей конфигурации; применение значения показано в итогах автозаполнения."));
                     }
 
                     continue;
@@ -371,7 +325,7 @@ public sealed class CatalogImportRecognitionShadowService
 
                 AddConflictGroup(
                     conflictGroups,
-                    row.RowNumber,
+                    rowNumber,
                     definition,
                     data.Name,
                     explicitValue!,
@@ -381,7 +335,7 @@ public sealed class CatalogImportRecognitionShadowService
                 {
                     samples.Add(
                         new CatalogImportRecognitionShadowSample(
-                            row.RowNumber,
+                            rowNumber,
                             CatalogImportRecognitionShadowSampleKind
                                 .Conflict,
                             characteristicCode,
@@ -534,23 +488,6 @@ public sealed class CatalogImportRecognitionShadowService
         conflictGroup.Register(
             rowNumber,
             productName);
-    }
-
-    private static CatalogImportNormalizedRowData?
-        DeserializeNormalizedData(
-            CatalogImportRow row)
-    {
-        try
-        {
-            return JsonSerializer.Deserialize<
-                CatalogImportNormalizedRowData>(
-                    row.NormalizedDataJson,
-                    JsonOptions);
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
     }
 
     private static bool AreEquivalent(

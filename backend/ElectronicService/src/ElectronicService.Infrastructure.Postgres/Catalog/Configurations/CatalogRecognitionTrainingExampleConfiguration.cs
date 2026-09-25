@@ -17,6 +17,7 @@ internal sealed class CatalogRecognitionTrainingExampleConfiguration : IEntityTy
             table.HasCheckConstraint("ck_recognition_training_example_revocation", "(\"revoked_at_utc\" IS NULL AND \"revoked_by_user_id\" IS NULL) OR (\"revoked_at_utc\" IS NOT NULL AND \"revoked_by_user_id\" IS NOT NULL AND \"revoked_at_utc\" >= \"confirmed_at_utc\")");
         });
 
+        builder.Property(x => x.IsEvaluationOnly).HasColumnName("is_evaluation_only").HasDefaultValue(false);
         builder.HasKey(example => example.Id);
         builder.Property(example => example.Id).HasColumnName("id").ValueGeneratedNever();
         builder.Property(example => example.SourceFeedbackId).HasColumnName("source_feedback_id").IsRequired();
@@ -32,6 +33,7 @@ internal sealed class CatalogRecognitionTrainingExampleConfiguration : IEntityTy
         builder.Property(example => example.ConfirmedAtUtc).HasColumnName("confirmed_at_utc").IsRequired();
         builder.Property(example => example.RevokedByUserId).HasColumnName("revoked_by_user_id");
         builder.Property(example => example.RevokedAtUtc).HasColumnName("revoked_at_utc");
+        builder.Property(example => example.RevocationReason).HasColumnName("revocation_reason").HasMaxLength(1000);
 
         builder.HasIndex(example => example.SourceFeedbackId).IsUnique().HasFilter("\"revoked_at_utc\" IS NULL").HasDatabaseName("ux_recognition_training_example_active_source");
         builder.HasIndex(example => new { example.ManufacturerId, example.ProductTypeId, example.CharacteristicDefinitionId, example.ConfirmedAtUtc }).HasFilter("\"revoked_at_utc\" IS NULL").HasDatabaseName("ix_recognition_training_example_scope");

@@ -68,23 +68,6 @@ public sealed class CatalogRecognitionTrainingExampleRepository : ICatalogRecogn
         return _dbContext.CatalogRecognitionTrainingExamples.AsNoTracking().SingleOrDefaultAsync(example => example.Id == exampleId, cancellationToken);
     }
 
-    public async Task RevokeAsync(Guid exampleId, Guid revokedByUserId, CancellationToken cancellationToken = default)
-    {
-        if (exampleId == Guid.Empty)
-        {
-            throw new ArgumentException("Не указан учебный пример.", nameof(exampleId));
-        }
-
-        if (revokedByUserId == Guid.Empty)
-        {
-            throw new ArgumentException("Не указан пользователь.", nameof(revokedByUserId));
-        }
-
-        var revokedAtUtc = DateTime.UtcNow;
-
-        await _dbContext.CatalogRecognitionTrainingExamples.Where(example => example.Id == exampleId && example.RevokedAtUtc == null).ExecuteUpdateAsync(setters => setters.SetProperty(example => example.RevokedByUserId, (Guid?)revokedByUserId).SetProperty(example => example.RevokedAtUtc, (DateTime?)revokedAtUtc), cancellationToken).ConfigureAwait(false);
-    }
-
     private Task<CatalogRecognitionTrainingExample?> FindActiveAsync(Guid feedbackId, CancellationToken cancellationToken)
     {
         return _dbContext.CatalogRecognitionTrainingExamples.AsNoTracking().SingleOrDefaultAsync(example => example.SourceFeedbackId == feedbackId && example.RevokedAtUtc == null, cancellationToken);

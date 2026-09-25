@@ -46,6 +46,11 @@ export interface CatalogCharacteristicRecognitionProfile {
 }
 
 export interface CatalogProductNameRecognitionPreview {
+  manufacturerId: string | null;
+  manufacturerName: string | null;
+  hasCompleteScope: boolean;
+  activeRuleSetVersionId: string | null;
+  activeRuleSetSequenceNumber: number | null;
   hasProductTypeScope: boolean;
   productTypeId: string | null;
   productTypeCode: string | null;
@@ -60,6 +65,7 @@ export interface CatalogProductNameRecognitionPreview {
 }
 
 export interface PreviewCatalogProductNameRecognitionParameters {
+  manufacturerId?: string | null;
   productName: string;
   productTypeCode: string | null;
 }

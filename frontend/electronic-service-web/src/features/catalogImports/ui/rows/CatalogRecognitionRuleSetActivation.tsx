@@ -1,5 +1,7 @@
 "use client";
 
+import { getEvaluationReport } from "@/features/catalogRecognition/api/evaluationReports";
+import { EvaluationReportPanel } from "@/features/catalogRecognition/ui/EvaluationReportPanel";
 import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppButton } from "@/shared/ui/AppButton";
@@ -37,6 +39,34 @@ function rowStatus(status: string): string {
       return "Другой производитель или тип товара";
     default:
       return status;
+  }
+}
+
+function ruleKindDetails(ruleKind: string): {
+  label: string;
+  draftSection: string;
+} {
+  switch (ruleKind) {
+    case "Literal":
+      return {
+        label: "Точное правило",
+        draftSection: "Правила → Точные черновики",
+      };
+    case "NumericCapture":
+      return {
+        label: "Одиночный числовой шаблон",
+        draftSection: "Правила → Числовые черновики",
+      };
+    case "MultipleNumericCaptures":
+      return {
+        label: "Составной числовой шаблон",
+        draftSection: "Правила → Составные черновики",
+      };
+    default:
+      return {
+        label: "Правило неизвестного вида",
+        draftSection: "Правила",
+      };
   }
 }
 
@@ -104,6 +134,13 @@ export function CatalogRecognitionRuleSetActivation({
     refetchOnWindowFocus: false,
   });
 
+  const evaluationQuery = useQuery({
+    queryKey: ["recognition-evaluation", reportId, 1, false],
+    queryFn: () => getEvaluationReport(reportId!),
+    enabled: !disabled && Boolean(reportId),
+    retry: false,
+  });
+
   const trainingQuery = useQuery({
     queryKey: ["recognition-rule-set-training-check", userId, versionId],
     queryFn: ({ signal }) => checkRecognitionRuleSetTraining(versionId, signal),
@@ -133,7 +170,10 @@ export function CatalogRecognitionRuleSetActivation({
     report.proposedRowsCount > 0 &&
     report.conflictRowsCount === 0 &&
     reportQuery.isSuccess &&
-    !reportQuery.isFetching;
+    !reportQuery.isFetching &&
+    evaluationQuery.data?.readiness.state === "Ready" &&
+    !evaluationQuery.isFetching &&
+    !evaluationQuery.isError;
 
   const confirmed =
     stateReady &&
@@ -156,6 +196,7 @@ export function CatalogRecognitionRuleSetActivation({
         setMustRefresh(false);
       }
     } finally {
+      void client.invalidateQueries({ queryKey: ["learning-workspace"] });
       requestLock.current = false;
       setBusy(false);
     }
@@ -182,6 +223,7 @@ export function CatalogRecognitionRuleSetActivation({
           " При обрыве связи отчёт мог сохраниться. Автоматического повтора нет.",
       );
     } finally {
+      void client.invalidateQueries({ queryKey: ["learning-workspace"] });
       requestLock.current = false;
       setBusy(false);
 
@@ -233,14 +275,17 @@ export function CatalogRecognitionRuleSetActivation({
       );
 
       setReason("");
+      void client.invalidateQueries({ queryKey: ["recognition-evaluation"] });
     } catch (caught) {
       setError(
         getApiErrorMessage(caught, "Не удалось подтвердить переключение.") +
           " Обновите состояние перед следующей попыткой: запрос мог выполниться.",
       );
     } finally {
+      void client.invalidateQueries({ queryKey: ["learning-workspace"] });
       setAcceptedSequence(null);
       setMustRefresh(true);
+      void client.invalidateQueries({ queryKey: ["recognition-evaluation"] });
       requestLock.current = false;
       setBusy(false);
 
@@ -271,7 +316,7 @@ export function CatalogRecognitionRuleSetActivation({
             ? "Эта версия активна."
             : currentState?.activeVersionId
               ? `Активна другая версия: ${currentState.activeVersionId}`
-              : "В этой области нет активной версии."}
+              : "Для выбранного производителя и типа товара нет активной версии."}
         </p>
       )}
 
@@ -294,7 +339,7 @@ export function CatalogRecognitionRuleSetActivation({
         disabled={locked}
         onClick={() => void createReport()}
       >
-        Проверить весь импорт и сохранить отчёт
+        Сравнить версии и проверить импорт
       </AppButton>
 
       <p className="text-[var(--app-muted)]">
@@ -381,6 +426,7 @@ export function CatalogRecognitionRuleSetActivation({
           ))}
       </div>
 
+      {report && <EvaluationReportPanel key={report.id} reportId={report.id} />}
       {report && (
         <div className="grid gap-2">
           <p className="break-all">Отчёт: {report.id}</p>
@@ -510,9 +556,17 @@ export function CatalogRecognitionRuleSetActivation({
           <>
             <p className="font-medium">
               {trainingQuery.data.passedTrainingChecks
-                ? "Все шаблоны прошли проверку учебных примеров."
-                : "Проверка не пройдена. Причины указаны ниже."}
+                ? "Все правила версии сохранили действующие учебные основания."
+                : "Версию нельзя включить: один или несколько черновиков нужно перепроверить."}
             </p>
+
+            {!trainingQuery.data.passedTrainingChecks && (
+              <p className="text-[var(--app-muted)]">
+                Откройте указанные ниже разделы, перепроверьте черновики и
+                соберите новую версию из актуальных черновиков. Состав уже
+                созданной версии не изменяется.
+              </p>
+            )}
 
             <p className="text-[var(--app-muted)]">
               Проверено:{" "}
@@ -521,24 +575,51 @@ export function CatalogRecognitionRuleSetActivation({
               )}
             </p>
 
-            {trainingQuery.data.items.map((item) => (
-              <div
-                key={`${item.ruleKind}:${item.draftId}`}
-                className="grid gap-1 rounded-lg border border-[var(--app-border)] p-2"
-              >
-                <p>
-                  {item.passed ? "Проверка пройдена" : "Требуется исправление"}
-                </p>
-                <p>{item.message}</p>
-                <p className="break-all text-[var(--app-muted)]">
-                  Черновик: {item.draftId}
-                </p>
-              </div>
-            ))}
+            {trainingQuery.data.items.map((item) => {
+              const details = ruleKindDetails(item.ruleKind);
+
+              return (
+                <div
+                  key={`${item.ruleKind}:${item.draftId}`}
+                  className="grid gap-2 rounded-lg border border-[var(--app-border)] p-3"
+                >
+                  <p className="font-medium">{details.label}</p>
+
+                  {item.passed ? (
+                    <p>Учебные основания не изменились. Правило готово.</p>
+                  ) : (
+                    <>
+                      <p className="text-[var(--app-danger)]">
+                        Учебные основания изменились, исчезли или больше не
+                        проходят проверку.
+                      </p>
+                      <p>
+                        Перейдите в раздел «{details.draftSection}»,
+                        перепроверьте этот черновик и затем соберите новую
+                        версию.
+                      </p>
+                    </>
+                  )}
+
+                  <details className="text-[var(--app-muted)]">
+                    <summary className="cursor-pointer">
+                      Технические сведения
+                    </summary>
+                    <div className="mt-2 grid gap-1">
+                      <p className="break-all">
+                        Идентификатор черновика: {item.draftId}
+                      </p>
+                      <p>{item.message}</p>
+                    </div>
+                  </details>
+                </div>
+              );
+            })}
 
             <p className="text-[var(--app-muted)]">
-              Это результат на момент проверки, а не оценка точности на новых
-              товарах. При активации сервер повторит проверку.
+              Эта проверка подтверждает актуальность учебных оснований. Качество
+              распознавания проверяется отдельно сравнительным отчётом. При
+              включении сервер повторит обе проверки.
             </p>
           </>
         )}

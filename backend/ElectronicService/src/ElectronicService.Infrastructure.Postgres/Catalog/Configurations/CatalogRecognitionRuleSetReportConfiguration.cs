@@ -44,6 +44,7 @@ internal sealed class CatalogRecognitionRuleSetReportConfiguration
                 "jsonb_typeof(\"snapshot_json\") = 'array'");
         });
 
+        builder.Property(report => report.EvaluationJson).HasColumnName("evaluation_json").HasColumnType("jsonb");
         builder.HasKey(report => report.Id);
 
         builder.Property(report => report.Id)

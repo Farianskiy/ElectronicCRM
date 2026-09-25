@@ -1,83 +1,68 @@
+using CSharpFunctionalExtensions;
+using ElectronicService.Core.Catalog.Products.Abstractions;
 using ElectronicService.Core.Catalog.ProductTypes.Abstractions;
 using ElectronicService.Core.Catalog.ProductTypes.GetCharacteristicSchema;
-using ElectronicService.Core.Catalog.Recognition.Abstractions;
-using ElectronicService.Core.Catalog.Recognition.Models;
+using ElectronicService.Core.Catalog.Recognition.Effective;
+using ElectronicService.Domain.Catalog.Characteristics;
+using ElectronicService.Domain.Common;
 
 namespace ElectronicService.Core.Catalog.Recognition.Preview;
 
-public sealed class PreviewCatalogProductNameRecognitionQueryHandler
+public sealed class PreviewCatalogProductNameRecognitionQueryHandler(
+    ICatalogProductTypeSchemaReader productTypeSchemaReader,
+    ICatalogProductMetadataRepository metadataRepository,
+    ICatalogEffectiveRecognitionService recognitionService)
 {
-    private readonly ICatalogProductTypeSchemaReader _productTypeSchemaReader;
-    private readonly ICatalogCharacteristicRecognitionProfileReader _recognitionProfileReader;
-    private readonly ICatalogProductNameRecognitionService _recognitionService;
-
-    public PreviewCatalogProductNameRecognitionQueryHandler(
-        ICatalogProductTypeSchemaReader productTypeSchemaReader,
-        ICatalogCharacteristicRecognitionProfileReader recognitionProfileReader,
-        ICatalogProductNameRecognitionService recognitionService)
-    {
-        ArgumentNullException.ThrowIfNull(productTypeSchemaReader);
-        ArgumentNullException.ThrowIfNull(recognitionProfileReader);
-        ArgumentNullException.ThrowIfNull(recognitionService);
-
-        _productTypeSchemaReader = productTypeSchemaReader;
-        _recognitionProfileReader = recognitionProfileReader;
-        _recognitionService = recognitionService;
-    }
-
-    public async Task<CatalogProductNameRecognitionPreviewResult?> Handle(
+    public async Task<Result<CatalogProductNameRecognitionPreviewResult, DomainError>> Handle(
         PreviewCatalogProductNameRecognitionQuery query,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(query);
-        ArgumentException.ThrowIfNullOrWhiteSpace(query.ProductName);
+        if (string.IsNullOrWhiteSpace(query.ProductName))
+        {
+            return new DomainError("recognition.name_required", "Укажите наименование товара.");
+        }
 
-        CatalogProductTypeCharacteristicSchemaResult? productTypeSchema = null;
-
+        CatalogProductTypeCharacteristicSchemaResult? schema = null;
+        IReadOnlyCollection<CharacteristicDefinition>? definitions = null;
         if (!string.IsNullOrWhiteSpace(query.ProductTypeCode))
         {
-            productTypeSchema = await _productTypeSchemaReader
-                .GetByCodeAsync(query.ProductTypeCode.Trim(), cancellationToken)
-                .ConfigureAwait(false);
-
-            if (productTypeSchema is null)
+            schema = await productTypeSchemaReader.GetByCodeAsync(query.ProductTypeCode.Trim(), cancellationToken).ConfigureAwait(false);
+            if (schema is null)
             {
-                return null;
+                return new DomainError("recognition.product_type_not_found", "Тип товара не найден.");
             }
+
+            definitions = await metadataRepository.GetCharacteristicDefinitionsByIdsAsync(
+                schema.Characteristics.Select(item => item.DefinitionId).ToArray(), cancellationToken).ConfigureAwait(false);
         }
 
-        IReadOnlyCollection<string>? allowedCharacteristicCodes = productTypeSchema?
-            .Characteristics
-            .Select(characteristic => characteristic.Code)
-            .Where(code => !string.IsNullOrWhiteSpace(code))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(code => code, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-
-        IReadOnlyCollection<CatalogCharacteristicRecognitionProfileResult> recognitionProfiles = [];
-
-        if (productTypeSchema is not null)
+        string? manufacturerName = null;
+        if (query.ManufacturerId.HasValue)
         {
-            recognitionProfiles = await _recognitionProfileReader
-                .GetProfilesAsync(productTypeSchema.ProductTypeId, cancellationToken)
-                .ConfigureAwait(false);
+            var manufacturer = await metadataRepository.GetManufacturerByIdAsync(query.ManufacturerId.Value, cancellationToken).ConfigureAwait(false);
+            if (manufacturer is null)
+            {
+                return new DomainError("recognition.manufacturer_not_found", "Производитель не найден.");
+            }
+
+            manufacturerName = manufacturer.Name;
         }
 
-        var recognitionRequest = new CatalogProductNameRecognitionRequest(
-            query.ProductName,
-            productTypeSchema?.ProductTypeId,
-            allowedCharacteristicCodes);
+        var context = await recognitionService.CreateRunAsync(cancellationToken).ConfigureAwait(false);
+        var result = await recognitionService.RecognizeAsync(new CatalogEffectiveRecognitionRequest(
+            query.ProductName, query.ManufacturerId, manufacturerName, schema?.ProductTypeId, definitions, context), cancellationToken).ConfigureAwait(false);
+        if (result.IsFailure)
+        {
+            return result.Error;
+        }
 
-        var recognitionResult = await _recognitionService
-            .RecognizeAsync(recognitionRequest, cancellationToken)
-            .ConfigureAwait(false);
-
+        var effective = result.Value;
         return new CatalogProductNameRecognitionPreviewResult(
-            productTypeSchema?.ProductTypeId,
-            productTypeSchema?.ProductTypeCode,
-            productTypeSchema?.ProductTypeName,
-            allowedCharacteristicCodes,
-            recognitionProfiles,
-            recognitionResult);
+            schema?.ProductTypeId, schema?.ProductTypeCode, schema?.ProductTypeName,
+            definitions?.Select(definition => definition.Code).Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(code => code, StringComparer.OrdinalIgnoreCase).ToArray(),
+            effective.RecognitionProfiles, effective.Recognition, query.ManufacturerId, manufacturerName,
+            effective.HasCompleteScope, effective.ActiveRuleSet?.ActiveVersionId, effective.ActiveRuleSet?.SequenceNumber);
     }
 }

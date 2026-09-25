@@ -25,6 +25,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\ElectronicService.Infrastructure.Postgres\ElectronicService.Infrastructure.Postgres.csproj" />
+    <ProjectReference Include="..\..\src\ElectronicService.Web\ElectronicService.Web.csproj" />
     <ProjectReference Include="..\ElectronicService.TestCommon\ElectronicService.TestCommon.csproj" />
   </ItemGroup>
 

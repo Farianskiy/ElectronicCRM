@@ -83,6 +83,9 @@ export interface AssistantDictionarySuggestionsResponse {
 }
 
 export interface ApproveDictionarySuggestionRequest {
+  evaluationReportId?: string;
+  confirmed?: boolean;
+  evidenceRevision?: number;
   phrase: string;
   kind: DictionaryTermKind;
   targetCode: string | null;

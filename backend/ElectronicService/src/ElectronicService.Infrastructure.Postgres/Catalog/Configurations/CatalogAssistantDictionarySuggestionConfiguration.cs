@@ -12,6 +12,8 @@ internal sealed class CatalogAssistantDictionarySuggestionConfiguration : IEntit
 {
     public void Configure(EntityTypeBuilder<CatalogAssistantDictionarySuggestion> builder)
     {
+        builder.Property(x => x.EvaluationReportId).HasColumnName("evaluation_report_id");
+        builder.HasOne<CatalogDictionaryEvaluationReport>().WithMany().HasForeignKey(x => x.EvaluationReportId).OnDelete(DeleteBehavior.Restrict);
         builder.ToTable("catalog_assistant_dictionary_suggestions", table =>
         {
             table.HasCheckConstraint(

@@ -12,6 +12,7 @@ internal sealed class CatalogRecognitionCandidateConfiguration : IEntityTypeConf
 {
     public void Configure(EntityTypeBuilder<CatalogRecognitionCandidate> builder)
     {
+        builder.Property(candidate => candidate.EvidenceRevision).HasColumnName("evidence_revision");
         builder.ToTable("catalog_recognition_candidates", table =>
         {
             table.HasCheckConstraint(
@@ -44,7 +45,7 @@ internal sealed class CatalogRecognitionCandidateConfiguration : IEntityTypeConf
 
             table.HasCheckConstraint(
                 "ck_catalog_recognition_candidates_counts",
-                "\"occurrence_count\" >= 1 AND " +
+                "\"occurrence_count\" >= 0 AND " +
                 "\"accepted_count\" >= 0 AND " +
                 "\"corrected_count\" >= 0 AND " +
                 "\"rejected_count\" >= 0 AND " +
@@ -52,7 +53,7 @@ internal sealed class CatalogRecognitionCandidateConfiguration : IEntityTypeConf
 
             table.HasCheckConstraint(
                 "ck_catalog_recognition_candidates_distinct_products",
-                "\"distinct_product_count\" >= 1 AND \"distinct_product_count\" <= \"occurrence_count\"");
+                "\"distinct_product_count\" >= 0 AND \"distinct_product_count\" <= \"occurrence_count\"");
 
             table.HasCheckConstraint(
                 "ck_catalog_recognition_candidates_dates",
