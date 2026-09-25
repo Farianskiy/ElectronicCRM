@@ -35,6 +35,18 @@ public sealed class CatalogRecognitionRuleSetReport : AggregateRoot
     public int OutsideScopeRowsCount { get; private set; }
 
     public string SnapshotJson { get; private set; } = string.Empty;
+    public string? EvaluationJson { get; private set; }
+
+    public UnitResult<DomainError> AttachEvaluation(string json)
+    {
+        if (EvaluationJson is not null || string.IsNullOrWhiteSpace(json) || System.Text.Encoding.UTF8.GetByteCount(json) > 8_000_000)
+            return UnitResult.Failure(new DomainError("evaluation.invalid_snapshot", "Снимок оценки отсутствует, уже сохранён или превышает 8 МБ."));
+        using var document = JsonDocument.Parse(json);
+        if (document.RootElement.ValueKind != JsonValueKind.Object)
+            return UnitResult.Failure(new DomainError("evaluation.invalid_snapshot", "Ожидался объект снимка оценки."));
+        EvaluationJson = json;
+        return UnitResult.Success<DomainError>();
+    }
 
     public static Result<CatalogRecognitionRuleSetReport, DomainError> Create(
         CatalogRecognitionRuleSetReportData data)

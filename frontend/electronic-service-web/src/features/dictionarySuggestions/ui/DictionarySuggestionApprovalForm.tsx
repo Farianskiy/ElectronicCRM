@@ -1,10 +1,14 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { getCatalogProductTypes } from "@/features/catalogMetadata/api/getCatalogProductTypes";
 import { getCatalogProductTypeCharacteristicSchema } from "@/features/catalogProductTypes/api/getCatalogProductTypeCharacteristicSchema";
 import { AppSelect } from "@/shared/ui/AppSelect";
+import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
+import { getEvaluationReport } from "@/features/catalogRecognition/api/evaluationReports";
+import { EvaluationReportPanel } from "@/features/catalogRecognition/ui/EvaluationReportPanel";
+import { evaluateDictionarySuggestion } from "../api/evaluateDictionarySuggestion";
 import type {
   ApproveDictionarySuggestionRequest,
   AssistantDictionarySuggestion,
@@ -37,6 +41,7 @@ interface DictionarySuggestionApprovalFormProps {
   suggestion: AssistantDictionarySuggestion;
   reviewComment: string;
   disabled: boolean;
+  evidenceRevision?: number;
   onReviewCommentChange: (value: string) => void;
   onApprove: (request: ApproveDictionarySuggestionRequest) => void;
 }
@@ -45,6 +50,7 @@ export function DictionarySuggestionApprovalForm({
   suggestion,
   reviewComment,
   disabled,
+  evidenceRevision,
   onReviewCommentChange,
   onApprove,
 }: DictionarySuggestionApprovalFormProps) {
@@ -86,6 +92,17 @@ export function DictionarySuggestionApprovalForm({
   const normalizedTargetCode = targetCode.trim();
   const normalizedTargetValue = targetValue.trim();
   const numericPriority = Number(priority);
+  const needsEvaluation = suggestion.source === "RecognitionLearning";
+  const request: ApproveDictionarySuggestionRequest = { phrase: normalizedPhrase, kind,
+    targetCode: kind === "Characteristic" ? normalizedTargetCode : null, targetValue: normalizedTargetValue,
+    productTypeCode: productTypeCode || null, priority: numericPriority, reviewComment: reviewComment.trim() || null, evidenceRevision };
+  const requestKey = JSON.stringify(request);
+  const [savedEvaluation, setSavedEvaluation] = useState<{ id: string; key: string } | null>(null);
+  const reportId = savedEvaluation?.key === requestKey ? savedEvaluation.id : null;
+  const evaluate = useMutation({ mutationFn: (input: ApproveDictionarySuggestionRequest) => evaluateDictionarySuggestion(suggestion.id, input),
+    onSuccess: (data, input) => { setSavedEvaluation({ id: data.reportId, key: JSON.stringify(input) }); setChangeConfirmed(false); } });
+  const readiness = useQuery({ queryKey: ["dictionary-evaluation", reportId, 1, false],
+    queryFn: () => getEvaluationReport(reportId!, 1, false, "dictionary"), enabled: needsEvaluation && !!reportId, retry: false });
 
   const validationErrors: string[] = [];
 
@@ -135,6 +152,7 @@ export function DictionarySuggestionApprovalForm({
     productTypesQuery.isError || characteristicSchemaQuery.isError;
 
   const canSubmit =
+    (!needsEvaluation || (!!reportId && readiness.data?.readiness.state === "Ready" && !readiness.isFetching && !readiness.isError && !evaluate.isPending)) &&
     !disabled &&
     !referenceDataIsLoading &&
     !referenceDataHasError &&
@@ -166,15 +184,7 @@ export function DictionarySuggestionApprovalForm({
       return;
     }
 
-    onApprove({
-      phrase: normalizedPhrase,
-      kind,
-      targetCode: kind === "Characteristic" ? normalizedTargetCode : null,
-      targetValue: normalizedTargetValue,
-      productTypeCode: productTypeCode || null,
-      priority: numericPriority,
-      reviewComment: reviewComment.trim() || null,
-    });
+    onApprove({ ...request, evaluationReportId: reportId ?? undefined, confirmed: changeConfirmed });
   }
 
   return (
@@ -417,6 +427,15 @@ export function DictionarySuggestionApprovalForm({
             </ul>
           </div>
         )}
+
+        {needsEvaluation && <section className="grid gap-3">
+          <p>Перед одобрением оцените влияние на распознавание. Контроль правил не исключает обратную связь из обучения словаря; известные учебные имена не входят в контроль этой оценки.</p>
+          <button type="button" disabled={disabled || evaluate.isPending || referenceDataIsLoading || referenceDataHasError || validationErrors.length > 0}
+            onClick={() => evaluate.mutate(request)} className="rounded border p-3 disabled:opacity-50">{evaluate.isPending ? "Оцениваем…" : "Оценить влияние"}</button>
+          {evaluate.error && <p role="alert">{getApiErrorMessage(evaluate.error, "Не удалось оценить влияние.")}</p>}
+          {savedEvaluation && !reportId && <p>Решение или основания изменились. Требуется новая оценка.</p>}
+          {reportId && <EvaluationReportPanel key={reportId} reportId={reportId} kind="dictionary" />}
+        </section>}
 
         <label className="flex items-start gap-3 rounded-2xl border border-white/10 bg-black/20 p-4">
           <input

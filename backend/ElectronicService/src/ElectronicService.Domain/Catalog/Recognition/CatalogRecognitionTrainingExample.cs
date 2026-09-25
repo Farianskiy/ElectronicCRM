@@ -27,10 +27,14 @@ public sealed class CatalogRecognitionTrainingExample : AggregateRoot
     public DateTime ConfirmedAtUtc { get; private set; }
     public Guid? RevokedByUserId { get; private set; }
     public DateTime? RevokedAtUtc { get; private set; }
+    public string? RevocationReason { get; private set; }
+    public bool IsEvaluationOnly { get; private set; }
 
     public static Result<CatalogRecognitionTrainingExample, DomainError> Create(CatalogRecognitionFeedback feedback, Guid confirmedByUserId)
     {
         ArgumentNullException.ThrowIfNull(feedback);
+        if (feedback.ExcludedAtUtc.HasValue)
+            return new DomainError("training.source_excluded", "Источник исключён из обучения.");
 
         if (confirmedByUserId == Guid.Empty)
         {
@@ -101,7 +105,7 @@ public sealed class CatalogRecognitionTrainingExample : AggregateRoot
         };
     }
 
-    public UnitResult<DomainError> Revoke(Guid revokedByUserId)
+    public UnitResult<DomainError> Revoke(Guid revokedByUserId, string reason = "legacy-api: причина не передана старым клиентом")
     {
         if (revokedByUserId == Guid.Empty)
         {
@@ -113,8 +117,14 @@ public sealed class CatalogRecognitionTrainingExample : AggregateRoot
             return UnitResult.Success<DomainError>();
         }
 
+        if (string.IsNullOrWhiteSpace(reason) || reason.Trim().Length > 1000)
+        {
+            return UnitResult.Failure(GeneralErrors.ValueIsInvalid(nameof(reason)));
+        }
+
         RevokedByUserId = revokedByUserId;
         RevokedAtUtc = DateTime.UtcNow;
+        RevocationReason = reason.Trim();
 
         return UnitResult.Success<DomainError>();
     }

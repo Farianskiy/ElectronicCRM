@@ -15,4 +15,8 @@ public sealed class ApproveCatalogAssistantDictionarySuggestionRequest
     public int Priority { get; init; }
 
     public string? ReviewComment { get; init; }
+
+    public long? EvidenceRevision { get; init; }
+    public Guid? EvaluationReportId { get; init; }
+    public bool? Confirmed { get; init; }
 }

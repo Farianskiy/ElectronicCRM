@@ -32,11 +32,7 @@ public sealed class CatalogRecognitionDatasetReader : ICatalogRecognitionDataset
     {
         var query = _dbContext.CatalogRecognitionFeedbackEntries
             .AsNoTracking()
-            .Where(feedback =>
-                feedback.Status == CatalogRecognitionFeedbackStatus.Finalized &&
-                feedback.IsTrainingEligible &&
-                feedback.FinalizedAtUtc.HasValue &&
-                feedback.FinalizedAtUtc.Value <= finalizedUntilUtc)
+            .ReviewedFeedback(finalizedUntilUtc)
             .OrderBy(feedback => feedback.FinalizedAtUtc)
             .ThenBy(feedback => feedback.Id)
             .Select(feedback => new CatalogRecognitionDatasetRow(

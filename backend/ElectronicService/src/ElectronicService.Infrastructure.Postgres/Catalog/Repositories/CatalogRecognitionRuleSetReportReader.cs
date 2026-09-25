@@ -18,13 +18,15 @@ public sealed class CatalogRecognitionRuleSetReportReader
         new(JsonSerializerDefaults.Web);
 
     private readonly ElectronicDbContext _dbContext;
+    private readonly RecognitionEvaluationAccess _access;
     private readonly ICurrentUserProvider _currentUserProvider;
 
     public CatalogRecognitionRuleSetReportReader(
         ElectronicDbContext dbContext,
-        ICurrentUserProvider currentUserProvider)
+        ICurrentUserProvider currentUserProvider, RecognitionEvaluationAccess access)
     {
         _dbContext = dbContext;
+        _access = access;
         _currentUserProvider = currentUserProvider;
     }
 
@@ -34,6 +36,8 @@ public sealed class CatalogRecognitionRuleSetReportReader
             int page,
             CancellationToken cancellationToken = default)
     {
+        var authorization = await _access.AuthorizeAsync(cancellationToken).ConfigureAwait(false);
+        if (authorization.IsFailure) return authorization.Error;
         if (_currentUserProvider.UserId is not Guid userId ||
             userId == Guid.Empty)
         {
@@ -138,6 +142,8 @@ public sealed class CatalogRecognitionRuleSetReportReader
         Guid batchId,
         CancellationToken cancellationToken = default)
     {
+        var authorization = await _access.AuthorizeAsync(cancellationToken).ConfigureAwait(false);
+        if (authorization.IsFailure) return authorization.Error;
         if (_currentUserProvider.UserId is not Guid userId ||
             userId == Guid.Empty)
         {

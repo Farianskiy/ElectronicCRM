@@ -198,6 +198,10 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("created_dictionary_term_id");
 
+                    b.Property<Guid?>("EvaluationReportId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("evaluation_report_id");
+
                     b.Property<bool>("GeneratedAutomatically")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -306,6 +310,8 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         .HasDatabaseName("ux_dictionary_suggestions_created_term")
                         .HasFilter("\"created_dictionary_term_id\" IS NOT NULL");
 
+                    b.HasIndex("EvaluationReportId");
+
                     b.HasIndex("NormalizedUnknownPhrase")
                         .HasDatabaseName("ix_catalog_assistant_dictionary_suggestions_normalized_unknown_phrase");
 
@@ -345,6 +351,47 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                             t.HasCheckConstraint("ck_dictionary_suggestions_recognition_learning", "\"source\" <> 'RecognitionLearning' OR (\"generated_automatically\" = TRUE AND \"manufacturer_id\" IS NOT NULL AND \"product_type_id\" IS NOT NULL AND \"characteristic_definition_id\" IS NOT NULL AND \"suggested_kind\" = 'Characteristic')");
 
                             t.HasCheckConstraint("ck_dictionary_suggestions_source", "\"source\" IN ('Assistant', 'ImportRecognition', 'UserCorrection', 'RecognitionLearning', 'MlRecognition')");
+                        });
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Dictionaries.CatalogDictionaryEvaluationReport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CandidateId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("candidate_id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<string>("SnapshotJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("snapshot_json");
+
+                    b.Property<Guid>("SuggestionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("suggestion_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CandidateId");
+
+                    b.HasIndex("SuggestionId");
+
+                    b.HasIndex("CreatedByUserId", "SuggestionId", "CreatedAtUtc");
+
+                    b.ToTable("catalog_dictionary_evaluation_reports", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_dictionary_evaluation_snapshot", "jsonb_typeof(snapshot_json) = 'object' AND octet_length(snapshot_json::text) <= 10000000");
                         });
                 });
 
@@ -1839,6 +1886,10 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("distinct_product_count");
 
+                    b.Property<long>("EvidenceRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("evidence_revision");
+
                     b.Property<DateTime>("FirstSeenAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("first_seen_at_utc");
@@ -1931,11 +1982,11 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
 
                             t.HasCheckConstraint("ck_catalog_recognition_candidates_characteristic_code", "char_length(btrim(\"characteristic_code_snapshot\")) > 0");
 
-                            t.HasCheckConstraint("ck_catalog_recognition_candidates_counts", "\"occurrence_count\" >= 1 AND \"accepted_count\" >= 0 AND \"corrected_count\" >= 0 AND \"rejected_count\" >= 0 AND \"occurrence_count\" = \"accepted_count\" + \"corrected_count\" + \"rejected_count\"");
+                            t.HasCheckConstraint("ck_catalog_recognition_candidates_counts", "\"occurrence_count\" >= 0 AND \"accepted_count\" >= 0 AND \"corrected_count\" >= 0 AND \"rejected_count\" >= 0 AND \"occurrence_count\" = \"accepted_count\" + \"corrected_count\" + \"rejected_count\"");
 
                             t.HasCheckConstraint("ck_catalog_recognition_candidates_dates", "\"last_seen_at_utc\" >= \"first_seen_at_utc\"");
 
-                            t.HasCheckConstraint("ck_catalog_recognition_candidates_distinct_products", "\"distinct_product_count\" >= 1 AND \"distinct_product_count\" <= \"occurrence_count\"");
+                            t.HasCheckConstraint("ck_catalog_recognition_candidates_distinct_products", "\"distinct_product_count\" >= 0 AND \"distinct_product_count\" <= \"occurrence_count\"");
 
                             t.HasCheckConstraint("ck_catalog_recognition_candidates_normalized_phrase", "char_length(btrim(\"normalized_phrase\")) > 0");
 
@@ -2017,6 +2068,19 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                     b.Property<Guid?>("DictionaryTermId")
                         .HasColumnType("uuid")
                         .HasColumnName("dictionary_term_id");
+
+                    b.Property<DateTime?>("ExcludedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("excluded_at_utc");
+
+                    b.Property<Guid?>("ExcludedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("excluded_by_user_id");
+
+                    b.Property<string>("ExclusionReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("exclusion_reason");
 
                     b.Property<string>("FeedbackType")
                         .IsRequired()
@@ -2209,6 +2273,8 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                             t.HasCheckConstraint("ck_catalog_recognition_feedback_training_quality", "\"is_training_eligible\" = FALSE OR (\"status\" = 'Finalized' AND \"label_quality\" IN ('Medium', 'Strong'))");
 
                             t.HasCheckConstraint("ck_catalog_recognition_feedback_type", "\"feedback_type\" IN ('None', 'Accepted', 'Corrected', 'Rejected', 'AddedManually', 'ConflictResolved')");
+
+                            t.HasCheckConstraint("ck_feedback_exclusion", "(excluded_at_utc IS NULL AND excluded_by_user_id IS NULL AND exclusion_reason IS NULL) OR (excluded_at_utc IS NOT NULL AND excluded_by_user_id IS NOT NULL AND exclusion_reason IS NOT NULL AND char_length(btrim(exclusion_reason)) > 0)");
                         });
                 });
 
@@ -2604,6 +2670,10 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("created_by_user_id");
 
+                    b.Property<string>("EvaluationJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("evaluation_json");
+
                     b.Property<string>("EvaluatorVersion")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -2796,6 +2866,12 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("confirmed_by_user_id");
 
+                    b.Property<bool>("IsEvaluationOnly")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_evaluation_only");
+
                     b.Property<Guid>("ManufacturerId")
                         .HasColumnType("uuid")
                         .HasColumnName("manufacturer_id");
@@ -2821,6 +2897,11 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)")
                         .HasColumnName("raw_value");
+
+                    b.Property<string>("RevocationReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("revocation_reason");
 
                     b.Property<DateTime?>("RevokedAtUtc")
                         .HasColumnType("timestamp with time zone")
@@ -2980,6 +3061,11 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_dictionary_suggestions_created_term");
 
+                    b.HasOne("ElectronicService.Domain.Catalog.Dictionaries.CatalogDictionaryEvaluationReport", null)
+                        .WithMany()
+                        .HasForeignKey("EvaluationReportId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("ElectronicService.Domain.Catalog.Manufacturers.Manufacturer", null)
                         .WithMany()
                         .HasForeignKey("ManufacturerId")
@@ -2996,6 +3082,21 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         .WithMany()
                         .HasForeignKey("ReviewedByUserId")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Dictionaries.CatalogDictionaryEvaluationReport", b =>
+                {
+                    b.HasOne("ElectronicService.Domain.Catalog.Recognition.CatalogRecognitionCandidate", null)
+                        .WithMany()
+                        .HasForeignKey("CandidateId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ElectronicService.Domain.Catalog.Dictionaries.CatalogAssistantDictionarySuggestion", null)
+                        .WithMany()
+                        .HasForeignKey("SuggestionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("ElectronicService.Domain.Catalog.Dictionaries.CatalogDictionaryTerm", b =>

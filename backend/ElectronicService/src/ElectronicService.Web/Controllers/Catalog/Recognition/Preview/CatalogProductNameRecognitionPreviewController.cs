@@ -26,6 +26,8 @@ public sealed class CatalogProductNameRecognitionPreviewController : ControllerB
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status422UnprocessableEntity)]
     public async Task<ActionResult<CatalogProductNameRecognitionPreviewResponse>> Preview(
         [FromBody] PreviewCatalogProductNameRecognitionRequest request,
         CancellationToken cancellationToken = default)
@@ -37,17 +39,33 @@ public sealed class CatalogProductNameRecognitionPreviewController : ControllerB
 
         var query = new PreviewCatalogProductNameRecognitionQuery(
             request.ProductName,
-            request.ProductTypeCode);
+            request.ProductTypeCode,
+            request.ManufacturerId);
 
-        var result = await _handler
+        var handled = await _handler
             .Handle(query, cancellationToken)
             .ConfigureAwait(false);
 
-        if (result is null)
+        if (handled.IsFailure)
         {
-            return NotFound($"Тип товара '{request.ProductTypeCode}' не найден.");
+            var status = handled.Error.Code switch
+            {
+                "recognition.product_type_not_found" or "recognition.manufacturer_not_found" => StatusCodes.Status404NotFound,
+                "recognition.scope_mismatch" => StatusCodes.Status409Conflict,
+                "recognition.active_rule_invalid" or "recognition.timeout" => StatusCodes.Status422UnprocessableEntity,
+                _ => StatusCodes.Status400BadRequest
+            };
+            var problem = new ProblemDetails
+            {
+                Status = status,
+                Title = "Распознавание действующей конфигурацией не выполнено.",
+                Detail = handled.Error.Message
+            };
+            problem.Extensions["code"] = handled.Error.Code;
+            return StatusCode(status, problem);
         }
 
+        var result = handled.Value;
         var response = new CatalogProductNameRecognitionPreviewResponse(
             result.ProductTypeId.HasValue,
             result.ProductTypeId,
@@ -83,7 +101,12 @@ public sealed class CatalogProductNameRecognitionPreviewController : ControllerB
                 .ToArray(),
             result.RecognitionResult.Candidates
                 .Select(MapCharacteristic)
-                .ToArray());
+                .ToArray(),
+            result.ManufacturerId,
+            result.ManufacturerName,
+            result.HasCompleteScope,
+            result.ActiveRuleSetVersionId,
+            result.ActiveRuleSetSequenceNumber);
 
         return Ok(response);
     }

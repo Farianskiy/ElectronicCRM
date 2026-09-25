@@ -1,3 +1,4 @@
+using ElectronicService.Core.Catalog.Recognition.Effective;
 using ElectronicService.Core.Catalog.Dictionaries.Abstractions;
 using ElectronicService.Core.Catalog.Dictionaries.GetTerms;
 using ElectronicService.Core.Catalog.Recognition.Abstractions;
@@ -14,7 +15,8 @@ public sealed class CatalogProductNameRecognitionService : ICatalogProductNameRe
 
     private readonly ICatalogCharacteristicRecognitionStrategy[] _strategies;
     private readonly ICatalogCharacteristicRecognitionProfileReader _recognitionProfileReader;
-    private readonly Lazy<Task<IReadOnlyCollection<CatalogDictionaryTermResult>>> _approvedDictionaryTerms;
+    private readonly ICatalogDictionaryReader _dictionaryReader;
+    private readonly CatalogRecognitionRunContext _defaultContext = new([]);
 
     public CatalogProductNameRecognitionService(
         IEnumerable<ICatalogCharacteristicRecognitionStrategy> strategies,
@@ -33,8 +35,7 @@ public sealed class CatalogProductNameRecognitionService : ICatalogProductNameRe
 
         _recognitionProfileReader = recognitionProfileReader;
 
-        _approvedDictionaryTerms = new Lazy<Task<IReadOnlyCollection<CatalogDictionaryTermResult>>>(
-            () => dictionaryReader.GetApprovedTermsAsync());
+        _dictionaryReader = dictionaryReader;
     }
 
     public async Task<CatalogProductNameRecognitionResult> RecognizeAsync(
@@ -46,6 +47,7 @@ public sealed class CatalogProductNameRecognitionService : ICatalogProductNameRe
 
         cancellationToken.ThrowIfCancellationRequested();
 
+        var context = request.Context ?? _defaultContext;
         HashSet<string>? allowedCharacteristicCodes = null;
 
         if (request.AllowedCharacteristicCodes is not null)
@@ -76,9 +78,14 @@ public sealed class CatalogProductNameRecognitionService : ICatalogProductNameRe
 
         if (effectiveProductTypeId.HasValue)
         {
-            recognitionProfiles = await _recognitionProfileReader
-                .GetProfilesAsync(effectiveProductTypeId.Value, cancellationToken)
-                .ConfigureAwait(false);
+            if (!context.Profiles.TryGetValue(effectiveProductTypeId.Value, out var cachedProfiles))
+            {
+                cachedProfiles = await _recognitionProfileReader
+                    .GetProfilesAsync(effectiveProductTypeId.Value, cancellationToken).ConfigureAwait(false);
+                context.Profiles.Add(effectiveProductTypeId.Value, cachedProfiles);
+            }
+
+            recognitionProfiles = cachedProfiles;
         }
 
         var ruleCandidates = RecognizeRuleCandidates(
@@ -92,6 +99,7 @@ public sealed class CatalogProductNameRecognitionService : ICatalogProductNameRe
                 effectiveProductTypeId,
                 effectiveManufacturerId,
                 allowedCharacteristicCodes,
+                context,
                 cancellationToken)
             .ConfigureAwait(false);
 
@@ -279,11 +287,11 @@ public sealed class CatalogProductNameRecognitionService : ICatalogProductNameRe
         Guid? productTypeId,
         Guid? manufacturerId,
         IReadOnlySet<string>? allowedCharacteristicCodes,
+        CatalogRecognitionRunContext context,
         CancellationToken cancellationToken)
     {
-        var terms = await _approvedDictionaryTerms.Value
-            .WaitAsync(cancellationToken)
-            .ConfigureAwait(false);
+        context.DictionaryTerms ??= await _dictionaryReader.GetApprovedTermsAsync(cancellationToken).ConfigureAwait(false);
+        var terms = context.DictionaryTerms;
 
         var normalizedProductName =
             CatalogRecognitionTextNormalizer.NormalizeText(productName);

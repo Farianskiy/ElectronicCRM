@@ -8,4 +8,7 @@ public sealed record ApproveCatalogAssistantDictionarySuggestionCommand(
     string TargetValue,
     string? ProductTypeCode,
     int Priority,
-    string? ReviewComment);
+    string? ReviewComment,
+    long? EvidenceRevision = null,
+    Guid? EvaluationReportId = null,
+    bool Confirmed = false);

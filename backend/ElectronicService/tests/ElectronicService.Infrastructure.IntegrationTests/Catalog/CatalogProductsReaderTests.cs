@@ -453,11 +453,11 @@ public sealed class CatalogProductsReaderTests
             result.Aliases,
             alias => Assert.StartsWith(
                 "Alpha Alias",
-                alias,
+                alias.Value,
                 StringComparison.Ordinal),
             alias => Assert.StartsWith(
                 "Special Reader Alias",
-                alias,
+                alias.Value,
                 StringComparison.Ordinal));
     }
 

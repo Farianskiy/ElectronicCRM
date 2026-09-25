@@ -23,10 +23,11 @@ export function CatalogImportTrainingExampleRevocation({
 }: CatalogImportTrainingExampleRevocationProps) {
   const queryClient = useQueryClient();
   const [isConfirming, setIsConfirming] = useState(false);
+  const [reason, setReason] = useState("");
 
   const mutation = useMutation({
     mutationFn: () =>
-      revokeCatalogImportTrainingExample(batchId, rowId, exampleId),
+      revokeCatalogImportTrainingExample(batchId, rowId, exampleId, reason.trim()),
     onSuccess: async () => {
       const queryKey = catalogImportConfirmedSpansQueryKey(batchId, rowId);
 
@@ -41,11 +42,12 @@ export function CatalogImportTrainingExampleRevocation({
       );
 
       await queryClient.invalidateQueries({ queryKey });
+      await queryClient.invalidateQueries({ queryKey: ["training-examples"] });
     },
   });
 
   function revoke(): void {
-    if (disabled || mutation.isPending || mutation.isSuccess) {
+    if (disabled || mutation.isPending || mutation.isSuccess || !reason.trim()) {
       return;
     }
 
@@ -61,7 +63,7 @@ export function CatalogImportTrainingExampleRevocation({
           disabled={disabled}
           onClick={() => setIsConfirming(true)}
         >
-          Отозвать подтверждение
+          Отозвать подтверждение примера
         </AppButton>
       )}
 
@@ -70,13 +72,17 @@ export function CatalogImportTrainingExampleRevocation({
           <p className="text-sm text-[var(--app-muted)]">
             Отозвать этот учебный пример? Запись останется в истории, но
             перестанет быть действующим подтверждённым примером. Разметка строки
-            не изменится.
+            не изменится. Проверенная обратная связь и действующие правила сохранятся;
+            изменение правил требует отдельной проверки и переключения.
           </p>
+          <label>Причина отзыва
+            <textarea className="block w-full rounded border border-[var(--app-border)] bg-transparent p-2" maxLength={1000} value={reason} onChange={event => setReason(event.target.value)} />
+          </label>
           <div className="flex flex-wrap gap-2">
             <AppButton
               type="button"
               variant="secondary"
-              disabled={disabled || mutation.isPending || mutation.isSuccess}
+              disabled={disabled || mutation.isPending || mutation.isSuccess || !reason.trim()}
               onClick={revoke}
             >
               {mutation.isPending ? "Отзываем..." : "Да, отозвать"}

@@ -9,13 +9,21 @@ export default function CatalogImportDetailsPage() {
 
   const fromReviewQueue = searchParams.get("from") === "review-queue";
 
-  const backHref = fromReviewQueue
-    ? "/catalog/import-reviews"
-    : "/catalog/imports";
+  const requestedReturn = searchParams.get("learningReturn");
+  const learningReturn = requestedReturn?.startsWith(
+    "/catalog/recognition/learning?",
+  )
+    ? requestedReturn
+    : null;
+  const backHref =
+    learningReturn ??
+    (fromReviewQueue ? "/catalog/import-reviews" : "/catalog/imports");
 
-  const backLabel = fromReviewQueue
-    ? "Назад к очереди проверки"
-    : "Назад к импортам";
+  const backLabel = learningReturn
+    ? "Назад к обучению выбранных товаров"
+    : fromReviewQueue
+      ? "Назад к очереди проверки"
+      : "Назад к импортам";
 
   return (
     <CatalogImportDetailsScreen

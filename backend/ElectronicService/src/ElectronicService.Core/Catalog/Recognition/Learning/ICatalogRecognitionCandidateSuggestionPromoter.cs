@@ -5,5 +5,5 @@ namespace ElectronicService.Core.Catalog.Recognition.Learning;
 
 public interface ICatalogRecognitionCandidateSuggestionPromoter
 {
-    Task<Result<CatalogRecognitionCandidateSuggestionPromotionResult, DomainError>> PromoteEligibleAsync(Guid createdByUserId, int batchSize = 500, CancellationToken cancellationToken = default);
+    Task<Result<CatalogRecognitionCandidateSuggestionPromotionResult, DomainError>> PromoteEligibleAsync(Guid upperId, Guid? after = null, int batchSize = 500, CancellationToken cancellationToken = default);
 }

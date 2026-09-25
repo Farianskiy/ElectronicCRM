@@ -151,7 +151,7 @@ public sealed class CatalogRecognitionActiveRuleSetReader
         return new CatalogRecognitionActiveRuleSet(state, snapshot);
     }
 
-    public async Task CaptureForRunAsync(
+    public async Task<IReadOnlyCollection<CatalogRecognitionRuleSetState>> CaptureForRunAsync(
     CancellationToken cancellationToken = default)
     {
         // Сбрасываем предыдущий снимок, если экземпляр используется повторно.
@@ -189,5 +189,7 @@ public sealed class CatalogRecognitionActiveRuleSetReader
                 item.NewVersionId,
                 item.ReportId,
                 item.CreatedAtUtc));
+
+        return _capturedStates.Values.ToArray();
     }
 }

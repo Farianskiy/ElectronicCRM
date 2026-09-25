@@ -14,10 +14,14 @@ internal sealed class CatalogRecognitionFeedbackConfiguration : IEntityTypeConfi
 {
     public void Configure(EntityTypeBuilder<CatalogRecognitionFeedback> builder)
     {
+        builder.Property(feedback => feedback.ExcludedAtUtc).HasColumnName("excluded_at_utc");
+        builder.Property(feedback => feedback.ExcludedByUserId).HasColumnName("excluded_by_user_id");
+        builder.Property(feedback => feedback.ExclusionReason).HasColumnName("exclusion_reason").HasMaxLength(1000);
         builder.ToTable(
             "catalog_recognition_feedback",
             table =>
             {
+                table.HasCheckConstraint("ck_feedback_exclusion", "(excluded_at_utc IS NULL AND excluded_by_user_id IS NULL AND exclusion_reason IS NULL) OR (excluded_at_utc IS NOT NULL AND excluded_by_user_id IS NOT NULL AND exclusion_reason IS NOT NULL AND char_length(btrim(exclusion_reason)) > 0)");
                 table.HasCheckConstraint(
                     "ck_catalog_recognition_feedback_product_name",
                     "char_length(btrim(\"product_name\")) > 0");

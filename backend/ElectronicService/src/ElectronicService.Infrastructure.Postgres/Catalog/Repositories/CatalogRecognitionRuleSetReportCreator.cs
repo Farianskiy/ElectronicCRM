@@ -30,11 +30,18 @@ public sealed class CatalogRecognitionRuleSetReportCreator
         _scopeFactory = scopeFactory;
     }
 
-    public async Task<Result<CatalogRecognitionRuleSetReportCreated, DomainError>>
-        CreateAsync(
-            Guid versionId,
-            Guid batchId,
-            CancellationToken cancellationToken = default)
+    public async Task<Result<CatalogRecognitionRuleSetReportCreated, DomainError>> CreateAsync(Guid versionId, Guid batchId, CancellationToken cancellationToken = default)
+    {
+        await using var settingsScope = _scopeFactory.CreateAsyncScope();
+        var options = settingsScope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<ElectronicService.Core.Catalog.Recognition.Evaluation.RecognitionEvaluationOptions>>().Value;
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(TimeSpan.FromSeconds(options.TimeoutSeconds));
+        try { return await CreateCoreAsync(versionId, batchId, deadline.Token).ConfigureAwait(false); }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        { return new DomainError("evaluation.timeout", "Проверка превысила допустимое время; частичный отчёт не сохранён."); }
+    }
+
+    private async Task<Result<CatalogRecognitionRuleSetReportCreated, DomainError>> CreateCoreAsync(Guid versionId, Guid batchId, CancellationToken cancellationToken)
     {
         if (versionId == Guid.Empty || batchId == Guid.Empty)
         {
@@ -200,7 +207,12 @@ public sealed class CatalogRecognitionRuleSetReportCreator
             return creation.Error;
         }
 
+        var comparison = await scope.ServiceProvider.GetRequiredService<RecognitionEvaluationService>()
+            .CreateAsync(versionId, userId, cancellationToken).ConfigureAwait(false);
+        if (comparison.IsFailure) return comparison.Error;
         var report = creation.Value;
+        var attached = report.AttachEvaluation(ElectronicService.Core.Catalog.Recognition.Evaluation.EvaluationJson.Serialize(comparison.Value));
+        if (attached.IsFailure) return attached.Error;
 
         dbContext.CatalogRecognitionRuleSetReports.Add(report);
 

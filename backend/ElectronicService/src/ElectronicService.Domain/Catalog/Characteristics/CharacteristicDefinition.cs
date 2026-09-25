@@ -86,6 +86,16 @@ public sealed class CharacteristicDefinition : AggregateRoot
             normalizedUnit);
     }
 
+    // Reconstitute a detached, validated definition for immutable recognition snapshots.
+    public static Result<CharacteristicDefinition, DomainError> RestoreSnapshot(Guid id, string code, string name, CharacteristicDataType dataType, string? unit)
+    {
+        if (id == Guid.Empty) return GeneralErrors.ValueIsInvalid(nameof(id));
+        var validated = Create(code, name, dataType, unit);
+        if (validated.IsFailure) return validated.Error;
+        var value = validated.Value;
+        return new CharacteristicDefinition(id, value.Code, value.Name, value.DataType, value.Unit);
+    }
+
     // Метод проверяет, подходит ли значение под тип характеристики
     public UnitResult<DomainError> ValidateValue(CharacteristicValue value)
     {

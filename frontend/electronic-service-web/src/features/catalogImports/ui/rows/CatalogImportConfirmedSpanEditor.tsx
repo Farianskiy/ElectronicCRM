@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { CatalogProductTypeCharacteristicMetadata } from "@/features/catalogMetadata/model/types";
@@ -12,8 +13,6 @@ import {
 } from "../../api/getCatalogImportRowConfirmedSpans";
 import type { CatalogImportConfirmedSpan } from "../../model/types";
 import { CatalogImportTrainingExampleConfirmation } from "./CatalogImportTrainingExampleConfirmation";
-import { CatalogRecognitionLiteralProposalPreview } from "./CatalogRecognitionLiteralProposalPreview";
-import { CatalogRecognitionMultiIntegerPreview } from "./CatalogRecognitionMultiIntegerPreview";
 
 interface CatalogImportConfirmedSpanEditorProps {
   batchId: string;
@@ -56,6 +55,17 @@ export function CatalogImportConfirmedSpanEditor({
   );
   const selectedValue = characteristicValues[characteristicId]?.trim() ?? "";
   const name = productName.trim();
+
+  const learningHref =
+    manufacturerId && productTypeId
+      ? `/catalog/recognition/learning?${new URLSearchParams({
+          manufacturerId,
+          productTypeId,
+          branch: "rules",
+          section: "prepare",
+          batchId,
+        }).toString()}`
+      : null;
 
   const contextMismatch = Boolean(
     selectedFeedback &&
@@ -113,13 +123,16 @@ export function CatalogImportConfirmedSpanEditor({
     <section className="grid gap-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-panel-strong)] p-5">
       <div>
         <h3 className="font-semibold text-[var(--app-text)]">
-          Разметка и правила распознавания
+          Разметка учебного примера
         </h3>
         <p className="mt-1 text-sm text-[var(--app-muted)]">
-          Выберите характеристику. Для просмотра сохранённых шаблонов и проверки
-          импорта разметка этой строки не нужна. Чтобы добавить учебный пример,
-          заполните правильное значение, выделите соответствующий фрагмент
-          названия и сохраните строку.
+          Чтобы добавить учебный пример, заполните правильное значение, выберите
+          характеристику, выделите соответствующий фрагмент названия и сохраните
+          строку. После сохранения пример нужно подтвердить отдельно.
+        </p>
+        <p className="mt-2 text-sm text-[var(--app-muted)]">
+          Подтверждение сохраняет проверенное значение и фрагмент названия, но
+          не создаёт и не включает новое правило автоматически.
         </p>
       </div>
 
@@ -143,7 +156,7 @@ export function CatalogImportConfirmedSpanEditor({
       )}
 
       <AppSelect
-        ariaLabel="Характеристика для разметки и просмотра правил"
+        ariaLabel="Характеристика для разметки учебного примера"
         value={characteristicId}
         disabled={disabled}
         onChange={(value) => {
@@ -271,69 +284,54 @@ export function CatalogImportConfirmedSpanEditor({
       {characteristicId && !selectedFeedback && query.isSuccess && (
         <p className="text-sm text-[var(--app-muted)]">
           У этой строки пока нет сохранённой разметки выбранной характеристики.
-          Это не мешает просматривать правила и проверять импорт. Разметка
-          потребуется только для добавления нового учебного примера.
+          Заполните правильное значение, выделите фрагмент названия, свяжите его
+          с характеристикой и нажмите «Сохранить строку».
         </p>
       )}
 
-      {characteristicId && (!manufacturerId || !productTypeId) && (
-        <p className="text-sm text-[var(--app-muted)]">
-          Для просмотра правил укажите производителя и тип товара.
-        </p>
-      )}
+      <section className="grid gap-3 rounded-xl border border-[var(--app-accent-border)] bg-[var(--app-accent-soft)] p-4">
+        <div>
+          <h4 className="font-semibold text-[var(--app-text)]">
+            Подготовка и включение правил
+          </h4>
 
-      {characteristicId && manufacturerId && productTypeId && (
-        <div className="grid gap-3">
-          <p className="text-sm text-[var(--app-muted)]">
-            Ниже показаны правила для выбранных в форме производителя, типа
-            товара и характеристики. Проверка импорта читает сохранённые строки
-            из базы — несохранённые изменения формы не учитываются.
+          <p className="mt-1 text-sm text-[var(--app-muted)]">
+            Генерация черновиков, составление версии, оценка и включение
+            изменений выполняются в рабочем пространстве обучения.
           </p>
-
-          <CatalogRecognitionLiteralProposalPreview
-            key={JSON.stringify([
-              "recognition-rules",
-              batchId,
-              rowId,
-              manufacturerId,
-              productTypeId,
-              characteristicId,
-              query.dataUpdatedAt,
-            ])}
-            batchId={batchId}
-            manufacturerId={manufacturerId}
-            productTypeId={productTypeId}
-            characteristicDefinitionId={characteristicId}
-            characteristicName={
-              characteristics.find((item) => item.id === characteristicId)
-                ?.name ?? "Характеристика"
-            }
-            disabled={disabled}
-          />
         </div>
-      )}
 
-      {manufacturerId && productTypeId && (
-        <CatalogRecognitionMultiIntegerPreview
-          key={JSON.stringify([
-            "multi-integer-preview",
-            batchId,
-            rowId,
-            manufacturerId,
-            productTypeId,
-          ])}
-          batchId={batchId}
-          manufacturerId={manufacturerId}
-          productTypeId={productTypeId}
-          characteristics={characteristics}
-          disabled={disabled}
-        />
-      )}
+        {learningHref ? (
+          <>
+            <p className="text-sm text-[var(--app-muted)]">
+              Производитель, тип товара и пакет импорта будут переданы
+              автоматически. Обучение откроется в новой вкладке, поэтому
+              несохранённые изменения этой строки останутся в форме.
+            </p>
+
+            <Link
+              href={learningHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center rounded-xl border border-[var(--app-accent-border)] bg-[var(--app-panel)] px-4 py-3 text-sm font-semibold text-[var(--app-accent)] transition hover:bg-[var(--app-panel-strong)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--app-accent)]"
+            >
+              Открыть обучение для этого товара
+            </Link>
+          </>
+        ) : (
+          <p className="text-sm text-[var(--app-muted)]">
+            Выберите производителя и тип товара, чтобы открыть обучение для
+            нужных товаров. Введённые данные сначала сохраните кнопкой
+            «Сохранить строку».
+          </p>
+        )}
+      </section>
 
       <p className="text-xs text-[var(--app-muted)]">
-        «Сохранить строку» сохраняет разметку. «Подтвердить для обучения»
-        отдельно сохраняет проверенный учебный пример. «Отменить выделение»
-        отменяет только новое несохранённое выделение.
+        «Сохранить строку» сохраняет значения товара и разметку фрагмента.
+        «Подтвердить для обучения» отдельно создаёт проверенный учебный пример.
+        Подготовка правила и его включение выполняются позже в рабочем
+        пространстве обучения.
       </p>
     </section>
   );

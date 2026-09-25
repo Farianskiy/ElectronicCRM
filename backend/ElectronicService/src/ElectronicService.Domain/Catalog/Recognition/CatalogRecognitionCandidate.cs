@@ -101,6 +101,23 @@ public sealed class CatalogRecognitionCandidate : AggregateRoot
     public DateTime LastSeenAtUtc { get; private set; }
 
     public uint Version { get; private set; }
+    public long EvidenceRevision { get; private set; }
+
+    public void RecalculateEvidence(int accepted, int corrected, int rejected, int distinctProducts)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(accepted);
+        ArgumentOutOfRangeException.ThrowIfNegative(corrected);
+        ArgumentOutOfRangeException.ThrowIfNegative(rejected);
+        ArgumentOutOfRangeException.ThrowIfNegative(distinctProducts);
+        var total = checked(accepted + corrected + rejected);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(distinctProducts, total);
+        AcceptedCount = accepted;
+        CorrectedCount = corrected;
+        RejectedCount = rejected;
+        OccurrenceCount = total;
+        DistinctProductCount = distinctProducts;
+        EvidenceRevision++;
+    }
 
     public bool IsAccumulating => Status == CatalogRecognitionCandidateStatus.Accumulating;
 
@@ -250,6 +267,7 @@ public sealed class CatalogRecognitionCandidate : AggregateRoot
         }
 
         OccurrenceCount++;
+        EvidenceRevision++;
 
         switch (feedbackType)
         {

@@ -15,10 +15,11 @@ public sealed class RevokeCatalogImportTrainingExampleController : ControllerBas
         Guid batchId,
         Guid rowId,
         Guid exampleId,
+        [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] RevokeTrainingExampleRequest? request,
         [FromServices] RevokeCatalogRecognitionTrainingExampleCommandHandler handler,
         CancellationToken cancellationToken)
     {
-        var result = await handler.Handle(new RevokeCatalogRecognitionTrainingExampleCommand(batchId, rowId, exampleId), cancellationToken).ConfigureAwait(false);
+        var result = await handler.Handle(new RevokeCatalogRecognitionTrainingExampleCommand(batchId, rowId, exampleId, request?.Reason), cancellationToken).ConfigureAwait(false);
 
         if (result.IsSuccess)
         {
@@ -41,3 +42,5 @@ public sealed class RevokeCatalogImportTrainingExampleController : ControllerBas
         });
     }
 }
+
+public sealed record RevokeTrainingExampleRequest(string? Reason);

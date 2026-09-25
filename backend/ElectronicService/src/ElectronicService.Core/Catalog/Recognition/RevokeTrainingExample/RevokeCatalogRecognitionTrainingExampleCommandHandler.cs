@@ -2,6 +2,7 @@ using CSharpFunctionalExtensions;
 using ElectronicService.Core.Abstractions;
 using ElectronicService.Core.Catalog.ImportBatches.Abstractions;
 using ElectronicService.Core.Catalog.Recognition.Abstractions;
+using ElectronicService.Core.Catalog.Recognition.Training;
 using ElectronicService.Core.Users;
 using ElectronicService.Core.Users.Access;
 using ElectronicService.Domain.Common;
@@ -9,7 +10,7 @@ using ElectronicService.Domain.Users.Enums;
 
 namespace ElectronicService.Core.Catalog.Recognition.RevokeTrainingExample;
 
-public sealed record RevokeCatalogRecognitionTrainingExampleCommand(Guid BatchId, Guid RowId, Guid ExampleId);
+public sealed record RevokeCatalogRecognitionTrainingExampleCommand(Guid BatchId, Guid RowId, Guid ExampleId, string? Reason = null);
 
 public sealed class RevokeCatalogRecognitionTrainingExampleCommandHandler
 {
@@ -19,6 +20,7 @@ public sealed class RevokeCatalogRecognitionTrainingExampleCommandHandler
     private readonly ICatalogImportBatchRepository _batchRepository;
     private readonly ICatalogRecognitionFeedbackRepository _feedbackRepository;
     private readonly ICatalogRecognitionTrainingExampleRepository _exampleRepository;
+    private readonly ICatalogTrainingExampleManagement _management;
 
     public RevokeCatalogRecognitionTrainingExampleCommandHandler(
         ICurrentUserProvider currentUserProvider,
@@ -26,7 +28,8 @@ public sealed class RevokeCatalogRecognitionTrainingExampleCommandHandler
         IUserPermissionOverrideRepository permissionRepository,
         ICatalogImportBatchRepository batchRepository,
         ICatalogRecognitionFeedbackRepository feedbackRepository,
-        ICatalogRecognitionTrainingExampleRepository exampleRepository)
+        ICatalogRecognitionTrainingExampleRepository exampleRepository,
+        ICatalogTrainingExampleManagement management)
     {
         _currentUserProvider = currentUserProvider;
         _userRepository = userRepository;
@@ -34,6 +37,7 @@ public sealed class RevokeCatalogRecognitionTrainingExampleCommandHandler
         _batchRepository = batchRepository;
         _feedbackRepository = feedbackRepository;
         _exampleRepository = exampleRepository;
+        _management = management;
     }
 
     public async Task<UnitResult<DomainError>> Handle(RevokeCatalogRecognitionTrainingExampleCommand command, CancellationToken cancellationToken = default)
@@ -94,8 +98,7 @@ public sealed class RevokeCatalogRecognitionTrainingExampleCommandHandler
             return UnitResult.Failure(new DomainError("training.not_found", "Учебный пример не относится к указанной строке."));
         }
 
-        await _exampleRepository.RevokeAsync(example.Id, userId, cancellationToken).ConfigureAwait(false);
-
-        return UnitResult.Success<DomainError>();
+        return await _management.RevokeAsync(example.Id,
+            command.Reason ?? "legacy-api: причина не передана старым клиентом", cancellationToken).ConfigureAwait(false);
     }
 }

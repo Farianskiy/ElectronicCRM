@@ -1,9 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type { FormEvent } from "react";
 import { useState } from "react";
 import { RequirePermission } from "@/features/auth/ui/RequirePermission";
+import { getCatalogManufacturers } from "@/features/catalogMetadata/api/getCatalogManufacturers";
 import { getCatalogProductTypes } from "@/features/catalogMetadata/api/getCatalogProductTypes";
 import { previewCatalogProductNameRecognition } from "@/features/catalogRecognition/api/previewCatalogProductNameRecognition";
 import type {
@@ -19,6 +21,7 @@ import { RecognitionProfilesPanel } from "@/features/catalogRecognition/ui/Recog
 import { RecognitionProfileManagementPanel } from "@/features/catalogRecognition/ui/RecognitionProfileManagementPanel";
 import { RecognitionDictionaryTermCreationPanel } from "@/features/catalogDictionaries/ui/RecognitionDictionaryTermCreationPanel";
 import { RecognitionDictionaryManagementPanel } from "@/features/catalogDictionaries/ui/RecognitionDictionaryManagementPanel";
+import { EvaluationReportLookup } from "@/features/catalogRecognition/ui/EvaluationReportLookup";
 import { RecognitionDatasetExportPanel } from "@/features/catalogRecognition/ui/RecognitionDatasetExportPanel";
 import { ProductTypeSuggestionPreviewPanel } from "@/features/catalogProductTypeSuggestions/ui/ProductTypeSuggestionPreviewPanel";
 
@@ -63,6 +66,7 @@ function CatalogRecognitionContent() {
     recognitionExamples[0]?.productTypeCode ?? "",
   );
 
+  const [manufacturerId, setManufacturerId] = useState("");
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const productTypesQuery = useQuery({
@@ -70,6 +74,20 @@ function CatalogRecognitionContent() {
     queryFn: getCatalogProductTypes,
     staleTime: 5 * 60 * 1000,
   });
+
+  const manufacturersQuery = useQuery({
+    queryKey: ["catalog-manufacturers"],
+    queryFn: getCatalogManufacturers,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const manufacturerOptions = [
+    { value: "", label: "Без производителя — только общая диагностика" },
+    ...(manufacturersQuery.data ?? []).map((manufacturer) => ({
+      value: manufacturer.id,
+      label: manufacturer.name,
+    })),
+  ];
 
   const previewMutation = useMutation({
     mutationFn: previewCatalogProductNameRecognition,
@@ -102,6 +120,7 @@ function CatalogRecognitionContent() {
     previewMutation.mutate({
       productName,
       productTypeCode: productTypeCode.length > 0 ? productTypeCode : null,
+      manufacturerId: manufacturerId || null,
     });
   }
 
@@ -128,6 +147,7 @@ function CatalogRecognitionContent() {
     await previewMutation.mutateAsync({
       productName,
       productTypeCode: productTypeCode.length > 0 ? productTypeCode : null,
+      manufacturerId: manufacturerId || null,
     });
   }
 
@@ -135,13 +155,45 @@ function CatalogRecognitionContent() {
     <div className="grid gap-6">
       <PageHeader
         title="Проверка распознавания"
-        description="Диагностическая страница для проверки Recognition Engine, профилей характеристик, конфликтов, confidence и span."
+        description="Проверка действующих правил распознавания, которые использует импорт: значения, источники и конфликты."
       />
+
+      <section
+        id="training-examples"
+        aria-labelledby="recognition-learning-title"
+        className="scroll-mt-24 rounded-3xl border border-teal-500/25 bg-teal-500/[0.06] p-6"
+      >
+        <h2
+          id="recognition-learning-title"
+          className="text-xl font-semibold text-teal-100"
+        >
+          Обучение распознавания
+        </h2>
+
+        <p className="mt-2 text-sm text-slate-300">
+          Подтверждённые примеры, подготовка правил, проверка и включение
+          изменений.
+        </p>
+
+        <p className="mt-3 text-sm text-slate-400">
+          Для работы с примерами откройте обучение, выберите производителя и тип
+          товара, затем вкладку «Мои подтверждения». Сохранение примера само по
+          себе не включает новое правило.
+        </p>
+
+        <Link
+          href="/catalog/recognition/learning"
+          className="mt-5 inline-flex items-center justify-center rounded-2xl border border-teal-500/30 bg-teal-500/10 px-5 py-3 text-sm font-medium text-teal-100 transition hover:bg-teal-500/20 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-teal-400"
+        >
+          Открыть обучение
+        </Link>
+      </section>
 
       <RecognitionExplanation />
 
       <ProductTypeSuggestionPreviewPanel />
 
+      <EvaluationReportLookup />
       <RecognitionDatasetExportPanel />
 
       <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
@@ -149,12 +201,37 @@ function CatalogRecognitionContent() {
           <h2 className="text-xl font-semibold text-white">Исходные данные</h2>
 
           <p className="mt-2 text-sm text-slate-400">
-            Выберите тип товара или оставьте режим ассистента, введите
-            наименование и запустите распознавание.
+            Выберите производителя и тип товара, введите наименование и
+            запустите распознавание.
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="mt-6 grid gap-5">
+          <div className="grid gap-2">
+            <span className="text-sm font-medium text-slate-300">
+              Производитель
+            </span>
+            <AppSelect
+              ariaLabel="Производитель для распознавания"
+              value={manufacturerId}
+              options={manufacturerOptions}
+              disabled={manufacturersQuery.isLoading}
+              onChange={(value) => {
+                setManufacturerId(value);
+                setValidationError(null);
+                previewMutation.reset();
+              }}
+            />
+            {manufacturersQuery.isError && (
+              <p className="text-sm text-amber-200">
+                {getApiErrorMessage(
+                  manufacturersQuery.error,
+                  "Не удалось загрузить производителей.",
+                )}{" "}
+                Без производителя доступна только диагностика неполной области.
+              </p>
+            )}
+          </div>
           <div className="grid gap-2">
             <span className="text-sm font-medium text-slate-300">
               Контекст типа товара
@@ -169,9 +246,9 @@ function CatalogRecognitionContent() {
             />
 
             <p className="text-xs text-slate-500">
-              При выборе типа движок использует его ProductTypeId, схему
-              характеристик и активные RecognitionProfile. Без типа движок
-              работает так же, как ассистент.
+              При выбранных производителе и типе используются те же правила, что
+              в импорте. Без полной области правила конкретного производителя и
+              типа не проверяются.
             </p>
           </div>
 
@@ -288,20 +365,24 @@ function RecognitionExplanation() {
 
       <div className="mt-4 grid gap-4 text-sm text-slate-300 lg:grid-cols-2">
         <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-          <p className="font-medium text-white">С выбранным типом товара</p>
+          <p className="font-medium text-white">
+            С производителем и типом товара
+          </p>
 
           <p className="mt-2 text-slate-400">
-            Используются характеристики схемы типа, его ProductTypeId, активные
-            профили, единицы, диапазоны и MinimumConfidence.
+            Используются базовые правила, словарь, профили и активная версия
+            правил для выбранного производителя и типа товара. Ручные значения и
+            значения Excel импорт обрабатывает отдельно.
           </p>
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-          <p className="font-medium text-white">Без выбранного типа товара</p>
+          <p className="font-medium text-white">Без производителя или типа</p>
 
           <p className="mt-2 text-slate-400">
-            Профили типа недоступны. Стратегии работают с базовыми настройками.
-            Это показывает текущее поведение ассистента.
+            Доступна общая диагностика. Правила конкретной области проверены не
+            полностью; такой результат не воспроизводит импорт с выбранным
+            производителем и типом.
           </p>
         </div>
       </div>
@@ -331,12 +412,13 @@ function RecognitionResult({
       <RecognitionScope preview={preview} />
 
       <RecognitionDictionaryTermCreationPanel
-        key={`${preview.productTypeCode ?? "assistant"}-${preview.productName}`}
+        key={`${preview.manufacturerId ?? "general"}-${preview.productTypeCode ?? "assistant"}-${preview.productName}`}
         preview={preview}
         isRecognitionRefreshing={isRecognitionRefreshing}
         onRecognitionRefresh={onRecognitionRefresh}
       />
 
+      <div id="dictionary-management" />
       <RecognitionDictionaryManagementPanel
         currentProductTypeId={preview.productTypeId}
         isRecognitionRefreshing={isRecognitionRefreshing}
@@ -445,11 +527,32 @@ function RecognitionScope({
         <ScopeDetail
           label="Режим"
           value={
-            preview.hasProductTypeScope
-              ? "Контекст типа товара"
-              : "Без типа товара — ассистент"
+            preview.hasCompleteScope
+              ? "Действующая конфигурация импорта"
+              : "Общая диагностика — производитель или тип не выбран"
           }
         />
+
+        <ScopeDetail
+          label="Производитель"
+          value={preview.manufacturerName ?? "Не выбран"}
+        />
+        <ScopeDetail
+          label="Использованная активная версия"
+          value={
+            preview.hasCompleteScope
+              ? (preview.activeRuleSetVersionId ??
+                "Нет активной версии — базовые правила и словарь")
+              : "Не проверена: выберите производителя и тип"
+          }
+          monospace={Boolean(preview.activeRuleSetVersionId)}
+        />
+        {preview.activeRuleSetSequenceNumber != null && (
+          <ScopeDetail
+            label="Переключение конфигурации"
+            value={String(preview.activeRuleSetSequenceNumber)}
+          />
+        )}
 
         <ScopeDetail
           label="Название типа"
@@ -468,6 +571,15 @@ function RecognitionScope({
           monospace
         />
       </div>
+
+      {!preview.hasCompleteScope && (
+        <p className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/[0.06] p-4 text-sm text-amber-200">
+          Производитель и тип товара выбраны не полностью. Правила для
+          конкретного сочетания товаров не проверены. Выберите оба значения,
+          чтобы использовать ту же конфигурацию распознавания, что и при
+          импорте.
+        </p>
+      )}
 
       <div className="mt-5">
         <p className="text-sm font-medium text-slate-300">
@@ -488,8 +600,9 @@ function RecognitionScope({
           </div>
         ) : (
           <p className="mt-3 rounded-2xl border border-amber-500/20 bg-amber-500/[0.06] p-4 text-sm text-amber-200">
-            Ограничение схемой типа отсутствует. Движок может запускать все
-            зарегистрированные стратегии.
+            {preview.hasProductTypeScope
+              ? "Для выбранного типа нет разрешённых характеристик."
+              : "Ограничение схемой типа отсутствует. Доступны общие стратегии."}
           </p>
         )}
       </div>

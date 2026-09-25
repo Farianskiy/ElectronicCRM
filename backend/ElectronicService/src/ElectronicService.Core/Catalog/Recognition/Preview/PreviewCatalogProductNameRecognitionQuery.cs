@@ -2,4 +2,5 @@ namespace ElectronicService.Core.Catalog.Recognition.Preview;
 
 public sealed record PreviewCatalogProductNameRecognitionQuery(
     string ProductName,
-    string? ProductTypeCode);
+    string? ProductTypeCode,
+    Guid? ManufacturerId = null);

@@ -153,7 +153,7 @@ export function CatalogRecognitionIntegerPatternPreview({
                 {proposal.conflictingExampleIds.length}
               </p>
 
-              {proposal.passedExamples && (
+              {batchId && proposal.passedExamples && (
                 <CatalogRecognitionIntegerBatchPreviewPanel
                   key={JSON.stringify([
                     batchId,

@@ -29,6 +29,11 @@ public sealed class CatalogAssistantDictionarySuggestionReader : ICatalogAssista
         int page,
         int pageSize,
         CancellationToken cancellationToken = default)
+        => await ReadAsync(status, page, pageSize, cancellationToken).ConfigureAwait(false);
+
+    public async Task<CatalogAssistantDictionarySuggestionsPageResult> ReadAsync(
+        CatalogAssistantDictionarySuggestionStatus? status, int page, int pageSize,
+        CancellationToken cancellationToken, Guid? manufacturerId = null, Guid? productTypeId = null, Guid? id = null)
     {
         var normalizedPage = Math.Max(page, 1);
 
@@ -39,6 +44,11 @@ public sealed class CatalogAssistantDictionarySuggestionReader : ICatalogAssista
         var suggestionsQuery = _dbContext.CatalogAssistantDictionarySuggestions
             .AsNoTracking()
             .AsQueryable();
+
+        if (manufacturerId.HasValue && productTypeId.HasValue)
+            suggestionsQuery = suggestionsQuery.Where(s => s.Source == CatalogDictionarySuggestionSource.RecognitionLearning &&
+                _dbContext.CatalogRecognitionCandidates.Any(c => c.SuggestionId == s.Id && c.ManufacturerId == manufacturerId && c.ProductTypeId == productTypeId));
+        if (id.HasValue) suggestionsQuery = suggestionsQuery.Where(s => s.Id == id);
 
         if (status.HasValue)
         {
@@ -112,7 +122,7 @@ public sealed class CatalogAssistantDictionarySuggestionReader : ICatalogAssista
             .ToArray();
 
         var evidenceExamplesBySuggestionId = await GetEvidenceExamplesAsync(
-            recognitionLearningSuggestionIds,
+            manufacturerId.HasValue ? [] : recognitionLearningSuggestionIds,
             cancellationToken).ConfigureAwait(false);
 
         var items = itemsData.Select(suggestion =>

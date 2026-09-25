@@ -143,6 +143,20 @@ public sealed class CatalogRecognitionFeedback : AggregateRoot
     public DateTime? FinalizedAtUtc { get; private set; }
 
     public bool IsTrainingEligible { get; private set; }
+    public DateTime? ExcludedAtUtc { get; private set; }
+    public Guid? ExcludedByUserId { get; private set; }
+    public string? ExclusionReason { get; private set; }
+
+    public UnitResult<DomainError> ExcludeFromLearning(Guid userId, string reason)
+    {
+        if (ExcludedAtUtc.HasValue) return UnitResult.Success<DomainError>();
+        if (userId == Guid.Empty || string.IsNullOrWhiteSpace(reason) || reason.Trim().Length > 1000)
+            return UnitResult.Failure(GeneralErrors.ValueIsInvalid(nameof(reason)));
+        ExcludedAtUtc = DateTime.UtcNow;
+        ExcludedByUserId = userId;
+        ExclusionReason = reason.Trim();
+        return UnitResult.Success<DomainError>();
+    }
 
     public bool IsPending => Status == CatalogRecognitionFeedbackStatus.Pending;
 

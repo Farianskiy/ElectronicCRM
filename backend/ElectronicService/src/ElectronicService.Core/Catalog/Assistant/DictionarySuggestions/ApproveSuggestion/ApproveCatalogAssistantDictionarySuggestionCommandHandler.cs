@@ -7,6 +7,7 @@ using ElectronicService.Core.Catalog.ProductTypes.Abstractions;
 using ElectronicService.Core.Catalog.ProductTypes.GetCharacteristicSchema;
 using ElectronicService.Core.Catalog.Recognition.Abstractions;
 using ElectronicService.Core.Users;
+using ElectronicService.Core.Catalog.Recognition.Evaluation;
 using ElectronicService.Domain.Catalog.Dictionaries;
 using ElectronicService.Domain.Catalog.Errors;
 using ElectronicService.Domain.Catalog.Recognition;
@@ -23,6 +24,9 @@ public sealed class ApproveCatalogAssistantDictionarySuggestionCommandHandler
     private readonly ICatalogProductTypeSchemaReader _productTypeSchemaReader;
     private readonly IUserRepository _userRepository;
     private readonly ICurrentUserProvider _currentUserProvider;
+    private readonly IRecognitionMutationGate _gate;
+    private readonly IRecognitionReleaseSession _session;
+    private readonly IDictionaryEvaluationReports _evaluation;
 
     public ApproveCatalogAssistantDictionarySuggestionCommandHandler(
         ICatalogAssistantDictionarySuggestionRepository suggestionRepository,
@@ -31,7 +35,7 @@ public sealed class ApproveCatalogAssistantDictionarySuggestionCommandHandler
         ICharacteristicDefinitionRepository characteristicDefinitionRepository,
         ICatalogProductTypeSchemaReader productTypeSchemaReader,
         IUserRepository userRepository,
-        ICurrentUserProvider currentUserProvider)
+        ICurrentUserProvider currentUserProvider, IRecognitionMutationGate gate, IRecognitionReleaseSession session, IDictionaryEvaluationReports evaluation)
     {
         ArgumentNullException.ThrowIfNull(suggestionRepository);
         ArgumentNullException.ThrowIfNull(dictionaryRepository);
@@ -48,11 +52,18 @@ public sealed class ApproveCatalogAssistantDictionarySuggestionCommandHandler
         _productTypeSchemaReader = productTypeSchemaReader;
         _userRepository = userRepository;
         _currentUserProvider = currentUserProvider;
+        _gate = gate;
+        _session = session;
+        _evaluation = evaluation;
     }
 
     public async Task<UnitResult<DomainError>> Handle(ApproveCatalogAssistantDictionarySuggestionCommand command, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command);
+        await using var mutation = await _gate.EnterAsync(cancellationToken).ConfigureAwait(false);
+        await using var transaction = await _session.BeginAsync(cancellationToken).ConfigureAwait(false);
+        var authorization = await _session.AuthorizeAsync(cancellationToken).ConfigureAwait(false);
+        if (authorization.IsFailure) return UnitResult.Failure(authorization.Error);
 
         var currentUserId = _currentUserProvider.UserId;
 
@@ -63,7 +74,7 @@ public sealed class ApproveCatalogAssistantDictionarySuggestionCommandHandler
 
         var user = await _userRepository.GetByIdAsync(currentUserId.Value, cancellationToken).ConfigureAwait(false);
 
-        if (user is null || !user.CanManageProductSynonyms())
+        if (user is null || !user.IsActive)
         {
             return UnitResult.Failure<DomainError>(CatalogErrors.UserCannotReviewDictionarySuggestion());
         }
@@ -82,6 +93,7 @@ public sealed class ApproveCatalogAssistantDictionarySuggestionCommandHandler
 
         if (!suggestion.IsPending)
         {
+            if (suggestion.IsGeneratedFromRecognitionLearning) return UnitResult.Failure(new DomainError("evaluation.stale", "Предложение уже обработано. Обновите состояние."));
             return UnitResult.Failure<DomainError>(GeneralErrors.ValueIsInvalid(nameof(suggestion.Status)));
         }
 
@@ -95,6 +107,10 @@ public sealed class ApproveCatalogAssistantDictionarySuggestionCommandHandler
             {
                 return UnitResult.Failure<DomainError>(CatalogErrors.RecognitionCandidateForSuggestionNotFound(suggestion.Id));
             }
+
+            if (command.EvidenceRevision != candidate.EvidenceRevision ||
+                !ElectronicService.Core.Catalog.Recognition.Learning.CatalogRecognitionCandidateSuggestionPolicy.HasSufficientEvidence(candidate))
+                return UnitResult.Failure(new DomainError("training.conflict", "Основания изменились или недостаточны. Обновите просмотр оснований."));
 
             if (!candidate.ManufacturerId.HasValue || candidate.ManufacturerId.Value == Guid.Empty || suggestion.ManufacturerId != candidate.ManufacturerId)
             {
@@ -176,6 +192,11 @@ public sealed class ApproveCatalogAssistantDictionarySuggestionCommandHandler
         }
 
         var decision = decisionResult.Value;
+        if (suggestion.IsGeneratedFromRecognitionLearning)
+        {
+            var evaluated = await _evaluation.ValidateAsync(command, decision, cancellationToken).ConfigureAwait(false);
+            if (evaluated.IsFailure) return evaluated;
+        }
 
         var termResult = CatalogDictionaryTerm.Create(
             decision.Phrase,
@@ -223,8 +244,10 @@ public sealed class ApproveCatalogAssistantDictionarySuggestionCommandHandler
         }
 
         _dictionaryRepository.Add(term);
+        if (suggestion.IsGeneratedFromRecognitionLearning) suggestion.RecordEvaluation(command.EvaluationReportId!.Value);
 
         await _suggestionRepository.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
 
         return UnitResult.Success<DomainError>();
     }

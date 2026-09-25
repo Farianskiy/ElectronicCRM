@@ -122,6 +122,8 @@ public sealed class CatalogImportRecognitionFeedbackCollector : ICatalogImportRe
             beforeRecognitionSuggestions.TryGetValue(characteristicDefinitionId, out var beforeRecognitionSuggestion);
             existingFeedbackByDefinitionId.TryGetValue(characteristicDefinitionId, out var currentFeedback);
 
+            if (currentFeedback?.ExcludedAtUtc is not null) continue;
+
             if (request.ConfirmedSpans is not null && request.ConfirmedSpans.TryGetValue(characteristicDefinitionId, out var confirmedSpan))
             {
                 if (currentFeedback is not null)
@@ -279,7 +281,7 @@ public sealed class CatalogImportRecognitionFeedbackCollector : ICatalogImportRe
                 cancellationToken)
             .ConfigureAwait(false);
 
-        var removable = pendingFeedback
+        var removable = pendingFeedback.Where(feedback => feedback.ExcludedAtUtc == null)
             .Where(feedback =>
                 !feedback.ImportRowId.HasValue ||
                 !preservedIds.Contains(feedback.ImportRowId.Value))

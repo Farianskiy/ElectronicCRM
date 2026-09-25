@@ -18,10 +18,12 @@ public static class CatalogRecognitionCandidateSuggestionPolicy
     {
         ArgumentNullException.ThrowIfNull(candidate);
 
-        if (!candidate.IsAccumulating || candidate.HasSuggestion)
-        {
-            return false;
-        }
+        return candidate.IsAccumulating && !candidate.HasSuggestion && HasSufficientEvidence(candidate);
+    }
+
+    public static bool HasSufficientEvidence(CatalogRecognitionCandidate candidate)
+    {
+        ArgumentNullException.ThrowIfNull(candidate);
 
         if (candidate.OccurrenceCount < MinimumOccurrenceCount)
         {

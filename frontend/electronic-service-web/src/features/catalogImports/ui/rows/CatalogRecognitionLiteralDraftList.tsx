@@ -108,11 +108,11 @@ export function CatalogRecognitionLiteralDraftList({
                 Идентификатор: {draft.id}
               </p>
               <CatalogRecognitionLiteralDraftEvidencePanel draftId={draft.id} />
-              <CatalogRecognitionLiteralBatchPreviewPanel
+              {batchId && (<CatalogRecognitionLiteralBatchPreviewPanel
                 key={`${session?.userId}-${draft.id}-${batchId}`}
                 draftId={draft.id}
                 batchId={batchId}
-              />
+              />)}
               <CatalogRecognitionLiteralDraftRecheckPanel
                 key={`${session?.userId}-${draft.id}`}
                 draftId={draft.id}

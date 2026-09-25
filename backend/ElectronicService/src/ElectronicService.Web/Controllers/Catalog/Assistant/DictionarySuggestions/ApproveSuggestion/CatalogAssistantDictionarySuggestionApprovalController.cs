@@ -41,12 +41,16 @@ public sealed class CatalogAssistantDictionarySuggestionApprovalController : Con
             request.TargetValue,
             request.ProductTypeCode,
             request.Priority,
-            request.ReviewComment);
+            request.ReviewComment, request.EvidenceRevision, request.EvaluationReportId, request.Confirmed == true);
 
         var result = await _handler.Handle(command, cancellationToken).ConfigureAwait(false);
 
         if (result.IsFailure)
         {
+            if (result.Error.Code.StartsWith("evaluation.", StringComparison.Ordinal) || result.Error.Code.StartsWith("training.", StringComparison.Ordinal))
+                return DictionaryEvaluationHttp.Problem(this, result.Error);
+            if (string.Equals(result.Error.Code, "training.conflict", StringComparison.Ordinal))
+                return Conflict(new ProblemDetails { Status = 409, Detail = result.Error.Message });
             return this.ToCatalogDictionaryProblem(result.Error);
         }
 

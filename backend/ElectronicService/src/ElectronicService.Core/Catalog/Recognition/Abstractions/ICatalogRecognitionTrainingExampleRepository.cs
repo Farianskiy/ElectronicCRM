@@ -8,7 +8,5 @@ public interface ICatalogRecognitionTrainingExampleRepository
 
     Task<CatalogRecognitionTrainingExample?> GetByIdAsync(Guid exampleId, CancellationToken cancellationToken = default);
 
-    Task RevokeAsync(Guid exampleId, Guid revokedByUserId, CancellationToken cancellationToken = default);
-
     Task<IReadOnlyCollection<CatalogRecognitionTrainingExample>> GetActiveByFeedbackIdsAsync(IReadOnlyCollection<Guid> feedbackIds, CancellationToken cancellationToken = default);
 }
