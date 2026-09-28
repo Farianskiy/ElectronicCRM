@@ -12,6 +12,8 @@ import { TechnicalProductEditor } from "@/features/catalogProducts/ui/TechnicalP
 import { formatPrice } from "@/shared/lib/formatters";
 import { PageWorkspace } from "@/shared/ui/PageWorkspace";
 import { AppButton } from "@/shared/ui/AppButton";
+import { ProductComponentCompatibilityPanel } from "@/features/componentCompatibility/ui/ProductComponentCompatibilityPanel";
+import { ComponentOfferManager } from "@/features/componentCompatibility/ui/ComponentOfferManager";
 
 function getErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
@@ -194,6 +196,18 @@ export default function CatalogProductDetailsPage() {
               <InfoCard label="Остаток" value={`${product.stockQuantity}`} />
             </div>
           </section>
+
+          <ProductComponentCompatibilityPanel
+            productId={product.id}
+            canEdit={canEditDetails}
+          />
+
+          {canEditDetails && (
+            <ComponentOfferManager
+              productId={product.id}
+              productTypeCode={product.productTypeCode}
+            />
+          )}
 
           {canOpenEditor && isEditorOpen ? (
             <TechnicalProductEditor

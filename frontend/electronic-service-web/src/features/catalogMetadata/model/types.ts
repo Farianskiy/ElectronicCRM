@@ -1,18 +1,23 @@
+export type CatalogProductTypeKind = "MainProduct" | "Component";
+
 export interface CatalogProductTypeMetadata {
   id: string;
   code: string;
   name: string;
+  kind: CatalogProductTypeKind;
 }
 
 export interface CreateCatalogProductTypeRequest {
   code: string;
   name: string;
+  kind: CatalogProductTypeKind;
 }
 
 export interface CreateCatalogProductTypeResponse {
   id: string;
   code: string;
   name: string;
+  kind: CatalogProductTypeKind;
 }
 
 export interface CatalogManufacturerMetadata {

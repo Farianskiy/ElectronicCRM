@@ -56,15 +56,22 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser : ICatalogAss
         string? manufacturer = null;
 
         var characteristics = new List<SearchProductCharacteristicFilter>();
+        var dictionarySearchTokens = new List<string>();
+        var hasAmbiguousProductTypePhrase = false;
 
         foreach (var term in terms)
         {
-            if (!Enum.TryParse<CatalogDictionaryTermKind>(term.Kind, ignoreCase: true, out var kind))
+            if (!Enum.TryParse<CatalogDictionaryTermKind>(
+                    term.Kind,
+                    ignoreCase: true,
+                    out var kind))
             {
                 continue;
             }
 
-            if (!IsDictionaryTermMatch(normalizedMessage, term.NormalizedPhrase, kind))
+            if (!IsDictionaryTermMatch(
+                    normalizedMessage,
+                    term.NormalizedPhrase))
             {
                 continue;
             }
@@ -76,7 +83,16 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser : ICatalogAss
                     break;
 
                 case CatalogDictionaryTermKind.ProductType:
-                    productTypeCode ??= term.TargetValue;
+                    if (AmbiguousProductTypePhrases.Contains(
+                            term.NormalizedPhrase))
+                    {
+                        hasAmbiguousProductTypePhrase = true;
+                    }
+                    else
+                    {
+                        productTypeCode ??= term.TargetValue;
+                    }
+
                     break;
 
                 case CatalogDictionaryTermKind.Characteristic:
@@ -91,16 +107,16 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser : ICatalogAss
                     break;
 
                 case CatalogDictionaryTermKind.SearchToken:
-                    search ??= term.TargetValue;
+                    dictionarySearchTokens.Add(term.TargetValue);
                     break;
             }
         }
 
         var recognitionResult = await _productNameRecognitionService
-            .RecognizeAsync(
-                new CatalogProductNameRecognitionRequest(message),
-                cancellationToken)
-            .ConfigureAwait(false);
+                .RecognizeAsync(
+                    new CatalogProductNameRecognitionRequest(message),
+                    cancellationToken)
+                .ConfigureAwait(false);
 
         foreach (var recognizedCharacteristic in recognitionResult.Characteristics)
         {
@@ -110,8 +126,24 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser : ICatalogAss
                 recognizedCharacteristic.NormalizedValue);
         }
 
+        if (string.Equals(
+                productTypeCode,
+                "CONTACTOR",
+                StringComparison.Ordinal))
+        {
+            var coilVoltageMatch = CoilVoltageRegex().Match(message);
+
+            if (coilVoltageMatch.Success)
+            {
+                AddOrReplaceCharacteristic(
+                    characteristics,
+                    "COIL_VOLTAGE",
+                    coilVoltageMatch.Groups["value"].Value);
+            }
+        }
+
         var manufacturerResolutionIndex = await _manufacturerResolver
-            .LoadIndexAsync(cancellationToken)
+                    .LoadIndexAsync(cancellationToken)
             .ConfigureAwait(false);
 
         var manufacturerRecognition = manufacturerResolutionIndex
@@ -124,9 +156,28 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser : ICatalogAss
 
         manufacturer = manufacturerSelection.Manufacturer;
 
-        search ??= ExtractSearchToken(
-            message,
-            recognitionResult);
+        search = string.Equals(
+        productTypeCode,
+        "SCHMP_CABINET",
+        StringComparison.Ordinal)
+            ? ExtractCabinetDimensions(message)
+                ?? ExtractSearchToken(message, recognitionResult)
+            : ExtractSearchToken(message, recognitionResult);
+
+        if (search is null
+        && productTypeCode is null
+        && hasAmbiguousProductTypePhrase)
+        {
+            search = "АВТ";
+        }
+
+        if (search is null
+            && productTypeCode is null
+                        && manufacturer is null
+            && characteristics.Count == 0)
+        {
+            search = SelectBestDictionarySearchToken(dictionarySearchTokens);
+        }
 
         CatalogAssistantClarificationResult? clarification;
 
@@ -136,16 +187,25 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser : ICatalogAss
         }
         else
         {
-            var unknownPhrase = FindFirstUnknownPhrase(
+            var unknownPhrases = FindUnknownPhrases(
                 normalizedMessage,
                 terms,
-                manufacturerRecognition);
+                manufacturerRecognition,
+                recognitionResult);
 
-            clarification = unknownPhrase is null
-                ? null
-                : await _unknownTermResolver
+            clarification = null;
+
+            foreach (var unknownPhrase in unknownPhrases)
+            {
+                clarification = await _unknownTermResolver
                     .ResolveAsync(unknownPhrase, cancellationToken)
                     .ConfigureAwait(false);
+
+                if (clarification is not null)
+                {
+                    break;
+                }
+            }
         }
 
         return new CatalogAssistantParsedRequest(
@@ -178,10 +238,30 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser : ICatalogAss
         return CatalogAssistantIntent.SearchProducts;
     }
 
+    private static string? ExtractCabinetDimensions(string message)
+    {
+        var match = CabinetDimensionsRegex().Match(message);
+
+        if (!match.Success)
+        {
+            return null;
+        }
+
+        var width = match.Groups["width"].Value;
+        var height = match.Groups["height"].Value;
+        var depth = match.Groups["depth"];
+
+        return depth.Success
+            ? $"{width}Х{height}Х{depth.Value}"
+            : $"{width}Х{height}";
+    }
+
     private static string? ExtractSearchToken(
     string message,
     CatalogProductNameRecognitionResult recognitionResult)
     {
+        var tokens = new List<string>();
+
         foreach (Match seriesMatch in SeriesTokenRegex().Matches(message))
         {
             var valueMatch = seriesMatch.Groups["value"];
@@ -198,6 +278,11 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser : ICatalogAss
                 continue;
             }
 
+            if (MeasurementTokenRegex().IsMatch(normalizedValue))
+            {
+                continue;
+            }
+
             if (OverlapsRecognizedCharacteristic(
                     valueMatch.Index,
                     valueMatch.Length,
@@ -206,10 +291,27 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser : ICatalogAss
                 continue;
             }
 
-            return normalizedValue;
+            if (!tokens.Contains(normalizedValue, StringComparer.Ordinal))
+            {
+                tokens.Add(normalizedValue);
+            }
         }
 
-        return null;
+        return tokens.Count == 0
+            ? null
+            : string.Join(' ', tokens);
+    }
+
+    private static string? SelectBestDictionarySearchToken(
+        IReadOnlyCollection<string> candidates)
+    {
+        return candidates
+            .Where(candidate => !string.IsNullOrWhiteSpace(candidate))
+            .Select(NormalizeText)
+            .Distinct(StringComparer.Ordinal)
+            .OrderByDescending(candidate => candidate.Any(char.IsDigit))
+            .ThenByDescending(candidate => candidate.Length)
+            .FirstOrDefault();
     }
 
     private static bool OverlapsRecognizedCharacteristic(
@@ -291,21 +393,21 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser : ICatalogAss
             .Replace("Ё", "Е", StringComparison.Ordinal);
     }
 
-    private static string? FindFirstUnknownPhrase(
+    private static List<string> FindUnknownPhrases(
     string normalizedMessage,
     IReadOnlyCollection<CatalogDictionaryTermResult> terms,
-    ManufacturerNameRecognitionResult manufacturerRecognition)
+    ManufacturerNameRecognitionResult manufacturerRecognition,
+    CatalogProductNameRecognitionResult recognitionResult)
     {
         var recognizedWords = terms
             .Where(term =>
                 Enum.TryParse<CatalogDictionaryTermKind>(
                     term.Kind,
                     ignoreCase: true,
-                    out var kind)
+                    out _)
                 && IsDictionaryTermMatch(
                     normalizedMessage,
-                    term.NormalizedPhrase,
-                    kind))
+                    term.NormalizedPhrase))
             .SelectMany<CatalogDictionaryTermResult, string>(term =>
                 term.NormalizedPhrase.Split(
                     ' ',
@@ -322,11 +424,12 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser : ICatalogAss
             }
         }
 
-        foreach (var word in WordRegex()
-                     .Matches(normalizedMessage)
-                     .Cast<Match>()
-                     .Select(match => match.Value))
+        var unknownPhrases = new List<string>();
+
+        foreach (Match match in WordRegex().Matches(normalizedMessage))
         {
+            var word = match.Value;
+
             if (word.Length < 3)
             {
                 continue;
@@ -347,10 +450,23 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser : ICatalogAss
                 continue;
             }
 
-            return word;
+            if (recognitionResult.Candidates.Any(candidate =>
+                    SpansOverlap(
+                        match.Index,
+                        match.Length,
+                        candidate.StartIndex,
+                        candidate.Length)))
+            {
+                continue;
+            }
+
+            if (!unknownPhrases.Contains(word, StringComparer.Ordinal))
+            {
+                unknownPhrases.Add(word);
+            }
         }
 
-        return null;
+        return unknownPhrases;
     }
 
     private static (
@@ -465,12 +581,9 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser : ICatalogAss
 
     private static bool IsDictionaryTermMatch(
         string normalizedMessage,
-        string normalizedPhrase,
-        CatalogDictionaryTermKind kind)
+        string normalizedPhrase)
     {
-        return kind == CatalogDictionaryTermKind.Manufacturer
-            ? ContainsWholeTerm(normalizedMessage, normalizedPhrase)
-            : normalizedMessage.Contains(normalizedPhrase, StringComparison.Ordinal);
+        return ContainsWholeTerm(normalizedMessage, normalizedPhrase);
     }
 
     private static bool ContainsWholeTerm(string text, string term)
@@ -515,6 +628,14 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser : ICatalogAss
         return false;
     }
 
+    private static readonly HashSet<string> AmbiguousProductTypePhrases =
+    new(StringComparer.Ordinal)
+    {
+        "АВТОМАТ",
+        "АВТОМАТИЧЕСКИЙ ВЫКЛЮЧАТЕЛЬ"
+    };
+
+
     private static readonly HashSet<string> IgnoredWords = new(StringComparer.Ordinal)
     {
         "НАЙДИ",
@@ -544,10 +665,30 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser : ICatalogAss
     };
 
     [GeneratedRegex(
-        @"\b(?<value>[А-ЯA-Z]{1,8}-?\d+[А-ЯA-Z0-9\-]*)\b",
+    @"(?<!\d)(?<width>\d{2,4})(?:\s*[XХ×*]\s*|\s+)(?<height>\d{2,4})(?:(?:\s*[XХ×*]\s*|\s+)(?<depth>\d{2,4}))?(?!\d)",
+    RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+    RegexTimeoutMilliseconds)]
+    private static partial Regex CabinetDimensionsRegex();
+
+
+    [GeneratedRegex(
+    @"(?<![\d,.])(?<value>\d+(?:[.,]\d+)?)\s*(?:В|V)(?![\p{L}\p{N}])",
+    RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+    RegexTimeoutMilliseconds)]
+    private static partial Regex CoilVoltageRegex();
+
+
+    [GeneratedRegex(
+        @"\b(?<value>(?:[А-ЯA-Z]{1,8}-?\d+[А-ЯA-Z0-9\-]*|\d+[А-ЯA-Z][А-ЯA-Z0-9\-]*))\b",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
         RegexTimeoutMilliseconds)]
     private static partial Regex SeriesTokenRegex();
+
+    [GeneratedRegex(
+        @"^\d+(?:[.,]\d+)?(?:А|A|В|V|КА|KA|КВ|KV|ВТ|W|П|P)$",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+        RegexTimeoutMilliseconds)]
+    private static partial Regex MeasurementTokenRegex();
 
     [GeneratedRegex(
         @"[А-ЯA-Z0-9\-]+",

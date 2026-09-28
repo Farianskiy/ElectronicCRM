@@ -1,5 +1,6 @@
 using ElectronicService.Contracts.Catalog.ProductTypes.Management;
 using ElectronicService.Core.Catalog.ProductTypes.CreateProductType;
+using ElectronicService.Domain.Catalog.ProductTypes;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ElectronicService.Web.Controllers.Catalog.ProductTypes.CreateProductType;
@@ -34,11 +35,22 @@ public sealed class CreateProductTypeController : ControllerBase
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        if (!Enum.TryParse<ProductTypeKind>(
+                request.Kind,
+                ignoreCase: true,
+                out var kind)
+            || !Enum.IsDefined(kind))
+        {
+            return BadRequest(
+                "Назначение типа товара должно быть MainProduct или Component.");
+        }
+
         var result = await _handler
             .Handle(
                 new CreateProductTypeCommand(
                     request.Code,
-                    request.Name),
+                    request.Name,
+                    kind),
                 cancellationToken)
             .ConfigureAwait(false);
 
@@ -60,6 +72,7 @@ public sealed class CreateProductTypeController : ControllerBase
             new CreateProductTypeResponse(
                 result.Value.Id,
                 result.Value.Code,
-                result.Value.Name));
+                result.Value.Name,
+                result.Value.Kind.ToString()));
     }
 }

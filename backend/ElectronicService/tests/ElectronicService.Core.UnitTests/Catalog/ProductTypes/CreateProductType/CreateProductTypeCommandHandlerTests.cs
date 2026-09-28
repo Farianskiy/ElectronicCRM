@@ -16,12 +16,17 @@ public sealed class CreateProductTypeCommandHandlerTests
         var result = await handler.Handle(
             new CreateProductTypeCommand(
                 " modular-breaker ",
-                "  Модульный автомат  "),
+                "  Модульный автомат  ",
+                ProductTypeKind.Component),
             cancellationToken);
 
         Assert.True(result.IsSuccess);
         Assert.Equal("MODULAR_BREAKER", result.Value.Code);
         Assert.Equal("Модульный автомат", result.Value.Name);
+        Assert.Equal(ProductTypeKind.Component, result.Value.Kind);
+        Assert.Equal(
+            ProductTypeKind.Component,
+            repository.AddedProductType?.Kind);
         Assert.Equal(result.Value.Id, repository.AddedProductType?.Id);
         Assert.Equal(cancellationToken, repository.LastCancellationToken);
         Assert.Equal(1, repository.SaveChangesCallsCount);

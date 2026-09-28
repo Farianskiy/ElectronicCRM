@@ -8,7 +8,11 @@ public sealed class ProductTypeConfiguration : IEntityTypeConfiguration<ProductT
 {
     public void Configure(EntityTypeBuilder<ProductType> builder)
     {
-        builder.ToTable("product_types");
+        builder.ToTable(
+            "product_types",
+            tableBuilder => tableBuilder.HasCheckConstraint(
+                "ck_product_types_kind",
+                "\"kind\" IN ('MainProduct', 'Component')"));
 
         builder.HasKey(productType => productType.Id);
 
@@ -24,6 +28,13 @@ public sealed class ProductTypeConfiguration : IEntityTypeConfiguration<ProductT
         builder.Property(productType => productType.Name)
             .HasColumnName("name")
             .HasMaxLength(200)
+            .IsRequired();
+
+        builder.Property(productType => productType.Kind)
+            .HasColumnName("kind")
+            .HasConversion<string>()
+            .HasMaxLength(50)
+            .HasDefaultValue(ProductTypeKind.MainProduct)
             .IsRequired();
 
         builder.HasMany(productType => productType.Characteristics)

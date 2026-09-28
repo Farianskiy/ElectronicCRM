@@ -29,6 +29,7 @@ public sealed class CatalogProductTypesController : ControllerBase
         return Ok(result.Select(productType => new CatalogProductTypeResponse(
             productType.Id,
             productType.Code,
-            productType.Name)).ToList());
+            productType.Name,
+            productType.Kind)).ToList());
     }
 }

@@ -1,5 +1,6 @@
 using ElectronicService.Domain.Catalog.Audit;
 using ElectronicService.Domain.Catalog.Characteristics;
+using ElectronicService.Domain.Catalog.Components;
 using ElectronicService.Domain.Catalog.Dictionaries;
 using ElectronicService.Domain.Catalog.ImportBatches;
 using ElectronicService.Domain.Catalog.Manufacturers;
@@ -29,6 +30,20 @@ public sealed class ElectronicDbContext : DbContext
     public DbSet<ProductCharacteristic> ProductCharacteristics => Set<ProductCharacteristic>();
 
     public DbSet<ProductAlias> ProductAliases => Set<ProductAlias>();
+
+    public DbSet<ComponentNeedDefinition> ComponentNeedDefinitions =>
+        Set<ComponentNeedDefinition>();
+
+    public DbSet<ComponentOffer> ComponentOffers => Set<ComponentOffer>();
+
+    public DbSet<ComponentCompatibilityConstraint> ComponentCompatibilityConstraints =>
+        Set<ComponentCompatibilityConstraint>();
+
+    public DbSet<ProductComponentNeedState> ProductComponentNeedStates =>
+        Set<ProductComponentNeedState>();
+
+    public DbSet<ProductSelectedComponent> ProductSelectedComponents =>
+        Set<ProductSelectedComponent>();
 
     public DbSet<ProductType> ProductTypes => Set<ProductType>();
 

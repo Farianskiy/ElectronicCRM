@@ -3,6 +3,7 @@ using ElectronicService.Core.Abstractions;
 using ElectronicService.Core.Abstractions.Data;
 using ElectronicService.Core.Catalog.Assistant.Abstractions;
 using ElectronicService.Core.Catalog.Assistant.DictionarySuggestions.Abstractions;
+using ElectronicService.Core.Catalog.Components;
 using ElectronicService.Core.Catalog.CharacteristicDefinitions.Abstractions;
 using ElectronicService.Core.Catalog.Dictionaries.Abstractions;
 using ElectronicService.Core.Catalog.ImportBatches.Abstractions;
@@ -25,6 +26,7 @@ using ElectronicService.Core.Catalog.Recognition.Abstractions;
 using ElectronicService.Core.Users;
 using ElectronicService.Core.Users.Access;
 using ElectronicService.Infrastructure.Postgres.Catalog.ImportBatches;
+using ElectronicService.Infrastructure.Postgres.Catalog.Components;
 using ElectronicService.Infrastructure.Postgres.Catalog.ImportBatches.Cleanup;
 using ElectronicService.Infrastructure.Postgres.Catalog.ImportBatches.Reports;
 using ElectronicService.Infrastructure.Postgres.Catalog.PriceCalculations;
@@ -116,6 +118,9 @@ public static class DependencyInjectionExtensions
         services.AddScoped<ICatalogProductsReader, CatalogProductsReader>();
         services.AddScoped<ICatalogProductReplacementsReader, CatalogProductReplacementsReader>();
         services.AddScoped<IProductRepository, ProductRepository>();
+        services.AddScoped<
+            ICatalogComponentCompatibilityService,
+            CatalogComponentCompatibilityService>();
         services.AddScoped<ICatalogStockWorkbookImporter, CatalogStockWorkbookImporter>();
         services.AddScoped<ICatalogProductMetadataRepository, CatalogProductMetadataRepository>();
         services.AddScoped<IManufacturerResolver, PostgresManufacturerResolver>();

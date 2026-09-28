@@ -13,6 +13,7 @@ import { PageHeader } from "@/shared/ui/PageHeader";
 import { ProductTypeCharacteristicRequirednessControl } from "@/features/catalogProductTypes/ui/ProductTypeCharacteristicRequirednessControl";
 import { ProductTypeCharacteristicRemovalControl } from "@/features/catalogProductTypes/ui/ProductTypeCharacteristicRemovalControl";
 import { CreateCatalogProductTypeForm } from "@/features/catalogProductTypes/ui/CreateCatalogProductTypeForm";
+import { ComponentNeedsManager } from "@/features/componentCompatibility/ui/ComponentNeedsManager";
 
 function getErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
@@ -87,6 +88,10 @@ function formatDataType(dataType: string): string {
   return dataType;
 }
 
+function formatProductTypeKind(kind: string): string {
+  return kind === "Component" ? "Комплектующее" : "Основной товар";
+}
+
 export default function CatalogProductTypesPage() {
   return (
     <RequirePermission permission="DictionariesManage">
@@ -117,6 +122,10 @@ function CatalogProductTypesContent() {
    */
   const effectiveProductTypeCode =
     selectedProductTypeCode || productTypes[0]?.code || "";
+
+  const selectedProductType = productTypes.find(
+    (productType) => productType.code === effectiveProductTypeCode,
+  );
 
   const schemaQuery = useQuery({
     queryKey: [
@@ -194,7 +203,7 @@ function CatalogProductTypesContent() {
               }}
               options={productTypes.map((productType) => ({
                 value: productType.code,
-                label: productType.name,
+                label: `${productType.name} · ${formatProductTypeKind(productType.kind)}`,
               }))}
             />
           </div>
@@ -267,6 +276,12 @@ function CatalogProductTypesContent() {
                 <p className="mt-2 text-sm text-slate-400">
                   Сводная информация о схеме и заполненности характеристик.
                 </p>
+
+                {selectedProductType && (
+                  <span className="mt-3 inline-flex rounded-full border border-teal-500/30 bg-teal-500/10 px-3 py-1 text-xs font-medium text-teal-300">
+                    {formatProductTypeKind(selectedProductType.kind)}
+                  </span>
+                )}
               </div>
 
               {incompleteRequiredCharacteristicsCount > 0 && (
@@ -304,6 +319,14 @@ function CatalogProductTypesContent() {
               />
             </div>
           </section>
+
+          {selectedProductType?.kind === "MainProduct" && (
+            <ComponentNeedsManager
+              key={selectedProductType.code}
+              productTypeCode={selectedProductType.code}
+              productTypeName={selectedProductType.name}
+            />
+          )}
 
           <AddOptionalCharacteristicToProductType
             key={schema.productTypeCode}

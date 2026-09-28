@@ -16,11 +16,13 @@ public sealed class ProductType : AggregateRoot
     private ProductType(
         Guid id,
         string code,
-        string name)
+        string name,
+        ProductTypeKind kind)
         : base(id)
     {
         Code = code;
         Name = name;
+        Kind = kind;
     }
 
     private ProductType()
@@ -31,9 +33,14 @@ public sealed class ProductType : AggregateRoot
 
     public string Name { get; private set; } = string.Empty;
 
+    public ProductTypeKind Kind { get; private set; }
+
     public IReadOnlyCollection<ProductTypeCharacteristic> Characteristics => _characteristics;
 
-    public static Result<ProductType, DomainError> Create(string code, string name)
+    public static Result<ProductType, DomainError> Create(
+        string code,
+        string name,
+        ProductTypeKind kind = ProductTypeKind.MainProduct)
     {
         if (string.IsNullOrWhiteSpace(code))
         {
@@ -43,6 +50,11 @@ public sealed class ProductType : AggregateRoot
         if (string.IsNullOrWhiteSpace(name))
         {
             return GeneralErrors.ValueIsRequired(nameof(name));
+        }
+
+        if (!Enum.IsDefined(kind))
+        {
+            return GeneralErrors.ValueIsInvalid(nameof(kind));
         }
 
         var normalizedCode = NormalizeCode(code);
@@ -61,7 +73,8 @@ public sealed class ProductType : AggregateRoot
         return new ProductType(
             Guid.CreateVersion7(),
             normalizedCode,
-            normalizedName);
+            normalizedName,
+            kind);
     }
 
     // Метод добавляет характеристику к типу товара

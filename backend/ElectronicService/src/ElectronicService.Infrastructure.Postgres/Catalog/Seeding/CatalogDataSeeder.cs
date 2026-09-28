@@ -101,6 +101,10 @@ public sealed partial class CatalogDataSeeder
         new("ЧЕТЫРЕХПОЛЮСНЫЙ", CatalogDictionaryTermKind.Characteristic, "POLES", "4P", 100),
 
         new("РЕВЕРСИВНЫЙ", CatalogDictionaryTermKind.Characteristic, "REVERSIBLE", "TRUE", 100),
+        new("РЕВЕРС", CatalogDictionaryTermKind.Characteristic, "REVERSIBLE", "TRUE", 100),
+        new("НЕРЕВЕРСИВНЫЙ", CatalogDictionaryTermKind.Characteristic, "REVERSIBLE", "FALSE", 100),
+        new("НЕРЕВЕРС", CatalogDictionaryTermKind.Characteristic, "REVERSIBLE", "FALSE", 100),
+
         new("С ЗАЩИТОЙ", CatalogDictionaryTermKind.Characteristic, "HAS_THERMAL_RELEASE", "TRUE", 100),
         new("БЕЗ ЗАЩИТЫ", CatalogDictionaryTermKind.Characteristic, "HAS_THERMAL_RELEASE", "FALSE", 100)
     ];
