@@ -8,10 +8,12 @@ import { applyCatalogImportBatch } from "../../api/applyCatalogImportBatch";
 import { rejectCatalogImportBatch } from "../../api/rejectCatalogImportBatch";
 import { requestCatalogImportChanges } from "../../api/requestCatalogImportChanges";
 import { catalogImportQueryKeys } from "../../model/queryKeys";
+import type { CatalogImportMode } from "../../model/types";
 
 interface CatalogImportReviewDecisionPanelProps {
   batchId: string;
   originalFileName: string;
+  importMode: CatalogImportMode;
   rowsCount: number;
   validRowsCount: number;
   errorRowsCount: number;
@@ -42,6 +44,7 @@ const textareaClassName = [
 export function CatalogImportReviewDecisionPanel({
   batchId,
   originalFileName,
+  importMode,
   rowsCount,
   validRowsCount,
   errorRowsCount,
@@ -199,7 +202,13 @@ export function CatalogImportReviewDecisionPanel({
         [
           `Применить пакет «${originalFileName}» к каталогу?`,
           "",
-          `Будет создано товаров: ${validRowsCount}`,
+          `Будет обработано строк: ${validRowsCount}`,
+          importMode === "CreateOnly"
+            ? "Будут созданы только новые товары. Существующий артикул остановит применение пакета."
+            : "Будут обновлены только характеристики существующих товаров. Отсутствующий артикул остановит применение пакета.",
+          importMode === "UpdateCharacteristicsOnly"
+            ? "Название, цена, остаток и характеристики, которых нет в Excel, останутся без изменений."
+            : "",
           "",
           "Операция изменит рабочий каталог и не может быть отменена через интерфейс импорта.",
         ].join("\n"),

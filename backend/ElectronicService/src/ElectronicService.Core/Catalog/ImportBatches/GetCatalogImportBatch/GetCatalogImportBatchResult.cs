@@ -6,6 +6,7 @@ public sealed record GetCatalogImportBatchResult(
     Guid BatchId,
     Guid CreatedByUserId,
     Guid? ProductTypeId,
+    CatalogImportMode ImportMode,
     string OriginalFileName,
     long FileSizeBytes,
     CatalogImportBatchStatus Status,

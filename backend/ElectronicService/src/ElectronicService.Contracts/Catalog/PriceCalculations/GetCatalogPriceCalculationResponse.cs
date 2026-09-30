@@ -37,6 +37,27 @@ public sealed record CatalogPriceCalculationLineResponse(
     decimal? MrcPriceAmount,
     decimal DiscountPercent,
     decimal ProjectPriceAmount,
+    decimal ProductTotalAmount,
+    decimal ComponentsTotalAmount,
+    decimal TotalAmount,
+    DateTime CreatedAtUtc,
+    DateTime? UpdatedAtUtc,
+    IReadOnlyList<CatalogPriceCalculationLineComponentResponse> Components);
+
+public sealed record CatalogPriceCalculationLineComponentResponse(
+    Guid ComponentLineId,
+    Guid NeedDefinitionId,
+    string NeedName,
+    Guid ComponentProductId,
+    Guid ManufacturerId,
+    string ManufacturerName,
+    string Article,
+    string Name,
+    int QuantityPerUnit,
+    decimal TotalQuantity,
+    decimal BasePriceAmount,
+    decimal DiscountPercent,
+    decimal ProjectPriceAmount,
     decimal TotalAmount,
     DateTime CreatedAtUtc,
     DateTime? UpdatedAtUtc);

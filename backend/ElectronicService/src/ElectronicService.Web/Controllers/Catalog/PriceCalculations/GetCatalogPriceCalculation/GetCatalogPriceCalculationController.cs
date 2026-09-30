@@ -69,31 +69,54 @@ public sealed class GetCatalogPriceCalculationController
         var value =
             result.Value;
 
-        var lines =
-            value.Lines
-                .Select(
-                    line =>
-                        new CatalogPriceCalculationLineResponse(
-                            line.LineId,
-                            line.ProductId,
-                            line.ManufacturerId,
-                            line.ManufacturerName,
-                            line.PriceListId,
-                            line.PriceListRowId,
-                            line.Article,
-                            line.Name,
-                            line.Unit,
-                            line.Quantity,
-                            line.StockQuantity,
-                            line.ShortageQuantity,
-                            line.BasePriceAmount,
-                            line.MrcPriceAmount,
-                            line.DiscountPercent,
-                            line.ProjectPriceAmount,
-                            line.TotalAmount,
-                            line.CreatedAtUtc,
-                            line.UpdatedAtUtc))
-                .ToArray();
+        var lines = value.Lines
+            .Select(line =>
+            {
+                var components = line.Components
+                    .Select(component => new CatalogPriceCalculationLineComponentResponse(
+                        component.ComponentLineId,
+                        component.NeedDefinitionId,
+                        component.NeedName,
+                        component.ComponentProductId,
+                        component.ManufacturerId,
+                        component.ManufacturerName,
+                        component.Article,
+                        component.Name,
+                        component.QuantityPerUnit,
+                        component.TotalQuantity,
+                        component.BasePriceAmount,
+                        component.DiscountPercent,
+                        component.ProjectPriceAmount,
+                        component.TotalAmount,
+                        component.CreatedAtUtc,
+                        component.UpdatedAtUtc))
+                    .ToArray();
+
+                return new CatalogPriceCalculationLineResponse(
+                    line.LineId,
+                    line.ProductId,
+                    line.ManufacturerId,
+                    line.ManufacturerName,
+                    line.PriceListId,
+                    line.PriceListRowId,
+                    line.Article,
+                    line.Name,
+                    line.Unit,
+                    line.Quantity,
+                    line.StockQuantity,
+                    line.ShortageQuantity,
+                    line.BasePriceAmount,
+                    line.MrcPriceAmount,
+                    line.DiscountPercent,
+                    line.ProjectPriceAmount,
+                    line.ProductTotalAmount,
+                    line.ComponentsTotalAmount,
+                    line.TotalAmount,
+                    line.CreatedAtUtc,
+                    line.UpdatedAtUtc,
+                    components);
+            })
+            .ToArray();
 
         var discounts =
             value.ManufacturerDiscounts

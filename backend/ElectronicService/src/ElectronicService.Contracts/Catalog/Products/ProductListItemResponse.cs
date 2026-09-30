@@ -9,4 +9,7 @@ public sealed record ProductListItemResponse(
     string ManufacturerName,
     decimal PriceAmount,
     string PriceCurrency,
-    decimal StockQuantity);
+    decimal StockQuantity,
+    Guid ManufacturerId = default,
+    decimal BasePriceAmount = 0,
+    string BasePriceCurrency = "");

@@ -86,6 +86,14 @@ builder.Services.AddAuthorization(options =>
 
     var catalogImportAccessPermissions = new[] { UserPermissionCode.CatalogImportsCreate, UserPermissionCode.CatalogImportsReview };
     options.AddPolicy(PermissionPolicy.ForAny(catalogImportAccessPermissions), policy => policy.RequireAuthenticatedUser().RequireAssertion(context => catalogImportAccessPermissions.Any(permission => context.User.HasClaim(PermissionClaimTypes.Permission, permission.ToString()))));
+
+    var bulkProductEditPermissions = new[]
+    {
+        UserPermissionCode.ProductsEdit,
+        UserPermissionCode.PricesManage,
+        UserPermissionCode.StockManage
+    };
+    options.AddPolicy(PermissionPolicy.ForAny(bulkProductEditPermissions), policy => policy.RequireAuthenticatedUser().RequireAssertion(context => bulkProductEditPermissions.Any(permission => context.User.HasClaim(PermissionClaimTypes.Permission, permission.ToString()))));
 });
 
 var frontendOrigins = builder.Configuration

@@ -50,6 +50,7 @@ public sealed class GetMyCatalogImportBatchesController : ControllerBase
             .Select(item => new MyCatalogImportBatchItemResponse(
                 item.BatchId,
                 item.ProductTypeId,
+                item.ImportMode.ToString(),
                 item.OriginalFileName,
                 item.FileSizeBytes,
                 item.Status.ToString(),

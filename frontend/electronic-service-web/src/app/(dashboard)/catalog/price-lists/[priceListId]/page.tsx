@@ -254,12 +254,6 @@ function PriceListRow({
             : formatPrice(row.basePriceAmount, currency)}
         </td>
 
-        <td className="whitespace-nowrap px-4 py-4 tabular-nums text-[var(--app-muted)]">
-          {row.mrcPriceAmount === null || row.mrcPriceAmount === undefined
-            ? "—"
-            : formatPrice(row.mrcPriceAmount, currency)}
-        </td>
-
         <td className="px-4 py-4">
           <p
             className={
@@ -354,7 +348,7 @@ function PriceListRow({
 
       {editing && (
         <tr className="bg-[var(--app-panel)]">
-          <td colSpan={8} className="px-4 pb-5">
+          <td colSpan={7} className="px-4 pb-5">
             <CatalogPriceListSingleRowEditor
               key={`${row.rowId}-${row.article}-${row.name}-${row.productId ?? ""}-${row.unit ?? ""}`}
               priceListId={priceListId}
@@ -1078,17 +1072,16 @@ export default function CatalogPriceListDetailsPage() {
               </div>
             ) : rows.length > 0 ? (
               <div className="mt-5 overflow-x-auto rounded-2xl border border-[var(--app-border)]">
-                <table className="w-full min-w-[1250px] table-fixed border-collapse text-left text-sm">
+                <table className="w-full min-w-[1100px] table-fixed border-collapse text-left text-sm">
                   <caption className="sr-only">Строки прайс-листа</caption>
 
                   <colgroup>
                     <col className="w-[4%]" />
                     <col className="w-[6%]" />
                     <col className="w-[23%]" />
-                    <col className="w-[12%]" />
-                    <col className="w-[12%]" />
                     <col className="w-[14%]" />
-                    <col className="w-[21%]" />
+                    <col className="w-[14%]" />
+                    <col className="w-[25%]" />
                     <col className="w-[8%]" />
                   </colgroup>
 
@@ -1108,8 +1101,7 @@ export default function CatalogPriceListDetailsPage() {
                       </th>
                       <th className="px-4 py-3 font-medium">Строка</th>
                       <th className="px-4 py-3 font-medium">Товар</th>
-                      <th className="px-4 py-3 font-medium">Прайс 100%</th>
-                      <th className="px-4 py-3 font-medium">МРЦ</th>
+                      <th className="px-4 py-3 font-medium">Цена</th>
                       <th className="px-4 py-3 font-medium">Состояние</th>
                       <th className="px-4 py-3 font-medium">Проблемы</th>
                       <th className="px-4 py-3 font-medium">Действия</th>

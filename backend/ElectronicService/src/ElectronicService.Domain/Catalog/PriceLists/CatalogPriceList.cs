@@ -336,7 +336,7 @@ public sealed class CatalogPriceList : AggregateRoot
     }
 
     public UnitResult<DomainError> CompleteProcessing(
-        DateOnly effectiveDate,
+        DateOnly? effectiveDate,
         int rowsCount,
         int validRowsCount,
         int errorRowsCount)
@@ -347,12 +347,6 @@ public sealed class CatalogPriceList : AggregateRoot
                 CatalogPriceListErrors.InvalidStatusTransition(
                     Status,
                     CatalogPriceListStatus.Ready));
-        }
-
-        if (effectiveDate == default)
-        {
-            return UnitResult.Failure(
-                GeneralErrors.ValueIsInvalid(nameof(effectiveDate)));
         }
 
         if (rowsCount <= 0

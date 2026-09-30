@@ -4,4 +4,5 @@ namespace ElectronicService.Core.Catalog.ImportBatches.CreateCatalogImportBatch;
 
 public sealed record CreateCatalogImportBatchResult(
     Guid BatchId,
-    CatalogImportBatchStatus Status);
+    CatalogImportBatchStatus Status,
+    CatalogImportMode ImportMode);

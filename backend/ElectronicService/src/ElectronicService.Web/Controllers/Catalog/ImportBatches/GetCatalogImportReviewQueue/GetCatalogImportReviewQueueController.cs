@@ -55,6 +55,7 @@ public sealed class GetCatalogImportReviewQueueController : ControllerBase
                     item.CreatedByEmail,
                     item.CreatedByUserType,
                     item.ProductTypeId,
+                    item.ImportMode.ToString(),
                     item.OriginalFileName,
                     item.Status.ToString(),
                     item.RowsCount,

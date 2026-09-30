@@ -16,5 +16,7 @@ public enum ProductAuditOperation
 
     ProductTypeMigrated = 8,
 
-    ImportApplied = 9
+    ImportApplied = 9,
+
+    BulkUpdated = 10
 }

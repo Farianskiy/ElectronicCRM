@@ -65,6 +65,19 @@ internal sealed class FakeProductRepository : IProductRepository
         return Task.FromResult<Product?>(product);
     }
 
+    public Task<IReadOnlyCollection<Product>> GetByIdsWithDetailsAsync(
+        IReadOnlyCollection<Guid> productIds,
+        CancellationToken cancellationToken = default)
+    {
+        var products = productIds
+            .Distinct()
+            .Where(_products.ContainsKey)
+            .Select(productId => _products[productId])
+            .ToArray();
+
+        return Task.FromResult<IReadOnlyCollection<Product>>(products);
+    }
+
     public Task SaveChangesAsync(
         CancellationToken cancellationToken = default)
     {

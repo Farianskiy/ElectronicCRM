@@ -57,16 +57,6 @@ function getStatusClassName(status: CatalogPriceListStatus): string {
   }
 }
 
-function formatEffectiveDate(value?: string | null): string {
-  if (!value) {
-    return "Не определена";
-  }
-
-  return new Intl.DateTimeFormat("ru-RU", {
-    dateStyle: "medium",
-  }).format(new Date(`${value}T00:00:00`));
-}
-
 function PriceListStatusBadge({ status }: { status: CatalogPriceListStatus }) {
   return (
     <span
@@ -95,7 +85,7 @@ function PriceListRow({ priceList }: { priceList: CatalogPriceListVersion }) {
       </td>
 
       <td className="px-4 py-4 text-[var(--app-muted)]">
-        {formatEffectiveDate(priceList.effectiveDate)}
+        {formatDate(priceList.createdAtUtc)}
       </td>
 
       <td className="px-4 py-4 tabular-nums text-[var(--app-text)]">
@@ -343,8 +333,9 @@ export default function CatalogPriceListsPage() {
         </h2>
 
         <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">
-          Поддерживаются ZIP и XLSX размером до 30 МБ. Загрузка только сохраняет
-          файл; обработка будет запускаться на странице версии.
+          В Excel нужны только колонки «Артикул» и «Цена» — их порядок и имя
+          листа не важны. Поддерживаются ZIP и XLSX размером до 30 МБ. Обработка
+          запускается на странице версии.
         </p>
 
         <form onSubmit={handleUpload} className="mt-5 grid min-w-0 gap-4">
@@ -500,7 +491,7 @@ export default function CatalogPriceListsPage() {
                 <tr>
                   <th className="px-4 py-3 font-medium">Файл</th>
                   <th className="px-4 py-3 font-medium">Статус</th>
-                  <th className="px-4 py-3 font-medium">Дата прайса</th>
+                  <th className="px-4 py-3 font-medium">Загружен</th>
                   <th className="px-4 py-3 font-medium">Строки</th>
                   <th className="px-4 py-3 font-medium">Последнее действие</th>
                   <th className="px-4 py-3 font-medium">Ошибка</th>

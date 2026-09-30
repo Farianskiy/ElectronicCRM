@@ -36,6 +36,30 @@ public sealed class ProductRepository : IProductRepository
                 cancellationToken);
     }
 
+    public async Task<IReadOnlyCollection<Product>> GetByIdsWithDetailsAsync(
+        IReadOnlyCollection<Guid> productIds,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(productIds);
+
+        var ids = productIds
+            .Where(productId => productId != Guid.Empty)
+            .Distinct()
+            .ToArray();
+
+        if (ids.Length == 0)
+        {
+            return [];
+        }
+
+        return await _dbContext.Products
+            .Include(product => product.Characteristics)
+            .Include(product => product.Aliases)
+            .Where(product => ids.Contains(product.Id))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     public async Task<bool> TrySaveChangesAsync(
     CancellationToken cancellationToken = default)
     {

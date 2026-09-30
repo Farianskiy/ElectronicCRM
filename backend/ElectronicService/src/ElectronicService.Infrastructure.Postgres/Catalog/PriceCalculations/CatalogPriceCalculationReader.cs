@@ -78,17 +78,13 @@ public sealed class CatalogPriceCalculationReader
             return null;
         }
 
-        var lines =
-            await (
-                from line in
-                    _dbContext.CatalogPriceCalculationLines
-                        .AsNoTracking()
-                join product in
-                    _dbContext.Products.AsNoTracking()
+        var storedLines = await (
+                from line in _dbContext.CatalogPriceCalculationLines.AsNoTracking()
+                join product in _dbContext.Products.AsNoTracking()
                     on line.ProductId equals product.Id
                 where line.CalculationId == calculationId
                 orderby line.CreatedAtUtc, line.Id
-                select new CatalogPriceCalculationLineDetails(
+                select new StoredCalculationLine(
                     line.Id,
                     line.ProductId,
                     line.ManufacturerId,
@@ -110,8 +106,89 @@ public sealed class CatalogPriceCalculationReader
                     line.TotalAmount,
                     line.CreatedAtUtc,
                     line.UpdatedAtUtc))
-                .ToArrayAsync(cancellationToken)
-                .ConfigureAwait(false);
+            .ToArrayAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var lineIds = storedLines.Select(line => line.LineId).ToArray();
+
+        var storedComponents = await _dbContext.CatalogPriceCalculationLineComponents
+            .AsNoTracking()
+            .Where(component => lineIds.Contains(component.CalculationLineId))
+            .OrderBy(component => component.NeedName)
+            .ThenBy(component => component.Name)
+            .ThenBy(component => component.Id)
+            .Select(component => new StoredCalculationLineComponent(
+                component.CalculationLineId,
+                new CatalogPriceCalculationLineComponentDetails(
+                    component.Id,
+                    component.NeedDefinitionId,
+                    component.NeedName,
+                    component.ComponentProductId,
+                    component.ManufacturerId,
+                    component.ManufacturerName,
+                    component.Article,
+                    component.Name,
+                    component.QuantityPerUnit,
+                    component.TotalQuantity,
+                    component.BasePriceAmount,
+                    component.DiscountPercent,
+                    component.ProjectPriceAmount,
+                    component.TotalAmount,
+                    component.CreatedAtUtc,
+                    component.UpdatedAtUtc)))
+            .ToArrayAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var componentsByLineId = storedComponents
+            .GroupBy(component => component.CalculationLineId)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<CatalogPriceCalculationLineComponentDetails>)group
+                    .Select(component => component.Details)
+                    .ToArray());
+
+        var lines = storedLines
+            .Select(line =>
+            {
+                var components = componentsByLineId.GetValueOrDefault(
+                    line.LineId,
+                    Array.Empty<CatalogPriceCalculationLineComponentDetails>());
+
+                var productTotalAmount = decimal.Round(
+                    line.ProjectPriceAmount * line.Quantity,
+                    2,
+                    MidpointRounding.AwayFromZero);
+
+                var componentsTotalAmount = decimal.Round(
+                    components.Sum(component => component.TotalAmount),
+                    2,
+                    MidpointRounding.AwayFromZero);
+
+                return new CatalogPriceCalculationLineDetails(
+                    line.LineId,
+                    line.ProductId,
+                    line.ManufacturerId,
+                    line.ManufacturerName,
+                    line.PriceListId,
+                    line.PriceListRowId,
+                    line.Article,
+                    line.Name,
+                    line.Unit,
+                    line.Quantity,
+                    line.StockQuantity,
+                    line.ShortageQuantity,
+                    line.BasePriceAmount,
+                    line.MrcPriceAmount,
+                    line.DiscountPercent,
+                    line.ProjectPriceAmount,
+                    productTotalAmount,
+                    componentsTotalAmount,
+                    line.TotalAmount,
+                    line.CreatedAtUtc,
+                    line.UpdatedAtUtc,
+                    components);
+            })
+            .ToArray();
 
         var discounts =
             await (
@@ -252,4 +329,29 @@ public sealed class CatalogPriceCalculationReader
         DateTime? UpdatedAtUtc,
         DateTime? CompletedAtUtc,
         DateTime? ArchivedAtUtc);
+
+    private sealed record StoredCalculationLine(
+        Guid LineId,
+        Guid ProductId,
+        Guid ManufacturerId,
+        string ManufacturerName,
+        Guid PriceListId,
+        Guid PriceListRowId,
+        string Article,
+        string Name,
+        string? Unit,
+        decimal Quantity,
+        decimal StockQuantity,
+        decimal ShortageQuantity,
+        decimal BasePriceAmount,
+        decimal? MrcPriceAmount,
+        decimal DiscountPercent,
+        decimal ProjectPriceAmount,
+        decimal TotalAmount,
+        DateTime CreatedAtUtc,
+        DateTime? UpdatedAtUtc);
+
+    private sealed record StoredCalculationLineComponent(
+        Guid CalculationLineId,
+        CatalogPriceCalculationLineComponentDetails Details);
 }

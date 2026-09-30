@@ -322,14 +322,14 @@ function CatalogProductTypesContent() {
 
           {selectedProductType?.kind === "MainProduct" && (
             <ComponentNeedsManager
-              key={selectedProductType.code}
+              key={`component-needs-${selectedProductType.code}`}
               productTypeCode={selectedProductType.code}
               productTypeName={selectedProductType.name}
             />
           )}
 
           <AddOptionalCharacteristicToProductType
-            key={schema.productTypeCode}
+            key={`characteristics-${schema.productTypeCode}`}
             productTypeCode={schema.productTypeCode}
             productTypeName={schema.productTypeName}
           />

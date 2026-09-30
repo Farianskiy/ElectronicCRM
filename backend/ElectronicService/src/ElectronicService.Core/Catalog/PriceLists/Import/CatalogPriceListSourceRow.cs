@@ -7,4 +7,5 @@ public sealed record CatalogPriceListSourceRow(
     decimal? BasePriceAmount,
     decimal? MrcPriceAmount,
     string? ProductLink,
-    string? Unit);
+    string? Unit,
+    bool IsDuplicateArticle = false);

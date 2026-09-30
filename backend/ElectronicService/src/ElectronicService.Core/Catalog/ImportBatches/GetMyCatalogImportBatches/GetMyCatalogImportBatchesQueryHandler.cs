@@ -130,6 +130,7 @@ public sealed class GetMyCatalogImportBatchesQueryHandler
         return new MyCatalogImportBatchItemResult(
             batch.Id,
             batch.ProductTypeId,
+            batch.ImportMode,
             batch.OriginalFileName,
             batch.FileSizeBytes,
             batch.Status,

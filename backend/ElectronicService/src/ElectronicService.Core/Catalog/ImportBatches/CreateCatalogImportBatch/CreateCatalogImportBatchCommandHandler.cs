@@ -116,7 +116,8 @@ public sealed class
                 command.CreatedByUserId,
                 command.FileName,
                 command.ContentType,
-                contentResult.Value);
+                contentResult.Value,
+                command.ImportMode);
 
         if (batchResult.IsFailure)
         {
@@ -152,7 +153,8 @@ public sealed class
             DomainError>(
                 new CreateCatalogImportBatchResult(
                     batch.Id,
-                    batch.Status));
+                    batch.Status,
+                    batch.ImportMode));
     }
 
     private static async Task<Result<

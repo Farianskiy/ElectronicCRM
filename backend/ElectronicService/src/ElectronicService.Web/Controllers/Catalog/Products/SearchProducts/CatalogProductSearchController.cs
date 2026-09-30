@@ -66,7 +66,10 @@ public sealed class CatalogProductSearchController : ControllerBase
                     item.ManufacturerName,
                     item.PriceAmount,
                     item.PriceCurrency,
-                    item.StockQuantity))
+                    item.StockQuantity,
+                    item.ManufacturerId,
+                    item.BasePriceAmount,
+                    item.BasePriceCurrency))
             .ToList();
 
         var response = new ProductsListResponse(

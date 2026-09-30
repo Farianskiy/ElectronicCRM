@@ -103,6 +103,8 @@ internal sealed class RecognitionTestCatalog : ICatalogProductMetadataRepository
     public Task<IReadOnlyCollection<CatalogDictionaryTermResult>> GetTermsAsync(CancellationToken cancellationToken = default) => Task.FromResult(Terms);
     public Task<ProductType?> GetProductTypeByIdAsync(Guid productTypeId, CancellationToken cancellationToken = default)
         => Task.FromResult(new[] { ProductType, OtherType }.FirstOrDefault(type => type.Id == productTypeId));
+    public Task<IReadOnlyCollection<ProductType>> GetProductTypesByIdsAsync(IReadOnlyCollection<Guid> productTypeIds, CancellationToken cancellationToken = default)
+        => Task.FromResult<IReadOnlyCollection<ProductType>>(new[] { ProductType, OtherType }.Where(type => productTypeIds.Contains(type.Id)).ToArray());
     public Task<CharacteristicDefinition?> GetCharacteristicDefinitionByCodeAsync(string code, CancellationToken cancellationToken = default)
         => Task.FromResult<CharacteristicDefinition?>(string.Equals(code, Definition.Code, StringComparison.Ordinal) ? Definition : null);
     public Task<Manufacturer?> GetManufacturerByIdAsync(Guid manufacturerId, CancellationToken cancellationToken = default)

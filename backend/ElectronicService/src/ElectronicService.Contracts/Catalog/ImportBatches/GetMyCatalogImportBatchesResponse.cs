@@ -10,6 +10,7 @@ public sealed record GetMyCatalogImportBatchesResponse(
 public sealed record MyCatalogImportBatchItemResponse(
     Guid BatchId,
     Guid? ProductTypeId,
+    string ImportMode,
     string OriginalFileName,
     long FileSizeBytes,
     string Status,

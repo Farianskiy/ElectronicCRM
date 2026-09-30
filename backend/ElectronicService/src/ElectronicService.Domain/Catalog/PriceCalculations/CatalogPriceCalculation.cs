@@ -399,32 +399,22 @@ public sealed class CatalogPriceCalculation : AggregateRoot
                     .LineNotFound(lineId));
         }
 
-        var manufacturerId =
-            line.ManufacturerId;
+        var affectedManufacturerIds =
+            line.Components
+                .Select(
+                    component =>
+                        component.ManufacturerId)
+                .Append(line.ManufacturerId)
+                .Distinct()
+                .ToArray();
 
         _lines.Remove(line);
 
-        var manufacturerStillHasLines =
-            _lines.Any(
-                existingLine =>
-                    existingLine.ManufacturerId
-                    == manufacturerId);
-
-        if (!manufacturerStillHasLines)
+        foreach (var manufacturerId
+                 in affectedManufacturerIds)
         {
-            var discount =
-                _manufacturerDiscounts
-                    .SingleOrDefault(
-                        existingDiscount =>
-                            existingDiscount
-                                .ManufacturerId
-                            == manufacturerId);
-
-            if (discount is not null)
-            {
-                _manufacturerDiscounts.Remove(
-                    discount);
-            }
+            RemoveUnusedManufacturerDiscount(
+                manufacturerId);
         }
 
         RecalculateTotal();
@@ -478,6 +468,209 @@ public sealed class CatalogPriceCalculation : AggregateRoot
         return UnitResult.Success<DomainError>();
     }
 
+    public Result<Guid, DomainError> AddLineComponent(
+        Guid lineId,
+        Guid needDefinitionId,
+        string needName,
+        Guid componentProductId,
+        Guid manufacturerId,
+        string article,
+        string name,
+        string manufacturerName,
+        int quantityPerUnit,
+        decimal basePriceAmount)
+    {
+        var editableResult =
+            EnsureEditable();
+
+        if (editableResult.IsFailure)
+        {
+            return Result.Failure<Guid, DomainError>(
+                editableResult.Error);
+        }
+
+        if (lineId == Guid.Empty)
+        {
+            return Result.Failure<Guid, DomainError>(
+                GeneralErrors.ValueIsInvalid(
+                    nameof(lineId)));
+        }
+
+        var line =
+            _lines.SingleOrDefault(
+                existingLine =>
+                    existingLine.Id == lineId);
+
+        if (line is null)
+        {
+            return Result.Failure<Guid, DomainError>(
+                CatalogPriceCalculationErrors
+                    .LineNotFound(lineId));
+        }
+
+        if (line.ProductId == componentProductId)
+        {
+            return Result.Failure<Guid, DomainError>(
+                CatalogPriceCalculationErrors
+                    .MainProductCannotBeComponent());
+        }
+
+        var discountPercent =
+            _manufacturerDiscounts
+                .SingleOrDefault(
+                    discount =>
+                        discount.ManufacturerId
+                            == manufacturerId)
+                ?.DiscountPercent
+            ?? 0m;
+
+        var componentResult =
+            line.AddComponent(
+                needDefinitionId,
+                needName,
+                componentProductId,
+                manufacturerId,
+                article,
+                name,
+                manufacturerName,
+                quantityPerUnit,
+                basePriceAmount,
+                discountPercent);
+
+        if (componentResult.IsFailure)
+        {
+            return Result.Failure<Guid, DomainError>(
+                componentResult.Error);
+        }
+
+        RecalculateTotal();
+        Touch();
+
+        return Result.Success<Guid, DomainError>(
+            componentResult.Value);
+    }
+
+    public UnitResult<DomainError> RemoveLineComponent(
+        Guid lineId,
+        Guid componentLineId)
+    {
+        var editableResult =
+            EnsureEditable();
+
+        if (editableResult.IsFailure)
+        {
+            return editableResult;
+        }
+
+        if (lineId == Guid.Empty)
+        {
+            return UnitResult.Failure(
+                GeneralErrors.ValueIsInvalid(
+                    nameof(lineId)));
+        }
+
+        if (componentLineId == Guid.Empty)
+        {
+            return UnitResult.Failure(
+                GeneralErrors.ValueIsInvalid(
+                    nameof(componentLineId)));
+        }
+
+        var line =
+            _lines.SingleOrDefault(
+                existingLine =>
+                    existingLine.Id == lineId);
+
+        if (line is null)
+        {
+            return UnitResult.Failure(
+                CatalogPriceCalculationErrors
+                    .LineNotFound(lineId));
+        }
+
+        var component =
+            line.Components.SingleOrDefault(
+                item =>
+                    item.Id == componentLineId);
+
+        if (component is null)
+        {
+            return UnitResult.Failure(
+                CatalogPriceCalculationErrors
+                    .ComponentNotFound(
+                        componentLineId));
+        }
+
+        var manufacturerId =
+            component.ManufacturerId;
+
+        var removalResult =
+            line.RemoveComponent(
+                componentLineId);
+
+        if (removalResult.IsFailure)
+        {
+            return removalResult;
+        }
+
+        RemoveUnusedManufacturerDiscount(
+            manufacturerId);
+
+        RecalculateTotal();
+        Touch();
+
+        return UnitResult.Success<DomainError>();
+    }
+
+    public UnitResult<DomainError>
+        ChangeLineComponentQuantityPerUnit(
+            Guid lineId,
+            Guid componentLineId,
+            int quantityPerUnit)
+    {
+        var editableResult =
+            EnsureEditable();
+
+        if (editableResult.IsFailure)
+        {
+            return editableResult;
+        }
+
+        if (lineId == Guid.Empty)
+        {
+            return UnitResult.Failure(
+                GeneralErrors.ValueIsInvalid(
+                    nameof(lineId)));
+        }
+
+        var line =
+            _lines.SingleOrDefault(
+                existingLine =>
+                    existingLine.Id == lineId);
+
+        if (line is null)
+        {
+            return UnitResult.Failure(
+                CatalogPriceCalculationErrors
+                    .LineNotFound(lineId));
+        }
+
+        var changeResult =
+            line.ChangeComponentQuantityPerUnit(
+                componentLineId,
+                quantityPerUnit);
+
+        if (changeResult.IsFailure)
+        {
+            return changeResult;
+        }
+
+        RecalculateTotal();
+        Touch();
+
+        return UnitResult.Success<DomainError>();
+    }
+
     public UnitResult<DomainError>
         SetManufacturerDiscount(
             Guid manufacturerId,
@@ -510,10 +703,19 @@ public sealed class CatalogPriceCalculation : AggregateRoot
                 .Where(
                     line =>
                         line.ManufacturerId
-                        == manufacturerId)
+                            == manufacturerId)
                 .ToArray();
 
-        if (manufacturerLines.Length == 0)
+        var componentLines =
+            _lines
+                .Where(
+                    line =>
+                        line.HasComponentManufacturer(
+                            manufacturerId))
+                .ToArray();
+
+        if (manufacturerLines.Length == 0
+            && componentLines.Length == 0)
         {
             return UnitResult.Failure(
                 CatalogPriceCalculationErrors
@@ -570,6 +772,19 @@ public sealed class CatalogPriceCalculation : AggregateRoot
             }
         }
 
+        foreach (var line in componentLines)
+        {
+            var componentResult =
+                line.ApplyComponentManufacturerDiscount(
+                    manufacturerId,
+                    discount.DiscountPercent);
+
+            if (componentResult.IsFailure)
+            {
+                return componentResult;
+            }
+        }
+
         RecalculateTotal();
         Touch();
 
@@ -615,7 +830,15 @@ public sealed class CatalogPriceCalculation : AggregateRoot
                 .Where(
                     line =>
                         line.ManufacturerId
-                        == manufacturerId)
+                            == manufacturerId)
+                .ToArray();
+
+        var componentLines =
+            _lines
+                .Where(
+                    line =>
+                        line.HasComponentManufacturer(
+                            manufacturerId))
                 .ToArray();
 
         foreach (var line in manufacturerLines)
@@ -626,6 +849,19 @@ public sealed class CatalogPriceCalculation : AggregateRoot
             if (lineResult.IsFailure)
             {
                 return lineResult;
+            }
+        }
+
+        foreach (var line in componentLines)
+        {
+            var componentResult =
+                line.ApplyComponentManufacturerDiscount(
+                    manufacturerId,
+                    0m);
+
+            if (componentResult.IsFailure)
+            {
+                return componentResult;
             }
         }
 
@@ -687,6 +923,38 @@ public sealed class CatalogPriceCalculation : AggregateRoot
 
         return UnitResult.Success<DomainError>();
     }
+
+    private bool HasManufacturer(
+    Guid manufacturerId)
+    {
+        return _lines.Any(
+            line =>
+                line.ManufacturerId == manufacturerId
+                || line.HasComponentManufacturer(
+                    manufacturerId));
+    }
+
+    private void RemoveUnusedManufacturerDiscount(
+        Guid manufacturerId)
+    {
+        if (HasManufacturer(manufacturerId))
+        {
+            return;
+        }
+
+        var discount =
+            _manufacturerDiscounts
+                .SingleOrDefault(
+                    existingDiscount =>
+                        existingDiscount.ManufacturerId
+                            == manufacturerId);
+
+        if (discount is not null)
+        {
+            _manufacturerDiscounts.Remove(discount);
+        }
+    }
+
 
     private UnitResult<DomainError> EnsureEditable()
     {

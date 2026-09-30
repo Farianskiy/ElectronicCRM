@@ -153,6 +153,17 @@ public sealed class CatalogPriceCalculationLineConfiguration
                 line.UpdatedAtUtc)
             .HasColumnName("updated_at_utc");
 
+        builder.Ignore(line =>
+            line.ProductTotalAmount);
+
+        builder.Ignore(line =>
+            line.ComponentsTotalAmount);
+
+        builder.Navigation(line =>
+                line.Components)
+            .UsePropertyAccessMode(
+                PropertyAccessMode.Field);
+
         builder.HasOne<Product>()
             .WithMany()
             .HasForeignKey(line =>

@@ -58,6 +58,7 @@ public static class CatalogPriceCalculationProblemDetailsExtensions
 
             "catalog.price_calculation.not_found"
                 or "catalog.price_calculation.line.not_found"
+                or "catalog.price_calculation.component.not_found"
                 or "catalog.price_calculation.discount.not_found"
                 => StatusCodes.Status404NotFound,
 
@@ -68,6 +69,13 @@ public static class CatalogPriceCalculationProblemDetailsExtensions
                 or "catalog.price_calculation.active_price_not_found"
                 or "catalog.price_calculation.active_price_ambiguous"
                 or "catalog.price_calculation.discount.manufacturer_has_no_lines"
+                or "catalog.component_need.product_type_mismatch"
+                or "catalog.component_offer.component_product_required"
+                or "catalog.selected_component.main_product_required"
+                or "catalog.selected_component.compatible_offer_not_found"
+                or "catalog.selected_component.already_exists"
+                or "catalog.price_calculation.component.same_as_main_product"
+                or "catalog.price_calculation.component.already_added"
                 => StatusCodes.Status409Conflict,
 
             _ => StatusCodes.Status400BadRequest

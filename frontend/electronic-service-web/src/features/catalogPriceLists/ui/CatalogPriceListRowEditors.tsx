@@ -363,7 +363,7 @@ export function CatalogPriceListSingleRowEditor({
 
         <label className="grid gap-2">
           <span className="text-sm font-medium text-[var(--app-text)]">
-            Прайс 100%
+            Цена
           </span>
 
           <AppInput
@@ -409,6 +409,8 @@ export function CatalogPriceListSingleRowEditor({
         onSelect={(product) => {
           setSelectedProduct(product);
           setProductId(product.productId);
+          setArticle(product.article);
+          setName(product.name);
         }}
         onClear={() => {
           setSelectedProduct(null);

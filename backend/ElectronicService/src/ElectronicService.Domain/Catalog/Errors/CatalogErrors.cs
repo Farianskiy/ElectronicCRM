@@ -320,6 +320,41 @@ public static class CatalogErrors
             "Обновите данные и повторите операцию.");
     }
 
+    public static DomainError BulkProductsRequired()
+    {
+        return new DomainError(
+            "catalog.product.bulk.rows_required",
+            "Передайте хотя бы один товар для массового обновления.");
+    }
+
+    public static DomainError BulkProductsLimitExceeded(int maximumRows)
+    {
+        return new DomainError(
+            "catalog.product.bulk.limit_exceeded",
+            $"За один запрос можно обновить не более {maximumRows} товаров.");
+    }
+
+    public static DomainError DuplicateBulkProduct(Guid productId)
+    {
+        return new DomainError(
+            "catalog.product.bulk.duplicate",
+            $"Товар '{productId}' передан в запросе несколько раз.");
+    }
+
+    public static DomainError BulkProductChangesRequired(Guid productId)
+    {
+        return new DomainError(
+            "catalog.product.bulk.changes_required",
+            $"Для товара '{productId}' не передано ни одного изменения.");
+    }
+
+    public static DomainError BulkProductPermissionDenied(string fieldGroup)
+    {
+        return new DomainError(
+            "catalog.product.bulk.permission_denied",
+            $"Недостаточно прав для массового изменения поля: {fieldGroup}.");
+    }
+
     public static DomainError DictionaryTargetCharacteristicIsNotAllowedForProductType(
         string targetCode,
         string productTypeCode)

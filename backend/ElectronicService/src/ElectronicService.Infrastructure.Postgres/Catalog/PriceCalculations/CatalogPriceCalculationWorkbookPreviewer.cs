@@ -189,10 +189,10 @@ public sealed class CatalogPriceCalculationWorkbookPreviewer
                                   == CatalogPriceListRowStatus.Valid
                               && row.BasePriceAmount.HasValue
                         select new PriceReference(
-                            row.ProductId.GetValueOrDefault(),
+                            row.ProductId!.Value,
                             priceList.Id,
                             row.Id,
-                            row.BasePriceAmount.GetValueOrDefault(),
+                            row.BasePriceAmount!.Value,
                             row.MrcPriceAmount))
                     .ToListAsync(cancellationToken)
                     .ConfigureAwait(false);

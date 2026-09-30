@@ -125,6 +125,7 @@ export function CatalogImportDetailsContent({
           <CatalogImportReviewDecisionPanel
             batchId={batch.batchId}
             originalFileName={batch.originalFileName}
+            importMode={batch.importMode}
             rowsCount={batch.rowsCount}
             validRowsCount={batch.validRowsCount}
             errorRowsCount={batch.errorRowsCount}

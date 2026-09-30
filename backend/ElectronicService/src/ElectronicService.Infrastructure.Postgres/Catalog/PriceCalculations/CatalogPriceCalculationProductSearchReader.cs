@@ -43,7 +43,7 @@ public sealed class CatalogPriceCalculationProductSearchReader
             select new
             {
                 ProductId =
-                    row.ProductId.GetValueOrDefault(),
+                    row.ProductId!.Value,
                 ManufacturerId =
                     priceList.ManufacturerId,
                 PriceListId =
@@ -58,7 +58,7 @@ public sealed class CatalogPriceCalculationProductSearchReader
                 row.NormalizedName,
                 row.Unit,
                 BasePriceAmount =
-                    row.BasePriceAmount.GetValueOrDefault(),
+                    row.BasePriceAmount!.Value,
                 row.MrcPriceAmount
             };
 

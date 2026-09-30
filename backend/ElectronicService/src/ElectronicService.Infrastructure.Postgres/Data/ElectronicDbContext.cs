@@ -79,6 +79,8 @@ public sealed class ElectronicDbContext : DbContext
 
     public DbSet<CatalogPriceCalculationLine> CatalogPriceCalculationLines => Set<CatalogPriceCalculationLine>();
 
+    public DbSet<CatalogPriceCalculationLineComponent> CatalogPriceCalculationLineComponents => Set<CatalogPriceCalculationLineComponent>();
+
     public DbSet<CatalogPriceCalculationManufacturerDiscount> CatalogPriceCalculationManufacturerDiscounts => Set<CatalogPriceCalculationManufacturerDiscount>();
 
     public DbSet<CatalogCharacteristicRecognitionProfile> CatalogCharacteristicRecognitionProfiles => Set<CatalogCharacteristicRecognitionProfile>();

@@ -150,4 +150,36 @@ public static class CatalogPriceCalculationErrors
             "catalog.price_calculation.discount.not_found",
             $"Скидка производителя '{manufacturerId}' не найдена.");
     }
+
+    public static DomainError ComponentQuantityPerUnitIsInvalid(
+        int maximumQuantity)
+    {
+        return new DomainError(
+            "catalog.price_calculation.component.quantity_invalid",
+            $"Количество комплектующего на единицу основного товара должно быть от 1 до {maximumQuantity}.");
+    }
+
+    public static DomainError MainProductCannotBeComponent()
+    {
+        return new DomainError(
+            "catalog.price_calculation.component.same_as_main_product",
+            "Основной товар нельзя добавить в расчёт как собственное комплектующее.");
+    }
+
+    public static DomainError ComponentAlreadyAdded(
+        Guid needDefinitionId,
+        Guid componentProductId)
+    {
+        return new DomainError(
+            "catalog.price_calculation.component.already_added",
+            $"Комплектующее '{componentProductId}' уже добавлено для потребности '{needDefinitionId}'.");
+    }
+
+    public static DomainError ComponentNotFound(
+        Guid componentLineId)
+    {
+        return new DomainError(
+            "catalog.price_calculation.component.not_found",
+            $"Строка комплектующего '{componentLineId}' не найдена в расчёте.");
+    }
 }

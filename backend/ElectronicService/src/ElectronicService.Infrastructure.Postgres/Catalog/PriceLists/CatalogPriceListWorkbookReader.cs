@@ -15,7 +15,7 @@ namespace ElectronicService.Infrastructure.Postgres.Catalog.PriceLists;
 public sealed class CatalogPriceListWorkbookReader
     : ICatalogPriceListWorkbookReader
 {
-    private const string PriceWorksheetName = "Прайс";
+    private const string PreferredPriceWorksheetName = "Прайс";
 
     private const int HeaderSearchRowsLimit = 30;
 
@@ -163,8 +163,13 @@ public sealed class CatalogPriceListWorkbookReader
                     CatalogPriceListErrors.InvalidWorkbook());
         }
 
+        var sharedStrings =
+            ReadSharedStrings(workbookPart);
+
         var worksheetResult =
-            FindPriceWorksheet(workbookPart);
+            FindPriceWorksheet(
+                workbookPart,
+                sharedStrings);
 
         if (worksheetResult.IsFailure)
         {
@@ -174,11 +179,9 @@ public sealed class CatalogPriceListWorkbookReader
                     worksheetResult.Error);
         }
 
-        var sharedStrings =
-            ReadSharedStrings(workbookPart);
-
         return await ReadWorksheetAsync(
-                worksheetResult.Value,
+                worksheetResult.Value.Name,
+                worksheetResult.Value.Part,
                 sharedStrings,
                 consumeRowAsync,
                 reportProgressAsync,
@@ -187,9 +190,10 @@ public sealed class CatalogPriceListWorkbookReader
     }
 
     private static Result<
-    WorksheetPart,
+    PriceWorksheet,
     DomainError> FindPriceWorksheet(
-        WorkbookPart workbookPart)
+        WorkbookPart workbookPart,
+        string[] sharedStrings)
     {
         const string TransitionalRelationshipNamespace =
             "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
@@ -197,7 +201,8 @@ public sealed class CatalogPriceListWorkbookReader
         const string StrictRelationshipNamespace =
             "http://purl.oclc.org/ooxml/officeDocument/relationships";
 
-        string? relationshipId = null;
+        var worksheets =
+            new List<WorksheetReference>();
 
         var settings =
             new XmlReaderSettings
@@ -231,17 +236,10 @@ public sealed class CatalogPriceListWorkbookReader
             }
 
             var sheetName =
-                reader.GetAttribute("name");
+                reader.GetAttribute("name")
+                ?? string.Empty;
 
-            if (!string.Equals(
-                    sheetName,
-                    PriceWorksheetName,
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            relationshipId =
+            var relationshipId =
                 reader.GetAttribute(
                     "id",
                     TransitionalRelationshipNamespace)
@@ -249,39 +247,108 @@ public sealed class CatalogPriceListWorkbookReader
                     "id",
                     StrictRelationshipNamespace);
 
-            break;
+            if (!string.IsNullOrWhiteSpace(
+                    relationshipId))
+            {
+                worksheets.Add(
+                    new WorksheetReference(
+                        sheetName,
+                        relationshipId));
+            }
         }
 
-        if (string.IsNullOrWhiteSpace(
-                relationshipId))
+        if (worksheets.Count == 0)
         {
             return Result.Failure<
-                WorksheetPart,
+                PriceWorksheet,
                 DomainError>(
-                    CatalogPriceListErrors
-                        .PriceWorksheetNotFound(
-                            PriceWorksheetName));
+                    CatalogPriceListErrors.InvalidWorkbook());
         }
 
-        var worksheetPart =
-            workbookPart.GetPartById(
-                relationshipId)
-            as WorksheetPart;
+        var orderedWorksheets =
+            worksheets
+                .OrderByDescending(item =>
+                    string.Equals(
+                        item.Name,
+                        PreferredPriceWorksheetName,
+                        StringComparison.OrdinalIgnoreCase));
 
-        if (worksheetPart is null)
+        foreach (var worksheet in orderedWorksheets)
         {
-            return Result.Failure<
-                WorksheetPart,
+            var worksheetPart =
+                workbookPart.GetPartById(
+                    worksheet.RelationshipId)
+                as WorksheetPart;
+
+            if (worksheetPart is null
+                || !ContainsRequiredHeaders(
+                    worksheetPart,
+                    sharedStrings))
+            {
+                continue;
+            }
+
+            return Result.Success<
+                PriceWorksheet,
                 DomainError>(
-                    CatalogPriceListErrors
-                        .PriceWorksheetNotFound(
-                            PriceWorksheetName));
+                    new PriceWorksheet(
+                        worksheet.Name,
+                        worksheetPart));
         }
 
-        return Result.Success<
-            WorksheetPart,
+        return Result.Failure<
+            PriceWorksheet,
             DomainError>(
+                CatalogPriceListErrors
+                    .WorkbookHeaderNotFound());
+    }
+
+    private static bool ContainsRequiredHeaders(
+        WorksheetPart worksheetPart,
+        string[] sharedStrings)
+    {
+        using var reader =
+            OpenXmlReader.Create(
                 worksheetPart);
+
+        while (reader.Read())
+        {
+            if (!reader.IsStartElement
+                || reader.ElementType != typeof(Row))
+            {
+                continue;
+            }
+
+            if (reader.LoadCurrentElement()
+                is not Row row)
+            {
+                continue;
+            }
+
+            var rowNumber = GetRowNumber(row);
+
+            if (rowNumber <= 0)
+            {
+                continue;
+            }
+
+            if (TryFindHeaderColumns(
+                    ReadCellValues(
+                        row,
+                        sharedStrings),
+                    out _,
+                    out _))
+            {
+                return true;
+            }
+
+            if (rowNumber >= HeaderSearchRowsLimit)
+            {
+                return false;
+            }
+        }
+
+        return false;
     }
 
     private static string[]
@@ -363,6 +430,7 @@ public sealed class CatalogPriceListWorkbookReader
         Result<
             CatalogPriceListWorkbookReadSummary,
             DomainError>> ReadWorksheetAsync(
+                string worksheetName,
                 WorksheetPart worksheetPart,
                 string[] sharedStrings,
                 Func<
@@ -375,8 +443,9 @@ public sealed class CatalogPriceListWorkbookReader
                     Task<UnitResult<DomainError>>> reportProgressAsync,
                 CancellationToken cancellationToken)
     {
-        DateOnly? effectiveDate = null;
         int? headerRowNumber = null;
+        string? articleColumnName = null;
+        string? priceColumnName = null;
         var rowsCount = 0;
         var estimatedRowsCount = 0;
         var lastWorksheetRowNumber = 0;
@@ -434,24 +503,22 @@ public sealed class CatalogPriceListWorkbookReader
             }
 
             var cellValues =
-                ReadRequiredCellValues(
+                ReadCellValues(
                     row,
                     sharedStrings);
 
-            if (rowNumber == 2)
-            {
-                effectiveDate =
-                    ParseEffectiveDate(
-                        GetValue(
-                            cellValues,
-                            "B"));
-            }
-
             if (headerRowNumber is null)
             {
-                if (IsHeaderRow(cellValues))
+                if (TryFindHeaderColumns(
+                        cellValues,
+                        out var foundArticleColumnName,
+                        out var foundPriceColumnName))
                 {
                     headerRowNumber = rowNumber;
+                    articleColumnName =
+                        foundArticleColumnName;
+                    priceColumnName =
+                        foundPriceColumnName;
 
                     estimatedRowsCount =
                         Math.Max(
@@ -500,15 +567,15 @@ public sealed class CatalogPriceListWorkbookReader
             var article =
                 GetValue(
                     cellValues,
-                    "A");
+                    articleColumnName!);
 
-            var name =
+            var price =
                 GetValue(
                     cellValues,
-                    "B");
+                    priceColumnName!);
 
             if (string.IsNullOrWhiteSpace(article)
-                && string.IsNullOrWhiteSpace(name))
+                && string.IsNullOrWhiteSpace(price))
             {
                 continue;
             }
@@ -531,20 +598,12 @@ public sealed class CatalogPriceListWorkbookReader
                 new CatalogPriceListSourceRow(
                     rowNumber,
                     article.Trim(),
-                    name.Trim(),
+                    string.Empty,
                     ParseNullableDecimal(
-                        GetValue(
-                            cellValues,
-                            "H")),
-                    ParseNullableDecimal(
-                        GetValue(
-                            cellValues,
-                            "J")),
+                        price),
                     null,
-                    NormalizeOptionalValue(
-                        GetValue(
-                            cellValues,
-                            "D")));
+                    null,
+                    null);
 
             var consumeResult =
                 await consumeRowAsync(
@@ -591,15 +650,6 @@ public sealed class CatalogPriceListWorkbookReader
                         .WorkbookHeaderNotFound());
         }
 
-        if (effectiveDate is null)
-        {
-            return Result.Failure<
-                CatalogPriceListWorkbookReadSummary,
-                DomainError>(
-                    CatalogPriceListErrors
-                        .EffectiveDateNotFound());
-        }
-
         if (rowsCount == 0)
         {
             return Result.Failure<
@@ -631,13 +681,13 @@ public sealed class CatalogPriceListWorkbookReader
             CatalogPriceListWorkbookReadSummary,
             DomainError>(
                 new CatalogPriceListWorkbookReadSummary(
-                    PriceWorksheetName,
-                    effectiveDate.Value,
+                    worksheetName,
+                    null,
                     headerRowNumber.Value,
                     rowsCount));
     }
 
-    private static Dictionary<string, string> ReadRequiredCellValues(
+    private static Dictionary<string, string> ReadCellValues(
             Row row,
             string[] sharedStrings)
     {
@@ -651,8 +701,7 @@ public sealed class CatalogPriceListWorkbookReader
             var columnName =
                 GetColumnName(cell);
 
-            if (!IsRequiredColumn(
-                    columnName))
+            if (columnName.Length == 0)
             {
                 continue;
             }
@@ -664,18 +713,6 @@ public sealed class CatalogPriceListWorkbookReader
         }
 
         return values;
-    }
-
-    private static bool IsRequiredColumn(
-        string columnName)
-    {
-        return columnName is
-            "A"
-            or "B"
-            or "C"
-            or "D"
-            or "H"
-            or "J";
     }
 
     private static string GetColumnName(
@@ -768,32 +805,37 @@ public sealed class CatalogPriceListWorkbookReader
         return rawValue;
     }
 
-    private static bool IsHeaderRow(
-        IReadOnlyDictionary<string, string> values)
+    private static bool TryFindHeaderColumns(
+        Dictionary<string, string> values,
+        out string articleColumnName,
+        out string priceColumnName)
     {
-        var articleHeader =
-            NormalizeHeader(
-                GetValue(
-                    values,
-                    "A"));
+        articleColumnName = string.Empty;
+        priceColumnName = string.Empty;
 
-        var nameHeader =
-            NormalizeHeader(
-                GetValue(
-                    values,
-                    "B"));
+        foreach (var (columnName, value) in values)
+        {
+            var header =
+                NormalizeHeader(value);
 
-        return string.Equals(
-                articleHeader,
-                "АРТИКУЛ",
-                StringComparison.Ordinal)
-            && (string.Equals(
-                    nameHeader,
-                    "НАИМЕНОВАНИЕ",
-                    StringComparison.Ordinal)
-                || nameHeader.Contains(
-                    "НАИМЕНОВАНИЕ",
-                    StringComparison.Ordinal));
+            if (string.Equals(
+                    header,
+                    "АРТИКУЛ",
+                    StringComparison.Ordinal))
+            {
+                articleColumnName = columnName;
+            }
+            else if (string.Equals(
+                         header,
+                         "ЦЕНА",
+                         StringComparison.Ordinal))
+            {
+                priceColumnName = columnName;
+            }
+        }
+
+        return articleColumnName.Length > 0
+               && priceColumnName.Length > 0;
     }
 
     private static string NormalizeHeader(
@@ -806,52 +848,6 @@ public sealed class CatalogPriceListWorkbookReader
                 "Ё",
                 "Е",
                 StringComparison.Ordinal);
-    }
-
-    private static DateOnly? ParseEffectiveDate(
-        string value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return null;
-        }
-
-        var normalizedValue =
-            value.Trim();
-
-        if (double.TryParse(
-                normalizedValue,
-                NumberStyles.Float,
-                CultureInfo.InvariantCulture,
-                out var oaDate)
-            && oaDate is >= 0d
-                and <= 2958465d)
-        {
-            return DateOnly.FromDateTime(
-                DateTime.FromOADate(oaDate));
-        }
-
-        if (DateTime.TryParse(
-                normalizedValue,
-                RussianCulture,
-                DateTimeStyles.AllowWhiteSpaces,
-                out var russianDate))
-        {
-            return DateOnly.FromDateTime(
-                russianDate);
-        }
-
-        if (DateTime.TryParse(
-                normalizedValue,
-                CultureInfo.InvariantCulture,
-                DateTimeStyles.AllowWhiteSpaces,
-                out var invariantDate))
-        {
-            return DateOnly.FromDateTime(
-                invariantDate);
-        }
-
-        return null;
     }
 
     private static decimal? ParseNullableDecimal(
@@ -892,7 +888,7 @@ public sealed class CatalogPriceListWorkbookReader
     }
 
     private static string GetValue(
-        IReadOnlyDictionary<string, string> values,
+        Dictionary<string, string> values,
         string columnName)
     {
         return values.TryGetValue(
@@ -900,17 +896,6 @@ public sealed class CatalogPriceListWorkbookReader
             out var value)
             ? value
             : string.Empty;
-    }
-
-    private static string? NormalizeOptionalValue(
-        string value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return null;
-        }
-
-        return value.Trim();
     }
 
     private static int GetLastRowNumber(
@@ -962,4 +947,12 @@ public sealed class CatalogPriceListWorkbookReader
                 ? rowNumber
                 : 0;
     }
+
+    private sealed record WorksheetReference(
+        string Name,
+        string RelationshipId);
+
+    private sealed record PriceWorksheet(
+        string Name,
+        WorksheetPart Part);
 }

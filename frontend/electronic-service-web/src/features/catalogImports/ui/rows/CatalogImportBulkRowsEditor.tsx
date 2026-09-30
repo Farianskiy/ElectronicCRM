@@ -14,6 +14,7 @@ import { AppSelect } from "@/shared/ui/AppSelect";
 import { AppButton } from "@/shared/ui/AppButton";
 import { AppInput } from "@/shared/ui/AppInput";
 import { CatalogImportRowStatusBadge } from "../CatalogImportRowStatusBadge";
+import { CatalogImportProductTypePicker } from "../productTypes/CatalogImportProductTypePicker";
 import { bulkUpdateCatalogImportRows } from "../../api/bulkUpdateCatalogImportRows";
 import { catalogImportQueryKeys } from "../../model/queryKeys";
 import type {
@@ -507,22 +508,17 @@ export function CatalogImportBulkRowsEditor({
             характеристик ниже обновится под него.
           </p>
 
-          <AppSelect
+          <CatalogImportProductTypePicker
             ariaLabel="Тип товара для выбранных строк"
             value={productTypeId}
+            productTypes={productTypesQuery.data ?? []}
             disabled={isBusy}
+            emptyLabel="Выберите тип товара"
             onChange={(value) => {
               setProductTypeId(value);
               setGeneralError(null);
               saveMutation.reset();
             }}
-            options={[
-              { value: "", label: "Выберите тип товара" },
-              ...(productTypesQuery.data ?? []).map((productType) => ({
-                value: productType.id,
-                label: `${productType.name} · ${productType.code}`,
-              })),
-            ]}
           />
         </div>
 

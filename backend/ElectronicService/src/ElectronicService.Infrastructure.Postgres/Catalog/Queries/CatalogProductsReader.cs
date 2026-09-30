@@ -97,6 +97,7 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
                 item.Product.Name.Value,
                 item.ProductType.Code,
                 item.ProductType.Name,
+                item.Manufacturer.Id,
                 item.Manufacturer.Name,
                 item.Product.Price.Amount,
                 item.Product.Price.Currency,
@@ -125,11 +126,14 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
                     item.Name,
                     item.ProductTypeCode,
                     item.ProductTypeName,
+                    item.ManufacturerId,
                     item.ManufacturerName,
                     activePrice?.Amount
                         ?? item.PriceAmount,
                     activePrice?.Currency
                         ?? item.PriceCurrency,
+                    item.PriceAmount,
+                    item.PriceCurrency,
                     item.StockQuantity);
             })
             .ToList();
@@ -465,6 +469,7 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
                 item.Product.Name.Value,
                 item.ProductType.Code,
                 item.ProductType.Name,
+                item.Manufacturer.Id,
                 item.Manufacturer.Name,
                 item.Product.Price.Amount,
                 item.Product.Price.Currency,
@@ -493,11 +498,14 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
                     item.Name,
                     item.ProductTypeCode,
                     item.ProductTypeName,
+                    item.ManufacturerId,
                     item.ManufacturerName,
                     activePrice?.Amount
                         ?? item.PriceAmount,
                     activePrice?.Currency
                         ?? item.PriceCurrency,
+                    item.PriceAmount,
+                    item.PriceCurrency,
                     item.StockQuantity);
             })
             .ToList();
@@ -667,6 +675,7 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
         string Name,
         string ProductTypeCode,
         string ProductTypeName,
+        Guid ManufacturerId,
         string ManufacturerName,
         decimal PriceAmount,
         string PriceCurrency,

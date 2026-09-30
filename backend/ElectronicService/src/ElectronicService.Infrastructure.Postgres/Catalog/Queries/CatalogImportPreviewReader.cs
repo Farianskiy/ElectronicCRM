@@ -37,6 +37,7 @@ public sealed class CatalogImportPreviewReader
                     batch.Id,
                     batch.CreatedByUserId,
                     batch.ProductTypeId,
+                    batch.ImportMode,
                     batch.OriginalFileName,
                     batch.ContentType,
                     batch.FileSizeBytes,
