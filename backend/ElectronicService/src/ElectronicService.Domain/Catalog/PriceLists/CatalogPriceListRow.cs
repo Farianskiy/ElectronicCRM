@@ -20,8 +20,6 @@ public sealed class CatalogPriceListRow : ElectronicService.Domain.Abstractions.
 
     private const string ArticleTooLongIssueCode = "article.too_long";
 
-    private const string NameRequiredIssueCode = "name.required";
-
     private const string NameTooShortIssueCode = "name.too_short";
 
     private const string NameTooLongIssueCode = "name.too_long";
@@ -41,6 +39,8 @@ public sealed class CatalogPriceListRow : ElectronicService.Domain.Abstractions.
     private const string ProductNotFoundIssueCode = "product.not_found";
 
     private const string ProductAmbiguousIssueCode = "product.ambiguous";
+
+    private const string DuplicateArticleIssueCode = "article.duplicate";
 
     private static readonly JsonSerializerOptions IssuesSerializerOptions =
         new(JsonSerializerDefaults.Web);
@@ -241,15 +241,8 @@ public sealed class CatalogPriceListRow : ElectronicService.Domain.Abstractions.
         var normalizedName =
             string.Empty;
 
-        if (sourceName.Length == 0)
-        {
-            issues.Add(
-                new CatalogPriceListRowIssue(
-                    NameRequiredIssueCode,
-                    nameof(Name),
-                    "В строке прайса не указано наименование."));
-        }
-        else if (sourceName.Length < MinimumNameLength)
+        if (sourceName.Length > 0
+            && sourceName.Length < MinimumNameLength)
         {
             issues.Add(
                 new CatalogPriceListRowIssue(
@@ -537,7 +530,16 @@ public sealed class CatalogPriceListRow : ElectronicService.Domain.Abstractions.
             new CatalogPriceListRowIssue(
                 ProductNotFoundIssueCode,
                 nameof(ProductId),
-                "Товар не найден ни по артикулу, ни по точному наименованию."));
+                "Товар с таким артикулом не найден."));
+    }
+
+    public void MarkDuplicateArticle()
+    {
+        AddIssue(
+            new CatalogPriceListRowIssue(
+                DuplicateArticleIssueCode,
+                nameof(Article),
+                "Артикул повторяется в этом прайс-листе."));
     }
 
     public void ResetMatch()

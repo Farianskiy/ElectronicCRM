@@ -6,4 +6,5 @@ public sealed record ApplyCatalogImportBatchResponse(
     Guid? AppliedByUserId,
     DateTime? AppliedAtUtc,
     int CreatedProductsCount,
+    int UpdatedProductsCount,
     uint Version);

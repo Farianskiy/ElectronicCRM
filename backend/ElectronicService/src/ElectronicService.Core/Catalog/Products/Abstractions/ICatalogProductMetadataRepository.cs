@@ -10,6 +10,10 @@ public interface ICatalogProductMetadataRepository
         Guid productTypeId,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyCollection<ProductType>> GetProductTypesByIdsAsync(
+        IReadOnlyCollection<Guid> productTypeIds,
+        CancellationToken cancellationToken = default);
+
     Task<CharacteristicDefinition?> GetCharacteristicDefinitionByCodeAsync(
         string code,
         CancellationToken cancellationToken = default);

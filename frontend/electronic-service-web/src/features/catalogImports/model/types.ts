@@ -15,9 +15,17 @@ export const catalogImportBatchStatuses = [
 export type CatalogImportBatchStatus =
   (typeof catalogImportBatchStatuses)[number];
 
+export const catalogImportModes = [
+  "CreateOnly",
+  "UpdateCharacteristicsOnly",
+] as const;
+
+export type CatalogImportMode = (typeof catalogImportModes)[number];
+
 export interface MyCatalogImportBatchItem {
   batchId: string;
   productTypeId?: string | null;
+  importMode: CatalogImportMode;
   originalFileName: string;
   fileSizeBytes: number;
   status: CatalogImportBatchStatus;
@@ -58,6 +66,7 @@ export interface CatalogImportBatchDetails {
   batchId: string;
   createdByUserId: string;
   productTypeId?: string | null;
+  importMode: CatalogImportMode;
   originalFileName: string;
   fileSizeBytes: number;
   status: CatalogImportBatchStatus;
@@ -90,6 +99,7 @@ export interface CatalogImportBatchDetails {
 export interface CreateCatalogImportBatchResponse {
   batchId: string;
   status: CatalogImportBatchStatus;
+  importMode: CatalogImportMode;
 }
 
 export const catalogImportRecognitionShadowSampleKinds = [
@@ -773,6 +783,7 @@ export interface CatalogImportReviewQueueItem {
   createdByEmail?: string | null;
   createdByUserType: string;
   productTypeId?: string | null;
+  importMode: CatalogImportMode;
   originalFileName: string;
   status: CatalogImportReviewQueueStatus;
   rowsCount: number;
@@ -839,6 +850,7 @@ export interface ApplyCatalogImportBatchResponse {
   appliedByUserId?: string | null;
   appliedAtUtc?: string | null;
   createdProductsCount: number;
+  updatedProductsCount: number;
   version: number;
 }
 

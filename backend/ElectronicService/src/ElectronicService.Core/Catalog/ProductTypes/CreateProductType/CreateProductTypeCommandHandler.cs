@@ -24,7 +24,8 @@ public sealed class CreateProductTypeCommandHandler
 
         var createResult = ProductType.Create(
             command.Code,
-            command.Name);
+            command.Name,
+            command.Kind);
 
         if (createResult.IsFailure)
         {
@@ -54,6 +55,7 @@ public sealed class CreateProductTypeCommandHandler
             new CreateProductTypeResult(
                 productType.Id,
                 productType.Code,
-                productType.Name));
+                productType.Name,
+                productType.Kind));
     }
 }

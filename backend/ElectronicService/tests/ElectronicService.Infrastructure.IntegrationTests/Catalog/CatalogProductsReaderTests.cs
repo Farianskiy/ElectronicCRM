@@ -2,6 +2,7 @@ using ElectronicService.Core.Catalog.Products.SearchProducts;
 using ElectronicService.Infrastructure.IntegrationTests.Data;
 using ElectronicService.Infrastructure.IntegrationTests.Fixtures;
 using ElectronicService.Infrastructure.Postgres.Catalog.Queries;
+using ElectronicService.TestCommon;
 
 namespace ElectronicService.Infrastructure.IntegrationTests.Catalog;
 
@@ -248,6 +249,49 @@ public sealed class CatalogProductsReaderTests
         Assert.Contains(
             result.Items,
             item => item.Id == data.Delta.Id);
+    }
+
+    [Fact]
+    public async Task SearchProductsAsyncDoesNotMatchTextInsideAnotherWord()
+    {
+        var data = await CreateCatalogAsync();
+        var reader = new CatalogProductsReader(DbContext);
+
+        var reversibleResult = data.Alpha.SetCharacteristic(
+            data.BreakerType,
+            data.SeriesDefinition,
+            TestDataFactory.CreateTextValue("Реверсивный"));
+
+        var nonReversibleResult = data.Beta.SetCharacteristic(
+            data.BreakerType,
+            data.SeriesDefinition,
+            TestDataFactory.CreateTextValue("Нереверсивный"));
+
+        Assert.True(reversibleResult.IsSuccess);
+        Assert.True(nonReversibleResult.IsSuccess);
+
+        await DbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var query = new SearchProductsQuery(
+            Search: null,
+            ProductTypeCode: null,
+            Manufacturer: null,
+            Characteristics:
+            [
+                new SearchProductCharacteristicFilter(
+                    data.SeriesDefinition.Code,
+                    "реверс")
+            ],
+            Page: 1,
+            PageSize: 20);
+
+        var result = await reader.SearchProductsAsync(
+            query,
+            TestContext.Current.CancellationToken);
+
+        var item = Assert.Single(result.Items);
+        Assert.Equal(data.Alpha.Id, item.Id);
+        Assert.DoesNotContain(result.Items, candidate => candidate.Id == data.Beta.Id);
     }
 
     // Проверяет разбор числа с десятичной запятой

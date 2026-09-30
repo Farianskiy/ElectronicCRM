@@ -4,4 +4,5 @@ namespace ElectronicService.Contracts.Catalog
 public sealed record
     CreateCatalogImportBatchResponse(
         Guid BatchId,
-        string Status);
+        string Status,
+        string ImportMode);

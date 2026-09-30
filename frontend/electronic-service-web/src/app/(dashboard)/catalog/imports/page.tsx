@@ -41,6 +41,11 @@ function CatalogImportRow({
         <p className="mt-1 text-xs text-[var(--app-muted)]">
           {formatFileSize(item.fileSizeBytes)}
         </p>
+        <p className="mt-1 text-xs font-medium text-[var(--app-accent)]">
+          {item.importMode === "CreateOnly"
+            ? "Добавление новых"
+            : "Обновление характеристик"}
+        </p>
       </td>
 
       <td className="px-4 py-4">

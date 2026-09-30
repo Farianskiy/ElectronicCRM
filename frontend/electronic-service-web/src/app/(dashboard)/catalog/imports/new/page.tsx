@@ -12,7 +12,10 @@ import {
 } from "react";
 import { analyzeCatalogImportBatch } from "@/features/catalogImports/api/analyzeCatalogImportBatch";
 import { createCatalogImportBatch } from "@/features/catalogImports/api/createCatalogImportBatch";
-import type { AnalyzeCatalogImportBatchResponse } from "@/features/catalogImports/model/types";
+import type {
+  AnalyzeCatalogImportBatchResponse,
+  CatalogImportMode,
+} from "@/features/catalogImports/model/types";
 import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
 import { formatFileSize } from "@/shared/lib/formatters";
 import { PageWorkspace } from "@/shared/ui/PageWorkspace";
@@ -56,19 +59,24 @@ export default function NewCatalogImportPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [importMode, setImportMode] = useState<CatalogImportMode>("CreateOnly");
   const [validationError, setValidationError] = useState<string | null>(null);
   const [createdBatchId, setCreatedBatchId] = useState<string | null>(null);
   const [phase, setPhase] = useState<UploadPhase>("idle");
   const [isDragging, setIsDragging] = useState(false);
 
   const uploadMutation = useMutation({
-    mutationFn: async (
-      file: File,
-    ): Promise<AnalyzeCatalogImportBatchResponse> => {
+    mutationFn: async ({
+      file,
+      mode,
+    }: {
+      file: File;
+      mode: CatalogImportMode;
+    }): Promise<AnalyzeCatalogImportBatchResponse> => {
       setCreatedBatchId(null);
       setPhase("uploading");
 
-      const createdBatch = await createCatalogImportBatch(file);
+      const createdBatch = await createCatalogImportBatch(file, mode);
 
       setCreatedBatchId(createdBatch.batchId);
       setPhase("analyzing");
@@ -172,7 +180,7 @@ export default function NewCatalogImportPage() {
     }
 
     setValidationError(null);
-    uploadMutation.mutate(selectedFile);
+    uploadMutation.mutate({ file: selectedFile, mode: importMode });
   }
 
   function clearFile(): void {
@@ -209,6 +217,36 @@ export default function NewCatalogImportPage() {
       }
     >
       <form onSubmit={handleSubmit} className="grid min-w-0 gap-6">
+        <section className="min-w-0 rounded-3xl border border-[var(--app-border)] bg-[var(--app-panel)] p-5 shadow-sm shadow-[var(--app-shadow)] sm:p-6">
+          <h2 className="text-xl font-semibold text-[var(--app-text)]">
+            Режим импорта
+          </h2>
+
+          <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">
+            Выберите, что система должна сделать с товарами из Excel.
+          </p>
+
+          <div className="mt-5 grid gap-4 md:grid-cols-2">
+            <ImportModeOption
+              mode="CreateOnly"
+              selectedMode={importMode}
+              title="Добавить новые товары"
+              description="Создаёт только отсутствующие товары. Уже существующий артикул будет считаться ошибкой."
+              disabled={isBusy}
+              onSelect={setImportMode}
+            />
+
+            <ImportModeOption
+              mode="UpdateCharacteristicsOnly"
+              selectedMode={importMode}
+              title="Обновить характеристики"
+              description="Работает только с существующими артикулами. Цена, остаток и название не изменяются."
+              disabled={isBusy}
+              onSelect={setImportMode}
+            />
+          </div>
+        </section>
+
         <section className="min-w-0 rounded-3xl border border-[var(--app-border)] bg-[var(--app-panel)] p-5 shadow-sm shadow-[var(--app-shadow)] sm:p-6">
           <h2 className="text-xl font-semibold text-[var(--app-text)]">
             Исходный Excel-файл
@@ -456,5 +494,57 @@ function StepCard({
         {description}
       </p>
     </div>
+  );
+}
+
+function ImportModeOption({
+  mode,
+  selectedMode,
+  title,
+  description,
+  disabled,
+  onSelect,
+}: {
+  mode: CatalogImportMode;
+  selectedMode: CatalogImportMode;
+  title: string;
+  description: string;
+  disabled: boolean;
+  onSelect: (mode: CatalogImportMode) => void;
+}) {
+  const isSelected = mode === selectedMode;
+
+  return (
+    <label
+      className={[
+        "min-w-0 rounded-2xl border p-4 transition-colors",
+        "motion-reduce:transition-none",
+        disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
+        isSelected
+          ? "border-[var(--app-accent)] bg-[var(--app-accent-soft)]"
+          : "border-[var(--app-border)] bg-[var(--app-surface)] hover:border-[var(--app-border-strong)]",
+      ].join(" ")}
+    >
+      <span className="flex items-start gap-3">
+        <input
+          type="radio"
+          name="importMode"
+          value={mode}
+          checked={isSelected}
+          disabled={disabled}
+          onChange={() => onSelect(mode)}
+          className="mt-1 h-4 w-4 accent-[var(--app-accent)]"
+        />
+
+        <span className="min-w-0">
+          <span className="block font-semibold text-[var(--app-text)]">
+            {title}
+          </span>
+          <span className="mt-2 block text-sm leading-6 text-[var(--app-muted)]">
+            {description}
+          </span>
+        </span>
+      </span>
+    </label>
   );
 }

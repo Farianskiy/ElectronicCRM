@@ -39,14 +39,14 @@ export function CatalogImportAppliedProducts({
     <section className="rounded-3xl border border-green-500/20 bg-green-500/[0.04] p-6">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
-          <h2 className="text-xl font-semibold text-white">Созданные товары</h2>
+          <h2 className="text-xl font-semibold text-white">Обработанные товары</h2>
 
           <p className="mt-2 text-sm leading-6 text-slate-400">
-            Товары, добавленные в каталог при применении этого пакета.
+            Товары, созданные или дополненные характеристиками из этого пакета.
           </p>
 
           <p className="mt-2 text-sm text-green-200">
-            Всего создано: {totalCount}
+            Всего создано или обновлено: {totalCount}
           </p>
         </div>
 
@@ -62,14 +62,14 @@ export function CatalogImportAppliedProducts({
         <div className="mt-6 rounded-2xl border border-red-500/30 bg-red-500/10 p-5 text-sm text-red-200">
           {getApiErrorMessage(
             productsQuery.error,
-            "Не удалось загрузить созданные товары.",
+            "Не удалось загрузить обработанные товары.",
           )}
         </div>
       )}
 
       {productsQuery.isLoading ? (
         <div className="mt-6 rounded-2xl border border-white/10 bg-black/20 p-5 text-slate-300">
-          Загружаем созданные товары...
+          Загружаем обработанные товары...
         </div>
       ) : products.length === 0 ? (
         <div className="mt-6 rounded-2xl border border-white/10 bg-black/20 p-5">

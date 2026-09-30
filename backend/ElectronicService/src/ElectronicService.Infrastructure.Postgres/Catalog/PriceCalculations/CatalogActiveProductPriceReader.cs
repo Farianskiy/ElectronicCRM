@@ -62,7 +62,7 @@ public sealed class CatalogActiveProductPriceReader
                 row.Article,
                 row.Name,
                 row.Unit,
-                row.BasePriceAmount.GetValueOrDefault(),
+                row.BasePriceAmount!.Value,
                 row.MrcPriceAmount);
 
         return await query
@@ -129,7 +129,7 @@ public sealed class CatalogActiveProductPriceReader
                 row.Article,
                 row.Name,
                 row.Unit,
-                row.BasePriceAmount.GetValueOrDefault(),
+                row.BasePriceAmount!.Value,
                 row.MrcPriceAmount);
 
         return await query

@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 using ElectronicService.Core.Catalog.Characteristics.Normalization;
 using ElectronicService.Core.Catalog.Products.Abstractions;
 using ElectronicService.Core.Catalog.Products.GetProductById;
@@ -96,6 +97,7 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
                 item.Product.Name.Value,
                 item.ProductType.Code,
                 item.ProductType.Name,
+                item.Manufacturer.Id,
                 item.Manufacturer.Name,
                 item.Product.Price.Amount,
                 item.Product.Price.Currency,
@@ -124,11 +126,14 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
                     item.Name,
                     item.ProductTypeCode,
                     item.ProductTypeName,
+                    item.ManufacturerId,
                     item.ManufacturerName,
                     activePrice?.Amount
                         ?? item.PriceAmount,
                     activePrice?.Currency
                         ?? item.PriceCurrency,
+                    item.PriceAmount,
+                    item.PriceCurrency,
                     item.StockQuantity);
             })
             .ToList();
@@ -276,46 +281,44 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
-            var normalizedSearch = NormalizeText(query.Search);
-            var searchPattern = CreateLikePattern(normalizedSearch);
-            var originalSearchPattern = CreateLikePattern(query.Search);
+            var searchTerms = NormalizeText(query.Search)
+                .Split(
+                    ' ',
+                    StringSplitOptions.RemoveEmptyEntries
+                    | StringSplitOptions.TrimEntries)
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
 
-            productsQuery = productsQuery.Where(item =>
-                // Наименование товара.
-                EF.Functions.ILike(
-                    item.Product.Name.NormalizedValue,
-                    searchPattern)
+            foreach (var searchTerm in searchTerms)
+            {
+                var searchPattern = CreateLikePattern(searchTerm);
 
-                // Артикул товара.
-                || EF.Functions.ILike(
-                    item.Product.Article.Value,
-                    originalSearchPattern)
-
-                // Человекочитаемое название типа:
-                // "Силовой автомат", "Выключатель нагрузки".
-                || EF.Functions.ILike(
-                    item.ProductType.Name,
-                    originalSearchPattern)
-
-                // Технический код типа:
-                // POWER_CIRCUIT_BREAKER, LOAD_SWITCH.
-                || EF.Functions.ILike(
-                    item.ProductType.Code,
-                    searchPattern)
-
-                // Нормализованное название производителя.
-                || EF.Functions.ILike(
-                    item.Manufacturer.NormalizedName,
-                    searchPattern)
-
-                // Дополнительные названия товара.
-                || _dbContext.ProductAliases
-                    .AsNoTracking()
-                    .Any(alias =>
-                        alias.ProductId == item.Product.Id
-                        && EF.Functions.ILike(
-                            alias.NormalizedValue,
-                            searchPattern)));
+                productsQuery = productsQuery.Where(item =>
+                    // Каждый значимый фрагмент запроса должен встречаться
+                    // хотя бы в одном из индексируемых полей товара.
+                    EF.Functions.ILike(
+                        item.Product.Name.NormalizedValue,
+                        searchPattern)
+                    || EF.Functions.ILike(
+                        item.Product.Article.Value,
+                        searchPattern)
+                    || EF.Functions.ILike(
+                        item.ProductType.Name,
+                        searchPattern)
+                    || EF.Functions.ILike(
+                        item.ProductType.Code,
+                        searchPattern)
+                    || EF.Functions.ILike(
+                        item.Manufacturer.NormalizedName,
+                        searchPattern)
+                    || _dbContext.ProductAliases
+                        .AsNoTracking()
+                        .Any(alias =>
+                            alias.ProductId == item.Product.Id
+                            && EF.Functions.ILike(
+                                alias.NormalizedValue,
+                                searchPattern)));
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(query.ProductTypeCode))
@@ -405,14 +408,20 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
                     }
 
                     var normalizedTextValue = NormalizeText(rawValue);
-                    var textValuePattern = CreateLikePattern(normalizedTextValue);
+                    var textValuePattern =
+                        $"(^|[^[:alnum:]]){Regex.Escape(normalizedTextValue)}";
 
                     productsQuery = productsQuery.Where(item =>
                         _dbContext.ProductCharacteristics.AsNoTracking().Any(characteristic =>
                             characteristic.ProductId == item.Product.Id
                             && characteristic.CharacteristicDefinitionId == characteristicDefinition.Id
                             && characteristic.Value.TextValue != null
-                            && EF.Functions.ILike(characteristic.Value.TextValue, textValuePattern)));
+#pragma warning disable MA0009 // EF Core translates this expression to PostgreSQL; .NET regex execution is not used.
+                            && Regex.IsMatch(
+                                characteristic.Value.TextValue,
+                                textValuePattern,
+                                RegexOptions.IgnoreCase)));
+#pragma warning restore MA0009
                 }
                 else if (characteristicDefinition.DataType == CharacteristicDataType.Number)
                 {
@@ -460,6 +469,7 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
                 item.Product.Name.Value,
                 item.ProductType.Code,
                 item.ProductType.Name,
+                item.Manufacturer.Id,
                 item.Manufacturer.Name,
                 item.Product.Price.Amount,
                 item.Product.Price.Currency,
@@ -488,11 +498,14 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
                     item.Name,
                     item.ProductTypeCode,
                     item.ProductTypeName,
+                    item.ManufacturerId,
                     item.ManufacturerName,
                     activePrice?.Amount
                         ?? item.PriceAmount,
                     activePrice?.Currency
                         ?? item.PriceCurrency,
+                    item.PriceAmount,
+                    item.PriceCurrency,
                     item.StockQuantity);
             })
             .ToList();
@@ -662,6 +675,7 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
         string Name,
         string ProductTypeCode,
         string ProductTypeName,
+        Guid ManufacturerId,
         string ManufacturerName,
         decimal PriceAmount,
         string PriceCurrency,

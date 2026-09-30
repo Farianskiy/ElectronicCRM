@@ -112,6 +112,7 @@ public sealed class GetCatalogImportReviewQueueQueryHandler
                     creator?.Email?.Value,
                     creator?.Type.ToString() ?? "Unknown",
                     batch.ProductTypeId,
+                    batch.ImportMode,
                     batch.OriginalFileName,
                     batch.Status,
                     batch.RowsCount,

@@ -28,6 +28,30 @@ public sealed class CatalogProductMetadataRepository : ICatalogProductMetadataRe
                 cancellationToken);
     }
 
+    public async Task<IReadOnlyCollection<ProductType>> GetProductTypesByIdsAsync(
+        IReadOnlyCollection<Guid> productTypeIds,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(productTypeIds);
+
+        var ids = productTypeIds
+            .Where(productTypeId => productTypeId != Guid.Empty)
+            .Distinct()
+            .ToArray();
+
+        if (ids.Length == 0)
+        {
+            return [];
+        }
+
+        return await _dbContext.ProductTypes
+            .AsNoTracking()
+            .Include(productType => productType.Characteristics)
+            .Where(productType => ids.Contains(productType.Id))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     public Task<CharacteristicDefinition?> GetCharacteristicDefinitionByCodeAsync(
         string code,
         CancellationToken cancellationToken = default)

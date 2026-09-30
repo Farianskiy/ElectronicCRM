@@ -14,6 +14,7 @@ public sealed record CatalogImportReviewQueueItemResponse(
     string? CreatedByEmail,
     string CreatedByUserType,
     Guid? ProductTypeId,
+    string ImportMode,
     string OriginalFileName,
     string Status,
     int RowsCount,

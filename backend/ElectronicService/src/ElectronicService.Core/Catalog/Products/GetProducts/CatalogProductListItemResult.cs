@@ -6,7 +6,10 @@ public sealed record CatalogProductListItemResult(
     string Name,
     string ProductTypeCode,
     string ProductTypeName,
+    Guid ManufacturerId,
     string ManufacturerName,
     decimal PriceAmount,
     string PriceCurrency,
+    decimal BasePriceAmount,
+    string BasePriceCurrency,
     decimal StockQuantity);

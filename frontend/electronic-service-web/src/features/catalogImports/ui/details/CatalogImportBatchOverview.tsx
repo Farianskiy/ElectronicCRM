@@ -114,6 +114,15 @@ export function CatalogImportBatchOverview({
 
           <dl className="flex flex-wrap gap-x-5 gap-y-2 text-xs sm:text-sm">
             <div className="flex items-baseline gap-1.5">
+              <dt className="text-[var(--app-muted)]">Режим:</dt>
+              <dd className="font-semibold text-[var(--app-text)]">
+                {batch.importMode === "CreateOnly"
+                  ? "Добавление новых"
+                  : "Обновление характеристик"}
+              </dd>
+            </div>
+
+            <div className="flex items-baseline gap-1.5">
               <dt className="text-[var(--app-muted)]">Всего строк:</dt>
               <dd className="font-semibold tabular-nums text-[var(--app-text)]">
                 {batch.rowsCount}

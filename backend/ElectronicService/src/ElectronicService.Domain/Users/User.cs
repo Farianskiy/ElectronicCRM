@@ -142,6 +142,7 @@ public sealed class User : AggregateRoot
             && (IsRegular
                 || IsManager
                 || IsTechnical
+                || IsAdministrator
                 || IsSystemDeveloper
             );
     }
@@ -160,7 +161,7 @@ public sealed class User : AggregateRoot
     public bool CanSubmitCatalogImportForReview()
     {
         return IsActive
-            && (IsRegular || IsManager);
+            && (IsRegular || IsManager || IsAdministrator);
     }
 
     public bool CanReviewCatalogImports()

@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import type { FormEvent } from "react";
 import { useState } from "react";
+import type { CatalogProductTypeKind } from "@/features/catalogMetadata/model/types";
 import { createCatalogProductType } from "../api/createCatalogProductType";
 
 function getErrorMessage(error: unknown): string {
@@ -38,6 +39,7 @@ export function CreateCatalogProductTypeForm({
   const queryClient = useQueryClient();
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
+  const [kind, setKind] = useState<CatalogProductTypeKind>("MainProduct");
   const [validationError, setValidationError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -50,6 +52,7 @@ export function CreateCatalogProductTypeForm({
 
       setCode("");
       setName("");
+      setKind("MainProduct");
       setValidationError(null);
       setSuccessMessage(
         `Тип товара «${createdProductType.name}» создан.`,
@@ -84,6 +87,7 @@ export function CreateCatalogProductTypeForm({
     mutation.mutate({
       code: normalizedCode,
       name: normalizedName,
+      kind,
     });
   }
 
@@ -158,6 +162,32 @@ export function CreateCatalogProductTypeForm({
         </label>
       </div>
 
+      <fieldset className="mt-5">
+        <legend className="text-sm text-slate-300">Назначение</legend>
+
+        <div className="mt-2 grid gap-3 sm:grid-cols-2">
+          <ProductTypeKindOption
+            checked={kind === "MainProduct"}
+            title="Основной товар"
+            description="Самостоятельное изделие с полной схемой обязательных характеристик."
+            onChange={() => {
+              setKind("MainProduct");
+              clearMessages();
+            }}
+          />
+
+          <ProductTypeKindOption
+            checked={kind === "Component"}
+            title="Комплектующее"
+            description="Дополнительная позиция: заполняются только применимые характеристики."
+            onChange={() => {
+              setKind("Component");
+              clearMessages();
+            }}
+          />
+        </div>
+      </fieldset>
+
       <button
         type="submit"
         disabled={mutation.isPending}
@@ -166,5 +196,46 @@ export function CreateCatalogProductTypeForm({
         {mutation.isPending ? "Создаём..." : "Создать тип товара"}
       </button>
     </form>
+  );
+}
+
+function ProductTypeKindOption({
+  checked,
+  title,
+  description,
+  onChange,
+}: {
+  checked: boolean;
+  title: string;
+  description: string;
+  onChange: () => void;
+}) {
+  return (
+    <label
+      className={[
+        "flex cursor-pointer gap-3 rounded-2xl border p-4 transition",
+        checked
+          ? "border-teal-400/60 bg-teal-500/10"
+          : "border-white/10 bg-black/20 hover:border-white/20",
+      ].join(" ")}
+    >
+      <input
+        type="radio"
+        name="product-type-kind"
+        checked={checked}
+        onChange={onChange}
+        className="mt-1 accent-teal-500"
+      />
+
+      <span>
+        <span className="block text-sm font-medium text-slate-100">
+          {title}
+        </span>
+
+        <span className="mt-1 block text-xs leading-5 text-slate-400">
+          {description}
+        </span>
+      </span>
+    </label>
   );
 }

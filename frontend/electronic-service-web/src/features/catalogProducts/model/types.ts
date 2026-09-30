@@ -12,10 +12,28 @@ export interface CatalogProductListItem {
   name: string;
   productTypeCode: string;
   productTypeName: string;
+  manufacturerId: string;
   manufacturerName: string;
   priceAmount: number;
   priceCurrency: string;
+  basePriceAmount: number;
+  basePriceCurrency: string;
   stockQuantity: number;
+}
+
+export interface BulkUpdateCatalogProductRequest {
+  productId: string;
+  name?: string | null;
+  article?: string | null;
+  manufacturerId?: string | null;
+  priceAmount?: number | null;
+  priceCurrency?: string | null;
+  stockQuantity?: number | null;
+}
+
+export interface BulkUpdateCatalogProductsResponse {
+  updatedProductsCount: number;
+  updatedProductIds: string[];
 }
 
 export interface CatalogProductsResponse {

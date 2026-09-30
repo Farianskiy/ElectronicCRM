@@ -26,7 +26,8 @@ public sealed class CatalogMetadataReader : ICatalogMetadataReader
             .Select(productType => new CatalogProductTypeResult(
                 productType.Id,
                 productType.Code,
-                productType.Name))
+                productType.Name,
+                productType.Kind.ToString()))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
     }

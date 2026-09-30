@@ -94,6 +94,7 @@ public sealed class ApplyCatalogImportBatchCommandHandler
             batch.AppliedByUserId,
             batch.AppliedAtUtc,
             applyResult.Value.CreatedProductsCount,
+            applyResult.Value.UpdatedProductsCount,
             batch.Version);
 
         return Result.Success<ApplyCatalogImportBatchResult, DomainError>(result);

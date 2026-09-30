@@ -134,7 +134,7 @@ public static class CatalogPriceListErrors
     {
         return new DomainError(
             "catalog.price_list.workbook.header_not_found",
-            "Не удалось найти строку заголовков с колонками 'Артикул' и 'Наименование'.");
+            "Не удалось найти строку заголовков с колонками 'Артикул' и 'Цена'.");
     }
 
     public static DomainError EffectiveDateNotFound()

@@ -22,6 +22,7 @@ import {
 } from "../../model/types";
 import { validateCatalogImportMapping } from "../../model/mappingValidation";
 import { catalogImportQueryKeys } from "../../model/queryKeys";
+import { CatalogImportProductTypePicker } from "../productTypes/CatalogImportProductTypePicker";
 import { CatalogImportCharacteristicAssignment } from "./CatalogImportCharacteristicAssignment";
 
 interface CatalogImportMappingEditorProps {
@@ -453,23 +454,16 @@ function CatalogImportMappingForm({
             Общий тип товара · необязательно
           </label>
 
-          <AppSelect
+          <CatalogImportProductTypePicker
             ariaLabel="Тип товара для импорта"
             value={selectedProductTypeId}
+            productTypes={productTypes}
+            allowAutomatic
+            emptyLabel="Выберите общий тип товара"
             disabled={
               !initialMapping.canEdit || isBusy || productTypes.length === 0
             }
             onChange={handleProductTypeChange}
-            options={[
-              {
-                value: "",
-                label: "Определять отдельно для каждой строки",
-              },
-              ...productTypes.map((productType) => ({
-                value: productType.id,
-                label: `${productType.name} · ${productType.code}`,
-              })),
-            ]}
           />
 
           {selectedProductType && (

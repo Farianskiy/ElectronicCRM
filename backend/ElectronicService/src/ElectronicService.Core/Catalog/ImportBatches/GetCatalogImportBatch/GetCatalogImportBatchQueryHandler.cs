@@ -183,6 +183,7 @@ public sealed class
             batch.Id,
             batch.CreatedByUserId,
             batch.ProductTypeId,
+            batch.ImportMode,
             batch.OriginalFileName,
             batch.FileSizeBytes,
             batch.Status,

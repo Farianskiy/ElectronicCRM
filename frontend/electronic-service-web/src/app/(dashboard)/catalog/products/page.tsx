@@ -26,6 +26,10 @@ import { AppButton } from "@/shared/ui/AppButton";
 import { VoiceInputButton } from "@/shared/ui/VoiceInputButton";
 import { importCatalogStock } from "@/features/catalogStockImport/api/importCatalogStock";
 import { useCurrentUserAccess } from "@/features/auth/model/CurrentUserAccessContext";
+import {
+  createCatalogProductBulkEditorHref,
+  hasCatalogProductBulkEditorFilters,
+} from "@/features/catalogProducts/model/bulkEditorFilters";
 
 function getErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
@@ -218,7 +222,10 @@ function CharacteristicFilterField({
 
 export default function CatalogProductsPage() {
   const { hasPermission } = useCurrentUserAccess();
+  const canEditProducts = hasPermission("ProductsEdit");
+  const canManagePrices = hasPermission("PricesManage");
   const canManageStock = hasPermission("StockManage");
+  const canBulkEdit = canEditProducts || canManagePrices || canManageStock;
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [productTypeCode, setProductTypeCode] = useState("");
@@ -285,6 +292,8 @@ export default function CatalogProductsPage() {
 
   const totalCount = productsQuery.data?.totalCount ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const hasBulkEditorFilters = hasCatalogProductBulkEditorFilters(appliedFilters);
+  const bulkEditorHref = createCatalogProductBulkEditorHref(appliedFilters);
 
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -678,11 +687,25 @@ export default function CatalogProductsPage() {
             )}
           </div>
 
-          {productsQuery.isFetching && productsQuery.data && (
-            <p role="status" className="text-sm text-[var(--app-muted)]">
-              Обновляем список...
-            </p>
-          )}
+          <div className="flex flex-wrap items-center gap-3">
+            {canBulkEdit &&
+              productsQuery.data &&
+              totalCount > 0 &&
+              hasBulkEditorFilters && (
+                <Link
+                  href={bulkEditorHref}
+                  className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[var(--app-accent-border)] bg-[var(--app-accent-soft)] px-4 py-2.5 text-sm font-semibold text-[var(--app-accent)] transition-colors hover:bg-[var(--app-surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]"
+                >
+                  Редактировать выборку
+                </Link>
+              )}
+
+            {productsQuery.isFetching && productsQuery.data && (
+              <p role="status" className="text-sm text-[var(--app-muted)]">
+                Обновляем список...
+              </p>
+            )}
+          </div>
         </div>
 
         {productsQuery.isError && (

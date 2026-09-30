@@ -23,6 +23,10 @@ public sealed class CatalogImportBatchConfiguration
                     "\"status\" <> 'None'");
 
                 table.HasCheckConstraint(
+                    "ck_catalog_import_batches_import_mode_not_none",
+                    "\"import_mode\" <> 'None'");
+
+                table.HasCheckConstraint(
                     "ck_catalog_import_batches_file_size",
                     "\"file_size_bytes\" > 0 " +
                     $"AND \"file_size_bytes\" <= " +
@@ -101,6 +105,12 @@ public sealed class CatalogImportBatchConfiguration
         builder.Property(batch =>
                 batch.Status)
             .HasColumnName("status")
+            .HasConversion<string>()
+            .HasMaxLength(50)
+            .IsRequired();
+
+        builder.Property(batch => batch.ImportMode)
+            .HasColumnName("import_mode")
             .HasConversion<string>()
             .HasMaxLength(50)
             .IsRequired();

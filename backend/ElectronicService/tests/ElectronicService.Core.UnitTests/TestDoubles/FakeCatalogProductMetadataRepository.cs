@@ -197,6 +197,21 @@ internal sealed class FakeCatalogProductMetadataRepository
             productType);
     }
 
+    public Task<IReadOnlyCollection<ProductType>> GetProductTypesByIdsAsync(
+        IReadOnlyCollection<Guid> productTypeIds,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(productTypeIds);
+
+        IReadOnlyCollection<ProductType> productTypes = productTypeIds
+            .Distinct()
+            .Where(_productTypes.ContainsKey)
+            .Select(productTypeId => _productTypes[productTypeId])
+            .ToArray();
+
+        return Task.FromResult(productTypes);
+    }
+
     public Task<CharacteristicDefinition?>
         GetCharacteristicDefinitionByCodeAsync(
             string code,

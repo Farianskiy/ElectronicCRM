@@ -13,6 +13,7 @@ public sealed class CatalogAssistantUnknownTermResolver
 {
     private const decimal MinimumConfidence = 0.65m;
     private const int MaxSeriesCandidates = 500;
+    private const int MaxCharacteristicCandidates = 2_000;
 
     private readonly ElectronicDbContext _dbContext;
 
@@ -52,6 +53,28 @@ public sealed class CatalogAssistantUnknownTermResolver
             .ConfigureAwait(false);
 
         candidates.AddRange(productTypeCandidates);
+
+        var characteristicCandidates = await (
+                from characteristic in _dbContext.ProductCharacteristics.AsNoTracking()
+                join definition in _dbContext.CharacteristicDefinitions.AsNoTracking()
+                    on characteristic.CharacteristicDefinitionId equals definition.Id
+                where characteristic.Value.TextValue != null
+                select new
+                {
+                    characteristic.Value.TextValue,
+                    definition.Code
+                })
+            .Distinct()
+            .Take(MaxCharacteristicCandidates)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        candidates.AddRange(characteristicCandidates.Select(characteristic =>
+            new CatalogAssistantSuggestionCandidate(
+                characteristic.TextValue!,
+                CatalogDictionaryTermKind.Characteristic,
+                characteristic.Code,
+                NormalizeText(characteristic.TextValue!))));
 
         var productSeriesDefinitionId = await _dbContext.CharacteristicDefinitions
             .AsNoTracking()
@@ -143,8 +166,12 @@ public sealed class CatalogAssistantUnknownTermResolver
             return 0;
         }
 
-        if (normalizedCandidate.Contains(normalizedSource, StringComparison.Ordinal)
-            || normalizedSource.Contains(normalizedCandidate, StringComparison.Ordinal))
+        const int minimumSubstringLength = 3;
+
+        if (normalizedSource.Length >= minimumSubstringLength
+            && normalizedCandidate.Length >= minimumSubstringLength
+            && (normalizedCandidate.Contains(normalizedSource, StringComparison.Ordinal)
+                || normalizedSource.Contains(normalizedCandidate, StringComparison.Ordinal)))
         {
             return 0.85m;
         }

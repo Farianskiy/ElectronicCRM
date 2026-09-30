@@ -17,6 +17,31 @@ public sealed class ProductTypeTests
         Assert.True(result.IsSuccess);
         Assert.Equal("MODULAR_CIRCUIT_BREAKER", result.Value.Code);
         Assert.Equal("Модульный автомат", result.Value.Name);
+        Assert.Equal(ProductTypeKind.MainProduct, result.Value.Kind);
+    }
+
+    [Fact]
+    public void CreateStoresComponentKind()
+    {
+        var result = ProductType.Create(
+            "MOUNTING_PANEL",
+            "Монтажная панель",
+            ProductTypeKind.Component);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(ProductTypeKind.Component, result.Value.Kind);
+    }
+
+    [Fact]
+    public void CreateRejectsUnknownKind()
+    {
+        var result = ProductType.Create(
+            "MOUNTING_PANEL",
+            "Монтажная панель",
+            (ProductTypeKind)99);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("general.value_is_invalid", result.Error.Code);
     }
 
     // Проверяет сохранение всех настроек характеристики внутри типа товара.

@@ -1,3 +1,5 @@
+using ElectronicService.Domain.Catalog.ImportBatches;
+
 namespace ElectronicService.Core.Catalog.ImportBatches.CreateCatalogImportBatch;
 
 public sealed class CreateCatalogImportBatchCommand
@@ -6,7 +8,8 @@ public sealed class CreateCatalogImportBatchCommand
         Guid createdByUserId,
         Stream fileStream,
         string fileName,
-        string contentType)
+        string contentType,
+        CatalogImportMode importMode)
     {
         ArgumentNullException.ThrowIfNull(
             fileStream);
@@ -15,6 +18,7 @@ public sealed class CreateCatalogImportBatchCommand
         FileStream = fileStream;
         FileName = fileName;
         ContentType = contentType;
+        ImportMode = importMode;
     }
 
     public Guid CreatedByUserId
@@ -33,6 +37,11 @@ public sealed class CreateCatalogImportBatchCommand
     }
 
     public string ContentType
+    {
+        get;
+    }
+
+    public CatalogImportMode ImportMode
     {
         get;
     }

@@ -13,6 +13,7 @@ import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
 import { AppSelect } from "@/shared/ui/AppSelect";
 import { AppButton } from "@/shared/ui/AppButton";
 import { AppInput } from "@/shared/ui/AppInput";
+import { CatalogImportProductTypePicker } from "../productTypes/CatalogImportProductTypePicker";
 import { updateCatalogImportRow } from "../../api/updateCatalogImportRow";
 import { catalogImportConfirmedSpansQueryKey } from "../../api/getCatalogImportRowConfirmedSpans";
 import { CatalogImportConfirmedSpanEditor } from "./CatalogImportConfirmedSpanEditor";
@@ -440,10 +441,12 @@ export function CatalogImportRowEditor({
             Тип товара
           </span>
 
-          <AppSelect
+          <CatalogImportProductTypePicker
             ariaLabel={`Тип товара строки ${row.rowNumber}`}
             value={productTypeId}
+            productTypes={productTypesQuery.data ?? []}
             disabled={isBusy}
+            emptyLabel="Тип товара не выбран"
             onChange={(value) => {
               setProductTypeId(value);
               setCharacteristicValues({});
@@ -451,13 +454,6 @@ export function CatalogImportRowEditor({
               setFormErrors([]);
               saveMutation.reset();
             }}
-            options={[
-              { value: "", label: "Тип товара не выбран" },
-              ...(productTypesQuery.data ?? []).map((productType) => ({
-                value: productType.id,
-                label: `${productType.name} · ${productType.code}`,
-              })),
-            ]}
           />
         </div>
 

@@ -34,6 +34,8 @@ public sealed class CatalogPriceCalculationRepository
         return _dbContext.CatalogPriceCalculations
             .Include(calculation =>
                 calculation.Lines)
+            .ThenInclude(line =>
+                line.Components)
             .Include(calculation =>
                 calculation.ManufacturerDiscounts)
             .SingleOrDefaultAsync(

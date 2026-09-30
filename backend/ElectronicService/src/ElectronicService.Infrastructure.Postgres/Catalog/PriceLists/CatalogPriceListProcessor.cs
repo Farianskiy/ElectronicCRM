@@ -105,6 +105,10 @@ public sealed class CatalogPriceListProcessor
             new List<CatalogPriceListSourceRow>(
                 WriteBatchSize);
 
+        var seenArticles =
+            new HashSet<string>(
+                StringComparer.Ordinal);
+
         var validRowsCount = 0;
         var errorRowsCount = 0;
         var savedRowsCount = 0;
@@ -113,7 +117,21 @@ public sealed class CatalogPriceListProcessor
             CatalogPriceListSourceRow sourceRow,
             CancellationToken rowCancellationToken)
         {
-            sourceRows.Add(sourceRow);
+            var normalizedArticle =
+                NormalizeArticle(
+                    sourceRow.Article);
+
+            var isDuplicateArticle =
+                normalizedArticle.Length > 0
+                && !seenArticles.Add(
+                    normalizedArticle);
+
+            sourceRows.Add(
+                sourceRow with
+                {
+                    IsDuplicateArticle =
+                        isDuplicateArticle
+                });
 
             if (sourceRows.Count < WriteBatchSize)
             {
@@ -314,7 +332,7 @@ public sealed class CatalogPriceListProcessor
             DomainError>> SaveRowsAsync(
                 Guid priceListId,
                 List<CatalogPriceListSourceRow> sourceRows,
-                Dictionary<string, Guid[]> articleIndex,
+                Dictionary<string, ProductLookup[]> articleIndex,
                 CancellationToken cancellationToken)
     {
         var rows =
@@ -326,12 +344,24 @@ public sealed class CatalogPriceListProcessor
 
         foreach (var sourceRow in sourceRows)
         {
+            var normalizedArticle =
+                NormalizeArticle(
+                    sourceRow.Article);
+
+            var sourceName =
+                articleIndex.TryGetValue(
+                    normalizedArticle,
+                    out var productMatches)
+                && productMatches.Length == 1
+                    ? productMatches[0].Name
+                    : string.Empty;
+
             var rowResult =
                 CatalogPriceListRow.Create(
                     priceListId,
                     sourceRow.RowNumber,
                     sourceRow.Article,
-                    sourceRow.Name,
+                    sourceName,
                     sourceRow.BasePriceAmount,
                     sourceRow.MrcPriceAmount,
                     sourceRow.ProductLink,
@@ -352,12 +382,20 @@ public sealed class CatalogPriceListProcessor
                 row,
                 articleIndex);
 
-            if (row.Status != CatalogPriceListRowStatus.Valid)
+            if (sourceRow.IsDuplicateArticle)
             {
-                continue;
+                row.MarkDuplicateArticle();
             }
 
-            validRowsCount++;
+            if (row.Status == CatalogPriceListRowStatus.Valid)
+            {
+                validRowsCount++;
+            }
+            else
+            {
+                errorRowsCount++;
+            }
+
             rows.Add(row);
         }
 
@@ -394,7 +432,7 @@ public sealed class CatalogPriceListProcessor
 
     private static void MatchRow(
         CatalogPriceListRow row,
-        Dictionary<string, Guid[]> articleIndex)
+        Dictionary<string, ProductLookup[]> articleIndex)
     {
         if (articleIndex.TryGetValue(
                 row.NormalizedArticle,
@@ -412,13 +450,13 @@ public sealed class CatalogPriceListProcessor
 
     private static void ApplyArticleMatches(
         CatalogPriceListRow row,
-        Guid[] productIds)
+        ProductLookup[] products)
     {
-        if (productIds.Length == 1)
+        if (products.Length == 1)
         {
             var matchResult =
                 row.MarkMatchedByArticle(
-                    productIds[0]);
+                    products[0].Id);
 
             if (matchResult.IsFailure)
             {
@@ -444,12 +482,13 @@ public sealed class CatalogPriceListProcessor
             .Select(product =>
                 new ProductLookup(
                     product.Id,
-                    product.Article.Value))
+                    product.Article.Value,
+                    product.Name.Value))
             .ToArrayAsync(cancellationToken)
             .ConfigureAwait(false);
     }
 
-    private static Dictionary<string, Guid[]>
+    private static Dictionary<string, ProductLookup[]>
         BuildArticleIndex(
             ProductLookup[] products)
     {
@@ -462,9 +501,8 @@ public sealed class CatalogPriceListProcessor
             .ToDictionary(
                 group => group.Key,
                 group => group
-                    .Select(product =>
-                        product.Id)
-                    .Distinct()
+                    .GroupBy(product => product.Id)
+                    .Select(group => group.First())
                     .ToArray(),
                 StringComparer.Ordinal);
     }
@@ -516,7 +554,8 @@ public sealed class CatalogPriceListProcessor
 
     private sealed record ProductLookup(
         Guid Id,
-        string Article);
+        string Article,
+        string Name);
 
     private sealed record CatalogPriceListBatchSaveResult(
         int SavedRowsCount,

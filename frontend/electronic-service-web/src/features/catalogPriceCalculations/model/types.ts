@@ -66,6 +66,28 @@ export interface CatalogPriceCalculationLine {
   mrcPriceAmount?: number | null;
   discountPercent: number;
   projectPriceAmount: number;
+  productTotalAmount: number;
+  componentsTotalAmount: number;
+  totalAmount: number;
+  createdAtUtc: string;
+  updatedAtUtc?: string | null;
+  components: CatalogPriceCalculationLineComponent[];
+}
+
+export interface CatalogPriceCalculationLineComponent {
+  componentLineId: string;
+  needDefinitionId: string;
+  needName: string;
+  componentProductId: string;
+  manufacturerId: string;
+  manufacturerName: string;
+  article: string;
+  name: string;
+  quantityPerUnit: number;
+  totalQuantity: number;
+  basePriceAmount: number;
+  discountPercent: number;
+  projectPriceAmount: number;
   totalAmount: number;
   createdAtUtc: string;
   updatedAtUtc?: string | null;

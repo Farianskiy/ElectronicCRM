@@ -153,6 +153,36 @@ public sealed class CatalogRecognitionLearningTests(PostgreSqlFixture fixture)
         Assert.True(feedback.IsFinalized && feedback.IsTrainingEligible);
         Assert.False(await db.CatalogRecognitionCandidateEvidenceEntries.AnyAsync(x => x.FeedbackId == feedback.Id, ct));
 
+        var updateBatch = CatalogImportBatch.Create(
+            reviewer,
+            "learning-update.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            [1],
+            CatalogImportMode.UpdateCharacteristicsOnly).Value;
+        var updateData = new CatalogImportNormalizedRowData("ignored updated name", article.ToUpperInvariant(), graph.Manufacturer.Name, 999m, 999,
+            new Dictionary<string, string>(StringComparer.Ordinal) { [graph.Definition.Id.ToString()] = "25" },
+            ManufacturerId: graph.Manufacturer.Id, ProductTypeId: graph.ProductType.Id);
+        var updateRow = CatalogImportRow.Create(updateBatch.Id, 2, CatalogImportRowStatus.Valid, "{}", JsonSerializer.Serialize(updateData, JsonOptions), "[]", "[]").Value;
+        Assert.True(updateBatch.RegisterAnalysisResult(1, 1, 0, false).IsSuccess);
+        db.CatalogImportBatches.Add(updateBatch);
+        db.CatalogImportRows.Add(updateRow);
+        await db.SaveChangesAsync(ct);
+
+        var updated = await applier.ApplyAsync(updateBatch, reviewer, UserType.Technical, ct);
+
+        Assert.True(updated.IsSuccess, updated.IsFailure ? updated.Error.Message : null);
+        Assert.Equal(0, updated.Value.CreatedProductsCount);
+        Assert.Equal(1, updated.Value.UpdatedProductsCount);
+        var enrichedProduct = await db.Products
+            .Include(product => product.Characteristics)
+            .SingleAsync(product => product.Article.Value == article, ct);
+        Assert.Equal(10m, enrichedProduct.Price.Amount);
+        Assert.Equal(1, enrichedProduct.StockQuantity.Value);
+        Assert.Equal(25m, Assert.Single(enrichedProduct.Characteristics).Value.NumberValue);
+        var updateAudit = await db.ProductAuditEntries.SingleAsync(entry => entry.SourceId == updateBatch.Id, ct);
+        Assert.NotNull(updateAudit.BeforeJson);
+        Assert.NotNull(updateAudit.AfterJson);
+
         var failure = new FailEvidenceSaveOnce();
         await using var provider = CreateProvider(failure);
         var log = new LearningLog();

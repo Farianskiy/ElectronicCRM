@@ -194,23 +194,53 @@ public sealed class CatalogImportBatchApplier : ICatalogImportBatchApplier
 
         var preparedRows = preparedRowsResult.Value;
 
-        var existingArticles = await _dbContext.Products
+        var articlesSet = preparedRows
+            .Select(row => row.Data.Article!.Trim())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var existingProductKeys = await _dbContext.Products
             .AsNoTracking()
-            .Select(product => product.Article.Value)
+            .Select(product => new
+            {
+                product.Id,
+                Article = product.Article.Value
+            })
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        var existingArticlesSet = existingArticles.ToHashSet(
+        var existingProductIds = existingProductKeys
+            .Where(product => articlesSet.Contains(product.Article))
+            .Select(product => product.Id)
+            .ToArray();
+
+        var existingProducts = await _dbContext.Products
+            .Include(product => product.Characteristics)
+            .Include(product => product.Aliases)
+            .Where(product => existingProductIds.Contains(product.Id))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var existingProductsByArticle = existingProducts.ToDictionary(
+            product => product.Article.Value,
             StringComparer.OrdinalIgnoreCase);
 
         foreach (var preparedRow in preparedRows)
         {
             var article = preparedRow.Data.Article!;
+            var productExists = existingProductsByArticle.ContainsKey(article);
 
-            if (existingArticlesSet.Contains(article))
+            if (batch.ImportMode == CatalogImportMode.CreateOnly && productExists)
             {
                 return Result.Failure<CatalogImportApplyExecutionResult, DomainError>(
                     CatalogImportErrors.ProductArticleAlreadyExists(
+                        article,
+                        preparedRow.RowNumber));
+            }
+
+            if (batch.ImportMode == CatalogImportMode.UpdateCharacteristicsOnly && !productExists)
+            {
+                return Result.Failure<CatalogImportApplyExecutionResult, DomainError>(
+                    CatalogImportErrors.ProductArticleNotFoundForUpdate(
                         article,
                         preparedRow.RowNumber));
             }
@@ -294,6 +324,7 @@ public sealed class CatalogImportBatchApplier : ICatalogImportBatchApplier
         }
 
         var createdProductsCount = 0;
+        var updatedProductsCount = 0;
 
         foreach (var preparedRow in preparedRows)
         {
@@ -302,38 +333,73 @@ public sealed class CatalogImportBatchApplier : ICatalogImportBatchApplier
             var data = preparedRow.Data;
             var manufacturerId = data.ManufacturerId!.Value;
             var productType = productTypesById[data.ProductTypeId!.Value];
-
-            var moneyResult = Money.Create(data.Price ?? 0m);
-
-            if (moneyResult.IsFailure)
-            {
-                return Result.Failure<CatalogImportApplyExecutionResult, DomainError>(
-                    moneyResult.Error);
-            }
-
-            var stockResult = StockQuantity.Create(data.StockQuantity ?? 0);
-
-            if (stockResult.IsFailure)
-            {
-                return Result.Failure<CatalogImportApplyExecutionResult, DomainError>(
-                    stockResult.Error);
-            }
-
-            var productResult = Product.Create(
+            var manufacturer = manufacturersById[manufacturerId];
+            var isExistingProduct = existingProductsByArticle.TryGetValue(
                 data.Article!,
-                data.Name!,
-                productType.Id,
-                manufacturerId,
-                moneyResult.Value,
-                stockResult.Value);
+                out var product);
+            string? beforeJson = null;
 
-            if (productResult.IsFailure)
+            if (isExistingProduct)
             {
-                return Result.Failure<CatalogImportApplyExecutionResult, DomainError>(
-                    productResult.Error);
-            }
+                if (product!.ProductTypeId != productType.Id)
+                {
+                    return Result.Failure<CatalogImportApplyExecutionResult, DomainError>(
+                        CatalogImportErrors.ExistingProductTypeMismatch(
+                            data.Article!,
+                            preparedRow.RowNumber));
+                }
 
-            var product = productResult.Value;
+                if (product.ManufacturerId != manufacturerId)
+                {
+                    return Result.Failure<CatalogImportApplyExecutionResult, DomainError>(
+                        CatalogImportErrors.ExistingProductManufacturerMismatch(
+                            data.Article!,
+                            preparedRow.RowNumber));
+                }
+
+                var beforeSnapshot = ProductAuditSnapshotFactory.Create(
+                    product,
+                    productType,
+                    manufacturer,
+                    definitionsById);
+
+                beforeJson = ProductAuditSnapshotSerializer.Serialize(
+                    beforeSnapshot);
+            }
+            else
+            {
+                var moneyResult = Money.Create(data.Price ?? 0m);
+
+                if (moneyResult.IsFailure)
+                {
+                    return Result.Failure<CatalogImportApplyExecutionResult, DomainError>(
+                        moneyResult.Error);
+                }
+
+                var stockResult = StockQuantity.Create(data.StockQuantity ?? 0);
+
+                if (stockResult.IsFailure)
+                {
+                    return Result.Failure<CatalogImportApplyExecutionResult, DomainError>(
+                        stockResult.Error);
+                }
+
+                var productResult = Product.Create(
+                    data.Article!,
+                    data.Name!,
+                    productType.Id,
+                    manufacturerId,
+                    moneyResult.Value,
+                    stockResult.Value);
+
+                if (productResult.IsFailure)
+                {
+                    return Result.Failure<CatalogImportApplyExecutionResult, DomainError>(
+                        productResult.Error);
+                }
+
+                product = productResult.Value;
+            }
 
             foreach (var characteristic in data.Characteristics)
             {
@@ -374,6 +440,16 @@ public sealed class CatalogImportBatchApplier : ICatalogImportBatchApplier
                         valueResult.Error);
                 }
 
+                var existingCharacteristic = product!.Characteristics
+                    .FirstOrDefault(item =>
+                        item.CharacteristicDefinitionId == characteristicDefinitionId);
+
+                if (existingCharacteristic is not null
+                    && existingCharacteristic.Value.Equals(valueResult.Value))
+                {
+                    continue;
+                }
+
                 var setResult = product.SetCharacteristic(
                     productType,
                     definition,
@@ -395,9 +471,10 @@ public sealed class CatalogImportBatchApplier : ICatalogImportBatchApplier
                     requiredValidationResult.Error);
             }
 
-            _dbContext.Products.Add(product);
-
-            var manufacturer = manufacturersById[manufacturerId];
+            if (!isExistingProduct)
+            {
+                _dbContext.Products.Add(product);
+            }
 
             var afterSnapshot = ProductAuditSnapshotFactory.Create(
                 product,
@@ -408,13 +485,19 @@ public sealed class CatalogImportBatchApplier : ICatalogImportBatchApplier
             var afterJson = ProductAuditSnapshotSerializer.Serialize(
                 afterSnapshot);
 
+            if (isExistingProduct
+                && string.Equals(beforeJson, afterJson, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
             var auditEntryResult = ProductAuditEntry.Create(
                 product.Id,
                 appliedByUserId,
                 ProductAuditOperation.ImportApplied,
                 ProductAuditSource.ImportBatch,
                 batch.Id,
-                beforeJson: null,
+                beforeJson,
                 afterJson);
 
             if (auditEntryResult.IsFailure)
@@ -426,7 +509,14 @@ public sealed class CatalogImportBatchApplier : ICatalogImportBatchApplier
             _dbContext.ProductAuditEntries.Add(
                 auditEntryResult.Value);
 
-            createdProductsCount++;
+            if (isExistingProduct)
+            {
+                updatedProductsCount++;
+            }
+            else
+            {
+                createdProductsCount++;
+            }
         }
 
         var completeApplyingResult = batch.CompleteApplying();
@@ -439,7 +529,8 @@ public sealed class CatalogImportBatchApplier : ICatalogImportBatchApplier
 
         return Result.Success<CatalogImportApplyExecutionResult, DomainError>(
             new CatalogImportApplyExecutionResult(
-                createdProductsCount));
+                createdProductsCount,
+                updatedProductsCount));
     }
 
     private static Result<List<PreparedImportRow>, DomainError> PrepareRows(

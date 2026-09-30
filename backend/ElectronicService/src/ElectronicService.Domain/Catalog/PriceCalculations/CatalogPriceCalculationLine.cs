@@ -16,8 +16,9 @@ public sealed class CatalogPriceCalculationLine
 
     public const decimal MaximumQuantity = 1_000_000m;
 
-    public const decimal MaximumPriceAmount =
-        1_000_000_000_000m;
+    public const decimal MaximumPriceAmount = 1_000_000_000_000m;
+
+    private readonly List<CatalogPriceCalculationLineComponent> _components = [];
 
     private CatalogPriceCalculationLine(
         Guid id,
@@ -159,6 +160,25 @@ public sealed class CatalogPriceCalculationLine
         get;
         private set;
     }
+
+    public IReadOnlyCollection<
+        CatalogPriceCalculationLineComponent>
+        Components =>
+            _components;
+
+    public decimal ProductTotalAmount =>
+        decimal.Round(
+            ProjectPriceAmount * Quantity,
+            2,
+            MidpointRounding.AwayFromZero);
+
+    public decimal ComponentsTotalAmount =>
+        decimal.Round(
+            _components.Sum(
+                component =>
+                    component.TotalAmount),
+            2,
+            MidpointRounding.AwayFromZero);
 
     internal static Result<
         CatalogPriceCalculationLine,
@@ -429,6 +449,185 @@ public sealed class CatalogPriceCalculationLine
         return UnitResult.Success<DomainError>();
     }
 
+    internal Result<Guid, DomainError> AddComponent(
+        Guid needDefinitionId,
+        string needName,
+        Guid componentProductId,
+        Guid manufacturerId,
+        string article,
+        string name,
+        string manufacturerName,
+        int quantityPerUnit,
+        decimal basePriceAmount,
+        decimal discountPercent)
+    {
+        var duplicateExists =
+            _components.Any(
+                component =>
+                    component.NeedDefinitionId
+                        == needDefinitionId
+                    && component.ComponentProductId
+                        == componentProductId);
+
+        if (duplicateExists)
+        {
+            return Result.Failure<Guid, DomainError>(
+                CatalogPriceCalculationErrors
+                    .ComponentAlreadyAdded(
+                        needDefinitionId,
+                        componentProductId));
+        }
+
+        var componentResult =
+            CatalogPriceCalculationLineComponent.Create(
+                Id,
+                needDefinitionId,
+                needName,
+                componentProductId,
+                manufacturerId,
+                article,
+                name,
+                manufacturerName,
+                quantityPerUnit,
+                basePriceAmount,
+                discountPercent,
+                Quantity);
+
+        if (componentResult.IsFailure)
+        {
+            return Result.Failure<Guid, DomainError>(
+                componentResult.Error);
+        }
+
+        _components.Add(componentResult.Value);
+
+        Recalculate();
+        UpdatedAtUtc = DateTime.UtcNow;
+
+        return Result.Success<Guid, DomainError>(
+            componentResult.Value.Id);
+    }
+
+    internal UnitResult<DomainError> RemoveComponent(
+        Guid componentLineId)
+    {
+        if (componentLineId == Guid.Empty)
+        {
+            return UnitResult.Failure(
+                GeneralErrors.ValueIsInvalid(
+                    nameof(componentLineId)));
+        }
+
+        var component =
+            _components.SingleOrDefault(
+                item =>
+                    item.Id == componentLineId);
+
+        if (component is null)
+        {
+            return UnitResult.Failure(
+                CatalogPriceCalculationErrors
+                    .ComponentNotFound(
+                        componentLineId));
+        }
+
+        _components.Remove(component);
+
+        Recalculate();
+        UpdatedAtUtc = DateTime.UtcNow;
+
+        return UnitResult.Success<DomainError>();
+    }
+
+    internal UnitResult<DomainError>
+        ChangeComponentQuantityPerUnit(
+            Guid componentLineId,
+            int quantityPerUnit)
+    {
+        if (componentLineId == Guid.Empty)
+        {
+            return UnitResult.Failure(
+                GeneralErrors.ValueIsInvalid(
+                    nameof(componentLineId)));
+        }
+
+        var component =
+            _components.SingleOrDefault(
+                item =>
+                    item.Id == componentLineId);
+
+        if (component is null)
+        {
+            return UnitResult.Failure(
+                CatalogPriceCalculationErrors
+                    .ComponentNotFound(
+                        componentLineId));
+        }
+
+        var changeResult =
+            component.ChangeQuantityPerUnit(
+                quantityPerUnit,
+                Quantity);
+
+        if (changeResult.IsFailure)
+        {
+            return changeResult;
+        }
+
+        Recalculate();
+        UpdatedAtUtc = DateTime.UtcNow;
+
+        return UnitResult.Success<DomainError>();
+    }
+
+    internal UnitResult<DomainError>
+        ApplyComponentManufacturerDiscount(
+            Guid manufacturerId,
+            decimal discountPercent)
+    {
+        if (manufacturerId == Guid.Empty)
+        {
+            return UnitResult.Failure(
+                GeneralErrors.ValueIsInvalid(
+                    nameof(manufacturerId)));
+        }
+
+        var components =
+            _components
+                .Where(
+                    component =>
+                        component.ManufacturerId
+                            == manufacturerId)
+                .ToArray();
+
+        foreach (var component in components)
+        {
+            var discountResult =
+                component.ApplyDiscount(
+                    discountPercent,
+                    Quantity);
+
+            if (discountResult.IsFailure)
+            {
+                return discountResult;
+            }
+        }
+
+        Recalculate();
+        UpdatedAtUtc = DateTime.UtcNow;
+
+        return UnitResult.Success<DomainError>();
+    }
+
+    internal bool HasComponentManufacturer(
+        Guid manufacturerId)
+    {
+        return _components.Any(
+            component =>
+                component.ManufacturerId
+                    == manufacturerId);
+    }
+
     private static UnitResult<DomainError>
         ValidateQuantity(
             decimal quantity)
@@ -487,9 +686,16 @@ public sealed class CatalogPriceCalculationLine
                 2,
                 MidpointRounding.AwayFromZero);
 
+        foreach (var component in _components)
+        {
+            component.RecalculateForParentQuantity(
+                Quantity);
+        }
+
         TotalAmount =
             decimal.Round(
-                ProjectPriceAmount * Quantity,
+                ProductTotalAmount
+                + ComponentsTotalAmount,
                 2,
                 MidpointRounding.AwayFromZero);
     }

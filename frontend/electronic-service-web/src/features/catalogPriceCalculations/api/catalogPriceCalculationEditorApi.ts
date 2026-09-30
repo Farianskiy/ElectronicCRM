@@ -96,6 +96,47 @@ export async function removeCatalogPriceCalculationLine(request: {
   );
 }
 
+export async function addCatalogPriceCalculationLineComponent(request: {
+  calculationId: string;
+  lineId: string;
+  needDefinitionId: string;
+  componentProductId: string;
+  quantityPerUnit: number;
+}): Promise<void> {
+  await httpClient.post(
+    `/api/catalog/price-calculations/${request.calculationId}/lines/${request.lineId}/components`,
+    {
+      needDefinitionId: request.needDefinitionId,
+      componentProductId: request.componentProductId,
+      quantityPerUnit: request.quantityPerUnit,
+    },
+  );
+}
+
+export async function changeCatalogPriceCalculationLineComponentQuantity(
+  request: {
+    calculationId: string;
+    lineId: string;
+    componentLineId: string;
+    quantityPerUnit: number;
+  },
+): Promise<void> {
+  await httpClient.patch(
+    `/api/catalog/price-calculations/${request.calculationId}/lines/${request.lineId}/components/${request.componentLineId}/quantity`,
+    { quantityPerUnit: request.quantityPerUnit },
+  );
+}
+
+export async function removeCatalogPriceCalculationLineComponent(request: {
+  calculationId: string;
+  lineId: string;
+  componentLineId: string;
+}): Promise<void> {
+  await httpClient.delete(
+    `/api/catalog/price-calculations/${request.calculationId}/lines/${request.lineId}/components/${request.componentLineId}`,
+  );
+}
+
 export async function setCatalogPriceCalculationManufacturerDiscount(request: {
   calculationId: string;
   manufacturerId: string;

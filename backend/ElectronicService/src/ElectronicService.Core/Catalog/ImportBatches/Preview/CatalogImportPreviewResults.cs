@@ -9,6 +9,7 @@ public sealed record
         Guid BatchId,
         Guid CreatedByUserId,
         Guid? ProductTypeId,
+        CatalogImportMode ImportMode,
         string OriginalFileName,
         string ContentType,
         long FileSizeBytes,

@@ -24,6 +24,7 @@ public sealed class CatalogImportBatch : AggregateRoot
         string contentType,
         long fileSizeBytes,
         string fileSha256,
+        CatalogImportMode importMode,
         CatalogImportFile file)
         : base(id)
     {
@@ -32,6 +33,7 @@ public sealed class CatalogImportBatch : AggregateRoot
         ContentType = contentType;
         FileSizeBytes = fileSizeBytes;
         FileSha256 = fileSha256;
+        ImportMode = importMode;
         File = file;
 
         Status =
@@ -93,6 +95,12 @@ public sealed class CatalogImportBatch : AggregateRoot
         get;
         private set;
     } = null!;
+
+    public CatalogImportMode ImportMode
+    {
+        get;
+        private set;
+    }
 
     public CatalogImportBatchStatus Status
     {
@@ -246,12 +254,19 @@ public sealed class CatalogImportBatch : AggregateRoot
             Guid createdByUserId,
             string originalFileName,
             string contentType,
-            byte[] content)
+            byte[] content,
+            CatalogImportMode importMode = CatalogImportMode.CreateOnly)
     {
         if (createdByUserId == Guid.Empty)
         {
             return GeneralErrors.ValueIsInvalid(
                 nameof(createdByUserId));
+        }
+
+        if (importMode is not CatalogImportMode.CreateOnly
+            and not CatalogImportMode.UpdateCharacteristicsOnly)
+        {
+            return CatalogImportErrors.InvalidImportMode(importMode.ToString());
         }
 
         if (string.IsNullOrWhiteSpace(
@@ -345,6 +360,7 @@ public sealed class CatalogImportBatch : AggregateRoot
             contentType.Trim(),
             content.LongLength,
             sha256,
+            importMode,
             fileResult.Value);
     }
 

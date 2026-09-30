@@ -52,6 +52,7 @@ public sealed class ApplyCatalogImportBatchController : ControllerBase
             result.Value.AppliedByUserId,
             result.Value.AppliedAtUtc,
             result.Value.CreatedProductsCount,
+            result.Value.UpdatedProductsCount,
             result.Value.Version);
 
         return Ok(response);

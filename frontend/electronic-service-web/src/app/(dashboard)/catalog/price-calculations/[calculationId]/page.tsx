@@ -6,24 +6,29 @@ import { useParams } from "next/navigation";
 import { useMemo, useState, type FormEvent } from "react";
 import {
   addCatalogPriceCalculationLine,
+  addCatalogPriceCalculationLineComponent,
   applyCatalogPriceCalculationImport,
+  changeCatalogPriceCalculationLineComponentQuantity,
   changeCatalogPriceCalculationLineQuantity,
   completeCatalogPriceCalculation,
   getCatalogPriceCalculation,
   previewCatalogPriceCalculationImport,
   removeCatalogPriceCalculationLine,
+  removeCatalogPriceCalculationLineComponent,
   removeCatalogPriceCalculationManufacturerDiscount,
   searchCatalogPriceCalculationProducts,
   setCatalogPriceCalculationManufacturerDiscount,
   updateCatalogPriceCalculationCard,
 } from "@/features/catalogPriceCalculations/api/catalogPriceCalculationEditorApi";
 import { exportCatalogPriceCalculation } from "@/features/catalogPriceCalculations/api/exportCatalogPriceCalculation";
+import { getProductComponentCompatibility } from "@/features/componentCompatibility/api/getProductComponentCompatibility";
 import { useCurrentUserAccess } from "@/features/auth/model/CurrentUserAccessContext";
 import { catalogPriceCalculationQueryKeys } from "@/features/catalogPriceCalculations/model/queryKeys";
 import type {
   CatalogPriceCalculationDetails,
   CatalogPriceCalculationImportRowStatus,
   CatalogPriceCalculationLine,
+  CatalogPriceCalculationLineComponent,
   CatalogPriceCalculationManufacturerDiscount,
   CatalogPriceCalculationProductSearchItem,
   CatalogPriceCalculationStatus,
@@ -147,8 +152,8 @@ function ProductSearchRow({
   );
 }
 
-function CalculationLineRow({
-  line,
+function CalculationComponentRow({
+  component,
   currency,
   editable,
   isChanging,
@@ -156,15 +161,316 @@ function CalculationLineRow({
   onChangeQuantity,
   onRemove,
 }: {
+  component: CatalogPriceCalculationLineComponent;
+  currency: string;
+  editable: boolean;
+  isChanging: boolean;
+  isRemoving: boolean;
+  onChangeQuantity: (componentLineId: string, quantityPerUnit: number) => void;
+  onRemove: (component: CatalogPriceCalculationLineComponent) => void;
+}) {
+  const [quantityPerUnit, setQuantityPerUnit] = useState(
+    component.quantityPerUnit.toString(),
+  );
+
+  const parsedQuantity = Number(quantityPerUnit);
+
+  return (
+    <tr className="bg-[var(--app-surface)] align-top">
+      <td className="border-l-4 border-l-[var(--app-accent)] px-4 py-4 pl-8">
+        <span className="inline-flex rounded-full border border-[var(--app-accent-border)] bg-[var(--app-accent-soft)] px-2 py-0.5 text-[11px] font-semibold text-[var(--app-accent)]">
+          Комплектующее
+        </span>
+        <p className="mt-2 font-medium text-[var(--app-text)]">
+          {component.name}
+        </p>
+        <p className="mt-1 text-xs text-[var(--app-muted)]">
+          {component.article} · Закрывает: {component.needName}
+        </p>
+      </td>
+
+      <td className="px-4 py-4 text-[var(--app-muted)]">
+        {component.manufacturerName}
+      </td>
+
+      <td className="px-4 py-4">
+        {editable ? (
+          <div className="flex min-w-[190px] items-center gap-2">
+            <AppInput
+              type="number"
+              min="1"
+              max="1000000"
+              step="1"
+              value={quantityPerUnit}
+              disabled={isChanging || isRemoving}
+              onChange={(event) => setQuantityPerUnit(event.target.value)}
+              className="max-w-24"
+            />
+            <AppButton
+              type="button"
+              variant="secondary"
+              size="sm"
+              loading={isChanging}
+              disabled={
+                !Number.isInteger(parsedQuantity) ||
+                parsedQuantity < 1 ||
+                parsedQuantity === component.quantityPerUnit
+              }
+              onClick={() =>
+                onChangeQuantity(component.componentLineId, parsedQuantity)
+              }
+            >
+              Сохранить
+            </AppButton>
+          </div>
+        ) : (
+          <span className="tabular-nums text-[var(--app-text)]">
+            {component.quantityPerUnit} на единицу
+          </span>
+        )}
+        <p className="mt-1 text-xs text-[var(--app-muted)]">
+          Всего: {formatQuantity(component.totalQuantity)}
+        </p>
+      </td>
+
+      <td className="px-4 py-4 text-[var(--app-muted)]">—</td>
+      <td className="px-4 py-4 text-[var(--app-muted)]">—</td>
+      <td className="whitespace-nowrap px-4 py-4 tabular-nums text-[var(--app-text)]">
+        {formatPrice(component.basePriceAmount, currency)}
+      </td>
+      <td className="px-4 py-4 text-[var(--app-muted)]">—</td>
+      <td className="whitespace-nowrap px-4 py-4 tabular-nums text-[var(--app-text)]">
+        {component.discountPercent.toFixed(2)}%
+      </td>
+      <td className="whitespace-nowrap px-4 py-4 tabular-nums text-[var(--app-text)]">
+        {formatPrice(component.projectPriceAmount, currency)}
+      </td>
+      <td className="whitespace-nowrap px-4 py-4 font-semibold tabular-nums text-[var(--app-text)]">
+        {formatPrice(component.totalAmount, currency)}
+      </td>
+
+      {editable && (
+        <td className="px-4 py-4">
+          <AppButton
+            type="button"
+            variant="danger"
+            size="sm"
+            loading={isRemoving}
+            disabled={isChanging}
+            onClick={() => onRemove(component)}
+          >
+            Удалить
+          </AppButton>
+        </td>
+      )}
+    </tr>
+  );
+}
+
+function ComponentPickerRow({
+  line,
+  currency,
+  editable,
+  addingKey,
+  onAdd,
+  onClose,
+}: {
+  line: CatalogPriceCalculationLine;
+  currency: string;
+  editable: boolean;
+  addingKey?: string;
+  onAdd: (
+    needDefinitionId: string,
+    componentProductId: string,
+    quantityPerUnit: number,
+  ) => void;
+  onClose: () => void;
+}) {
+  const [quantities, setQuantities] = useState<Record<string, string>>({});
+  const compatibilityQuery = useQuery({
+    queryKey: ["product-component-compatibility", line.productId],
+    queryFn: () => getProductComponentCompatibility(line.productId),
+  });
+  const columnCount = editable ? 11 : 10;
+
+  return (
+    <tr className="bg-[var(--app-panel)]">
+      <td colSpan={columnCount} className="px-4 py-4">
+        <div className="rounded-2xl border border-[var(--app-accent-border)] bg-[var(--app-accent-soft)] p-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="font-semibold text-[var(--app-text)]">
+                Совместимые комплектующие
+              </h3>
+              <p className="mt-1 text-sm text-[var(--app-muted)]">
+                Количество задаётся на одну единицу основного товара.
+              </p>
+            </div>
+            <AppButton type="button" variant="ghost" size="sm" onClick={onClose}>
+              Закрыть
+            </AppButton>
+          </div>
+
+          {compatibilityQuery.isLoading && (
+            <p className="mt-4 text-sm text-[var(--app-muted)]">
+              Загружаем совместимые позиции...
+            </p>
+          )}
+
+          {compatibilityQuery.isError && (
+            <p className="mt-4 text-sm text-[var(--app-danger)]">
+              {getApiErrorMessage(
+                compatibilityQuery.error,
+                "Не удалось получить совместимые комплектующие.",
+              )}
+            </p>
+          )}
+
+          {compatibilityQuery.data && compatibilityQuery.data.needs.length === 0 && (
+            <p className="mt-4 text-sm text-[var(--app-muted)]">
+              Для этого типа товара потребности в комплектующих не настроены.
+            </p>
+          )}
+
+          <div className="mt-4 grid gap-4">
+            {compatibilityQuery.data?.needs.map((need) => {
+              const availableComponents = need.compatibleComponents.filter(
+                (candidate) =>
+                  !line.components.some(
+                    (component) =>
+                      component.needDefinitionId === need.needDefinitionId &&
+                      component.componentProductId === candidate.productId,
+                  ),
+              );
+
+              return (
+                <section
+                  key={need.needDefinitionId}
+                  className="rounded-xl border border-[var(--app-border)] bg-[var(--app-panel)] p-4"
+                >
+                  <h4 className="font-semibold text-[var(--app-text)]">
+                    {need.name}
+                  </h4>
+
+                  {availableComponents.length === 0 ? (
+                    <p className="mt-2 text-sm text-[var(--app-muted)]">
+                      Подходящих новых комплектующих нет.
+                    </p>
+                  ) : (
+                    <div className="mt-3 grid gap-2">
+                      {availableComponents.map((candidate) => {
+                        const candidateKey = `${need.needDefinitionId}:${candidate.productId}`;
+                        const quantityValue = quantities[candidateKey] ?? "1";
+                        const quantity = Number(quantityValue);
+
+                        return (
+                          <div
+                            key={candidate.productId}
+                            className="flex flex-col gap-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-3 lg:flex-row lg:items-center lg:justify-between"
+                          >
+                            <div className="min-w-0">
+                              <p className="font-medium text-[var(--app-text)]">
+                                {candidate.name}
+                              </p>
+                              <p className="mt-1 text-xs text-[var(--app-muted)]">
+                                {candidate.article} · {formatPrice(
+                                  candidate.priceAmount,
+                                  candidate.priceCurrency || currency,
+                                )}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <AppInput
+                                type="number"
+                                min="1"
+                                max="1000000"
+                                step="1"
+                                value={quantityValue}
+                                aria-label={`Количество ${candidate.name} на единицу товара`}
+                                onChange={(event) =>
+                                  setQuantities((current) => ({
+                                    ...current,
+                                    [candidateKey]: event.target.value,
+                                  }))
+                                }
+                                className="w-24"
+                              />
+                              <AppButton
+                                type="button"
+                                variant="primary"
+                                size="sm"
+                                loading={addingKey === candidateKey}
+                                disabled={!Number.isInteger(quantity) || quantity < 1}
+                                onClick={() =>
+                                  onAdd(
+                                    need.needDefinitionId,
+                                    candidate.productId,
+                                    quantity,
+                                  )
+                                }
+                              >
+                                Добавить
+                              </AppButton>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </section>
+              );
+            })}
+          </div>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+function CalculationLineRow({
+  line,
+  currency,
+  editable,
+  isChanging,
+  isRemoving,
+  changingComponentLineId,
+  removingComponentLineId,
+  addingComponentKey,
+  onChangeQuantity,
+  onRemove,
+  onAddComponent,
+  onChangeComponentQuantity,
+  onRemoveComponent,
+}: {
   line: CatalogPriceCalculationLine;
   currency: string;
   editable: boolean;
   isChanging: boolean;
   isRemoving: boolean;
+  changingComponentLineId?: string;
+  removingComponentLineId?: string;
+  addingComponentKey?: string;
   onChangeQuantity: (lineId: string, quantity: number) => void;
   onRemove: (line: CatalogPriceCalculationLine) => void;
+  onAddComponent: (
+    lineId: string,
+    needDefinitionId: string,
+    componentProductId: string,
+    quantityPerUnit: number,
+  ) => void;
+  onChangeComponentQuantity: (
+    lineId: string,
+    componentLineId: string,
+    quantityPerUnit: number,
+  ) => void;
+  onRemoveComponent: (
+    lineId: string,
+    component: CatalogPriceCalculationLineComponent,
+  ) => void;
 }) {
   const [quantity, setQuantity] = useState(line.quantity.toString());
+  const [showComponentPicker, setShowComponentPicker] = useState(false);
 
   function handleSave(): void {
     const parsedQuantity = Number(quantity.replace(",", "."));
@@ -177,107 +483,159 @@ function CalculationLineRow({
   }
 
   return (
-    <tr className="bg-[var(--app-panel)] align-top">
-      <td className="px-4 py-4">
-        <p className="font-medium text-[var(--app-text)]">{line.name}</p>
+    <>
+      <tr className="bg-[var(--app-panel)] align-top">
+        <td className="px-4 py-4">
+          <span className="inline-flex rounded-full border border-[var(--app-border)] bg-[var(--app-surface)] px-2 py-0.5 text-[11px] font-semibold text-[var(--app-muted)]">
+            Основной товар
+          </span>
+          <p className="mt-2 font-medium text-[var(--app-text)]">{line.name}</p>
+          <p className="mt-1 text-xs text-[var(--app-muted)]">{line.article}</p>
 
-        <p className="mt-1 text-xs text-[var(--app-muted)]">{line.article}</p>
-      </td>
-
-      <td className="px-4 py-4 text-[var(--app-muted)]">
-        {line.manufacturerName}
-      </td>
-
-      <td className="px-4 py-4">
-        {editable ? (
-          <div className="flex min-w-[170px] items-center gap-2">
-            <AppInput
-              type="number"
-              min="0.001"
-              step="0.001"
-              value={quantity}
-              disabled={isChanging || isRemoving}
-              onChange={(event) => setQuantity(event.target.value)}
-              className="max-w-24"
-            />
-
+          {editable && (
             <AppButton
               type="button"
               variant="secondary"
               size="sm"
-              loading={isChanging}
-              disabled={Number(quantity.replace(",", ".")) === line.quantity}
-              onClick={handleSave}
+              className="mt-3"
+              onClick={() => setShowComponentPicker((current) => !current)}
             >
-              Сохранить
+              {showComponentPicker ? "Закрыть подбор" : "Добавить комплектующее"}
             </AppButton>
-          </div>
-        ) : (
-          <span className="tabular-nums text-[var(--app-text)]">
-            {formatQuantity(line.quantity)}
-          </span>
-        )}
-
-        {line.unit && (
-          <p className="mt-1 text-xs text-[var(--app-muted)]">
-            Единица: {line.unit}
-          </p>
-        )}
-      </td>
-
-      <td className="whitespace-nowrap px-4 py-4 tabular-nums text-[var(--app-text)]">
-        {formatQuantity(line.stockQuantity)}
-      </td>
-
-      <td
-        className={`whitespace-nowrap px-4 py-4 font-semibold tabular-nums ${
-          line.shortageQuantity > 0
-            ? "text-[var(--app-danger)]"
-            : "text-[var(--app-success)]"
-        }`}
-      >
-        {line.shortageQuantity > 0
-          ? formatQuantity(line.shortageQuantity)
-          : "Достаточно"}
-      </td>
-
-      <td className="whitespace-nowrap px-4 py-4 tabular-nums text-[var(--app-text)]">
-        {formatPrice(line.basePriceAmount, currency)}
-      </td>
-
-      <td className="whitespace-nowrap px-4 py-4 tabular-nums text-[var(--app-muted)]">
-        {line.mrcPriceAmount === null || line.mrcPriceAmount === undefined
-          ? "—"
-          : formatPrice(line.mrcPriceAmount, currency)}
-      </td>
-
-      <td className="whitespace-nowrap px-4 py-4 tabular-nums text-[var(--app-text)]">
-        {line.discountPercent.toFixed(2)}%
-      </td>
-
-      <td className="whitespace-nowrap px-4 py-4 tabular-nums text-[var(--app-text)]">
-        {formatPrice(line.projectPriceAmount, currency)}
-      </td>
-
-      <td className="whitespace-nowrap px-4 py-4 font-semibold tabular-nums text-[var(--app-text)]">
-        {formatPrice(line.totalAmount, currency)}
-      </td>
-
-      {editable && (
-        <td className="px-4 py-4">
-          <AppButton
-            type="button"
-            variant="danger"
-            size="sm"
-            loading={isRemoving}
-            disabled={isChanging}
-            onClick={() => onRemove(line)}
-          >
-            Удалить
-          </AppButton>
+          )}
         </td>
+
+        <td className="px-4 py-4 text-[var(--app-muted)]">
+          {line.manufacturerName}
+        </td>
+
+        <td className="px-4 py-4">
+          {editable ? (
+            <div className="flex min-w-[170px] items-center gap-2">
+              <AppInput
+                type="number"
+                min="0.001"
+                step="0.001"
+                value={quantity}
+                disabled={isChanging || isRemoving}
+                onChange={(event) => setQuantity(event.target.value)}
+                className="max-w-24"
+              />
+              <AppButton
+                type="button"
+                variant="secondary"
+                size="sm"
+                loading={isChanging}
+                disabled={Number(quantity.replace(",", ".")) === line.quantity}
+                onClick={handleSave}
+              >
+                Сохранить
+              </AppButton>
+            </div>
+          ) : (
+            <span className="tabular-nums text-[var(--app-text)]">
+              {formatQuantity(line.quantity)}
+            </span>
+          )}
+          {line.unit && (
+            <p className="mt-1 text-xs text-[var(--app-muted)]">
+              Единица: {line.unit}
+            </p>
+          )}
+        </td>
+
+        <td className="whitespace-nowrap px-4 py-4 tabular-nums text-[var(--app-text)]">
+          {formatQuantity(line.stockQuantity)}
+        </td>
+        <td
+          className={`whitespace-nowrap px-4 py-4 font-semibold tabular-nums ${
+            line.shortageQuantity > 0
+              ? "text-[var(--app-danger)]"
+              : "text-[var(--app-success)]"
+          }`}
+        >
+          {line.shortageQuantity > 0
+            ? formatQuantity(line.shortageQuantity)
+            : "Достаточно"}
+        </td>
+        <td className="whitespace-nowrap px-4 py-4 tabular-nums text-[var(--app-text)]">
+          {formatPrice(line.basePriceAmount, currency)}
+        </td>
+        <td className="whitespace-nowrap px-4 py-4 tabular-nums text-[var(--app-muted)]">
+          {line.mrcPriceAmount === null || line.mrcPriceAmount === undefined
+            ? "—"
+            : formatPrice(line.mrcPriceAmount, currency)}
+        </td>
+        <td className="whitespace-nowrap px-4 py-4 tabular-nums text-[var(--app-text)]">
+          {line.discountPercent.toFixed(2)}%
+        </td>
+        <td className="whitespace-nowrap px-4 py-4 tabular-nums text-[var(--app-text)]">
+          {formatPrice(line.projectPriceAmount, currency)}
+        </td>
+        <td className="whitespace-nowrap px-4 py-4 font-semibold tabular-nums text-[var(--app-text)]">
+          {formatPrice(line.totalAmount, currency)}
+          {line.componentsTotalAmount > 0 && (
+            <p className="mt-1 text-xs font-normal text-[var(--app-muted)]">
+              Товар: {formatPrice(line.productTotalAmount, currency)} · Комплектующие: {formatPrice(line.componentsTotalAmount, currency)}
+            </p>
+          )}
+        </td>
+
+        {editable && (
+          <td className="px-4 py-4">
+            <AppButton
+              type="button"
+              variant="danger"
+              size="sm"
+              loading={isRemoving}
+              disabled={isChanging}
+              onClick={() => onRemove(line)}
+            >
+              Удалить
+            </AppButton>
+          </td>
+        )}
+      </tr>
+
+      {line.components.map((component) => (
+        <CalculationComponentRow
+          key={`${component.componentLineId}-${component.quantityPerUnit}`}
+          component={component}
+          currency={currency}
+          editable={editable}
+          isChanging={changingComponentLineId === component.componentLineId}
+          isRemoving={removingComponentLineId === component.componentLineId}
+          onChangeQuantity={(componentLineId, quantityPerUnit) =>
+            onChangeComponentQuantity(
+              line.lineId,
+              componentLineId,
+              quantityPerUnit,
+            )
+          }
+          onRemove={(selectedComponent) =>
+            onRemoveComponent(line.lineId, selectedComponent)
+          }
+        />
+      ))}
+
+      {showComponentPicker && (
+        <ComponentPickerRow
+          line={line}
+          currency={currency}
+          editable={editable}
+          addingKey={addingComponentKey}
+          onAdd={(needDefinitionId, componentProductId, quantityPerUnit) =>
+            onAddComponent(
+              line.lineId,
+              needDefinitionId,
+              componentProductId,
+              quantityPerUnit,
+            )
+          }
+          onClose={() => setShowComponentPicker(false)}
+        />
       )}
-    </tr>
+    </>
   );
 }
 
@@ -628,6 +986,21 @@ export default function CatalogPriceCalculationPage() {
     onSuccess: refreshCalculation,
   });
 
+  const addComponentMutation = useMutation({
+    mutationFn: addCatalogPriceCalculationLineComponent,
+    onSuccess: refreshCalculation,
+  });
+
+  const componentQuantityMutation = useMutation({
+    mutationFn: changeCatalogPriceCalculationLineComponentQuantity,
+    onSuccess: refreshCalculation,
+  });
+
+  const removeComponentMutation = useMutation({
+    mutationFn: removeCatalogPriceCalculationLineComponent,
+    onSuccess: refreshCalculation,
+  });
+
   const setDiscountMutation = useMutation({
     mutationFn: setCatalogPriceCalculationManufacturerDiscount,
     onSuccess: refreshCalculation,
@@ -677,6 +1050,10 @@ export default function CatalogPriceCalculationPage() {
 
     for (const line of calculation?.lines ?? []) {
       result.set(line.manufacturerId, line.manufacturerName);
+
+      for (const component of line.components) {
+        result.set(component.manufacturerId, component.manufacturerName);
+      }
     }
 
     return Array.from(result, ([manufacturerId, manufacturerName]) => ({
@@ -689,6 +1066,9 @@ export default function CatalogPriceCalculationPage() {
     addLineMutation.error ??
     quantityMutation.error ??
     removeLineMutation.error ??
+    addComponentMutation.error ??
+    componentQuantityMutation.error ??
+    removeComponentMutation.error ??
     setDiscountMutation.error ??
     removeDiscountMutation.error ??
     completeMutation.error ??
@@ -776,6 +1156,53 @@ export default function CatalogPriceCalculationPage() {
     removeLineMutation.mutate({
       calculationId,
       lineId: line.lineId,
+    });
+  }
+
+  function handleAddComponent(
+    lineId: string,
+    needDefinitionId: string,
+    componentProductId: string,
+    quantityPerUnit: number,
+  ): void {
+    addComponentMutation.mutate({
+      calculationId,
+      lineId,
+      needDefinitionId,
+      componentProductId,
+      quantityPerUnit,
+    });
+  }
+
+  function handleChangeComponentQuantity(
+    lineId: string,
+    componentLineId: string,
+    quantityPerUnit: number,
+  ): void {
+    componentQuantityMutation.mutate({
+      calculationId,
+      lineId,
+      componentLineId,
+      quantityPerUnit,
+    });
+  }
+
+  function handleRemoveComponent(
+    lineId: string,
+    component: CatalogPriceCalculationLineComponent,
+  ): void {
+    const confirmed = window.confirm(
+      `Удалить комплектующее «${component.name}» из расчёта?`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    removeComponentMutation.mutate({
+      calculationId,
+      lineId,
+      componentLineId: component.componentLineId,
     });
   }
 
@@ -1404,8 +1831,31 @@ export default function CatalogPriceCalculationPage() {
                       removeLineMutation.isPending &&
                       removeLineMutation.variables?.lineId === line.lineId
                     }
+                    changingComponentLineId={
+                      componentQuantityMutation.isPending &&
+                      componentQuantityMutation.variables?.lineId === line.lineId
+                        ? componentQuantityMutation.variables.componentLineId
+                        : undefined
+                    }
+                    removingComponentLineId={
+                      removeComponentMutation.isPending &&
+                      removeComponentMutation.variables?.lineId === line.lineId
+                        ? removeComponentMutation.variables.componentLineId
+                        : undefined
+                    }
+                    addingComponentKey={
+                      addComponentMutation.isPending &&
+                      addComponentMutation.variables?.lineId === line.lineId
+                        ? `${addComponentMutation.variables.needDefinitionId}:${addComponentMutation.variables.componentProductId}`
+                        : undefined
+                    }
                     onChangeQuantity={handleChangeQuantity}
                     onRemove={handleRemoveLine}
+                    onAddComponent={handleAddComponent}
+                    onChangeComponentQuantity={
+                      handleChangeComponentQuantity
+                    }
+                    onRemoveComponent={handleRemoveComponent}
                   />
                 ))}
               </tbody>

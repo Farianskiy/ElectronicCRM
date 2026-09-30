@@ -72,6 +72,20 @@ public sealed class UserTests
         Assert.Equal("general.value_is_invalid", result.Error.Code);
     }
 
+    [Fact]
+    public void AdministratorCanCreateAnalyzeAndSubmitCatalogImport()
+    {
+        var result = ElectronicService.Domain.Users.User.CreateAdministrator(
+            "Администратор",
+            "administrator@example.com",
+            "password-hash");
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value.CanCreateCatalogImport());
+        Assert.True(result.Value.CanEditCatalogImport());
+        Assert.True(result.Value.CanSubmitCatalogImportForReview());
+    }
+
     // Проверяет повышение обычного пользователя до технического.
     [Fact]
     public void MakeTechnicalChangesRoleAndEmail()

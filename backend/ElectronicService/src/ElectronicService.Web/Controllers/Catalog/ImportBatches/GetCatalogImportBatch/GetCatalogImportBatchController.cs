@@ -61,6 +61,7 @@ public sealed class
             value.BatchId,
             value.CreatedByUserId,
             value.ProductTypeId,
+            value.ImportMode.ToString(),
             value.OriginalFileName,
             value.FileSizeBytes,
             value.Status.ToString(),

@@ -29,6 +29,7 @@ public sealed class CreateCatalogImportBatchController : ControllerBase
     [ProducesResponseType(StatusCodes.Status415UnsupportedMediaType)]
     public async Task<ActionResult<CreateCatalogImportBatchResponse>> Create(
             [FromForm] IFormFile? file,
+            [FromForm] string? importMode,
             [FromServices]
             CreateCatalogImportBatchCommandHandler
             handler,
@@ -43,6 +44,15 @@ public sealed class CreateCatalogImportBatchController : ControllerBase
                     "Excel-файл не передан.",
                 detail:
                     "Добавьте файл в поле 'file'.");
+        }
+
+        if (!Enum.TryParse<CatalogImportMode>(importMode, ignoreCase: true, out var parsedImportMode)
+            || parsedImportMode is not CatalogImportMode.CreateOnly
+                and not CatalogImportMode.UpdateCharacteristicsOnly)
+        {
+            return this.ToCatalogImportProblem(
+                CatalogImportErrors.InvalidImportMode(importMode),
+                ProblemTitle);
         }
 
         if (!User.TryGetUserId(out var currentUserId))
@@ -78,7 +88,8 @@ public sealed class CreateCatalogImportBatchController : ControllerBase
                 currentUserId,
                 fileStream,
                 file.FileName,
-                contentType);
+                contentType,
+                parsedImportMode);
 
         var result = await handler
             .Handle(
@@ -94,7 +105,8 @@ public sealed class CreateCatalogImportBatchController : ControllerBase
         var response =
             new CreateCatalogImportBatchResponse(
                 result.Value.BatchId,
-                result.Value.Status.ToString());
+                result.Value.Status.ToString(),
+                result.Value.ImportMode.ToString());
 
         return Created(
             new Uri(

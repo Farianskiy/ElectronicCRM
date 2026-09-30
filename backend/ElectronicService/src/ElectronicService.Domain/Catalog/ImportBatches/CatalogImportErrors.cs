@@ -4,6 +4,13 @@ namespace ElectronicService.Domain.Catalog.ImportBatches;
 
 public static class CatalogImportErrors
 {
+    public static DomainError InvalidImportMode(string? importMode)
+    {
+        return new DomainError(
+            "catalog.import.invalid_mode",
+            $"Режим импорта '{importMode}' не поддерживается.");
+    }
+
     public static DomainError UnsupportedFileExtension(
         string extension)
     {
@@ -413,6 +420,36 @@ public static class CatalogImportErrors
             "catalog.import.apply.article_already_exists",
             $"Товар с артикулом '{article}' уже существует. " +
             $"Конфликт обнаружен в строке Excel '{rowNumber}'.");
+    }
+
+    public static DomainError ProductArticleNotFoundForUpdate(
+        string article,
+        int rowNumber)
+    {
+        return new DomainError(
+            "catalog.import.apply.article_not_found_for_update",
+            $"Товар с артикулом '{article}' не найден. " +
+            $"Строка Excel '{rowNumber}' не может быть применена в режиме обновления характеристик.");
+    }
+
+    public static DomainError ExistingProductTypeMismatch(
+        string article,
+        int rowNumber)
+    {
+        return new DomainError(
+            "catalog.import.apply.existing_product_type_mismatch",
+            $"Тип существующего товара с артикулом '{article}' не совпадает " +
+            $"с типом в строке Excel '{rowNumber}'.");
+    }
+
+    public static DomainError ExistingProductManufacturerMismatch(
+        string article,
+        int rowNumber)
+    {
+        return new DomainError(
+            "catalog.import.apply.existing_product_manufacturer_mismatch",
+            $"Производитель существующего товара с артикулом '{article}' не совпадает " +
+            $"с производителем в строке Excel '{rowNumber}'.");
     }
 
     public static DomainError CharacteristicDefinitionNotFound(

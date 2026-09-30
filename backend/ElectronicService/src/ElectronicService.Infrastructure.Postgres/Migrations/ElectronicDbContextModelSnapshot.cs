@@ -122,6 +122,178 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         });
                 });
 
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Components.ComponentCompatibilityConstraint", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CharacteristicDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("characteristic_definition_id");
+
+                    b.Property<Guid>("ComponentOfferId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("component_offer_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CharacteristicDefinitionId");
+
+                    b.HasIndex("ComponentOfferId");
+
+                    b.ToTable("component_compatibility_constraints", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_component_constraints_data_type_not_none", "\"expected_data_type\" <> 'None'");
+
+                            t.HasCheckConstraint("ck_component_constraints_only_one_value_type", "(\n    \"expected_data_type\" = 'Text'\n    AND \"expected_text\" IS NOT NULL\n    AND \"expected_number\" IS NULL\n    AND \"expected_boolean\" IS NULL\n)\nOR\n(\n    \"expected_data_type\" = 'Number'\n    AND \"expected_text\" IS NULL\n    AND \"expected_number\" IS NOT NULL\n    AND \"expected_boolean\" IS NULL\n)\nOR\n(\n    \"expected_data_type\" = 'Boolean'\n    AND \"expected_text\" IS NULL\n    AND \"expected_number\" IS NULL\n    AND \"expected_boolean\" IS NOT NULL\n)");
+                        });
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Components.ComponentNeedDefinition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("code");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("MainProductTypeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("main_product_type_id");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MainProductTypeId", "Code")
+                        .IsUnique();
+
+                    b.ToTable("component_need_definitions", (string)null);
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Components.ComponentOffer", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ComponentProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("component_product_id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("NeedDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("need_definition_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NeedDefinitionId");
+
+                    b.HasIndex("ComponentProductId", "NeedDefinitionId")
+                        .IsUnique();
+
+                    b.ToTable("component_offers", (string)null);
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Components.ProductComponentNeedState", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("NeedDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("need_definition_id");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NeedDefinitionId");
+
+                    b.HasIndex("ProductId", "NeedDefinitionId")
+                        .IsUnique();
+
+                    b.ToTable("product_component_need_states", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_product_component_need_status", "\"status\" IN ('Unknown', 'Missing', 'Included', 'NotApplicable')");
+                        });
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Components.ProductSelectedComponent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ComponentProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("component_product_id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("MainProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("main_product_id");
+
+                    b.Property<Guid>("NeedDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("need_definition_id");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ComponentProductId");
+
+                    b.HasIndex("NeedDefinitionId");
+
+                    b.HasIndex("MainProductId", "NeedDefinitionId", "ComponentProductId")
+                        .IsUnique();
+
+                    b.ToTable("product_selected_components", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_product_selected_components_quantity", "\"quantity\" >= 1 AND \"quantity\" <= 1000000");
+                        });
+                });
+
             modelBuilder.Entity("ElectronicService.Domain.Catalog.Dictionaries.CatalogAssistantDictionarySuggestion", b =>
                 {
                     b.Property<Guid>("Id")
@@ -589,6 +761,12 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("file_size_bytes");
 
+                    b.Property<string>("ImportMode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("import_mode");
+
                     b.Property<string>("OriginalFileName")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -679,6 +857,8 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                             t.HasCheckConstraint("ck_catalog_import_batches_file_sha256", "char_length(\"file_sha256\") = 64");
 
                             t.HasCheckConstraint("ck_catalog_import_batches_file_size", "\"file_size_bytes\" > 0 AND \"file_size_bytes\" <= 10485760");
+
+                            t.HasCheckConstraint("ck_catalog_import_batches_import_mode_not_none", "\"import_mode\" <> 'None'");
 
                             t.HasCheckConstraint("ck_catalog_import_batches_rows_count", "\"rows_count\" >= 0");
 
@@ -1250,6 +1430,123 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         });
                 });
 
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.PriceCalculations.CatalogPriceCalculationLineComponent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Article")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("article");
+
+                    b.Property<decimal>("BasePriceAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("base_price_amount");
+
+                    b.Property<Guid>("CalculationLineId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("calculation_line_id");
+
+                    b.Property<Guid>("ComponentProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("component_product_id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<decimal>("DiscountPercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("discount_percent");
+
+                    b.Property<Guid>("ManufacturerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("manufacturer_id");
+
+                    b.Property<string>("ManufacturerName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("manufacturer_name");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("NeedDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("need_definition_id");
+
+                    b.Property<string>("NeedName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("need_name");
+
+                    b.Property<decimal>("ProjectPriceAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("project_price_amount");
+
+                    b.Property<int>("QuantityPerUnit")
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity_per_unit");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasPrecision(22, 2)
+                        .HasColumnType("numeric(22,2)")
+                        .HasColumnName("total_amount");
+
+                    b.Property<decimal>("TotalQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("total_quantity");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CalculationLineId")
+                        .HasDatabaseName("ix_catalog_price_calculation_line_components_line");
+
+                    b.HasIndex("ComponentProductId")
+                        .HasDatabaseName("ix_catalog_price_calculation_line_components_product");
+
+                    b.HasIndex("ManufacturerId")
+                        .HasDatabaseName("ix_catalog_price_calculation_line_components_manufacturer");
+
+                    b.HasIndex("NeedDefinitionId")
+                        .HasDatabaseName("ix_catalog_price_calculation_line_components_need");
+
+                    b.HasIndex("CalculationLineId", "NeedDefinitionId", "ComponentProductId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_catalog_price_calculation_line_components_line_need_product");
+
+                    b.ToTable("catalog_price_calculation_line_components", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_catalog_price_calculation_line_components_base_price", "\"base_price_amount\" >= 0 AND \"base_price_amount\" <= 1000000000000");
+
+                            t.HasCheckConstraint("ck_catalog_price_calculation_line_components_discount", "\"discount_percent\" >= 0 AND \"discount_percent\" <= 100");
+
+                            t.HasCheckConstraint("ck_catalog_price_calculation_line_components_project_price", "\"project_price_amount\" >= 0 AND \"project_price_amount\" <= \"base_price_amount\"");
+
+                            t.HasCheckConstraint("ck_catalog_price_calculation_line_components_quantity", "\"quantity_per_unit\" >= 1 AND \"quantity_per_unit\" <= 1000000");
+
+                            t.HasCheckConstraint("ck_catalog_price_calculation_line_components_total", "\"total_amount\" >= 0");
+
+                            t.HasCheckConstraint("ck_catalog_price_calculation_line_components_total_quantity", "\"total_quantity\" > 0");
+                        });
+                });
+
             modelBuilder.Entity("ElectronicService.Domain.Catalog.PriceCalculations.CatalogPriceCalculationManufacturerDiscount", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1610,6 +1907,14 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("code");
 
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("MainProduct")
+                        .HasColumnName("kind");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -1623,7 +1928,10 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
 
                     b.HasIndex("Name");
 
-                    b.ToTable("product_types", (string)null);
+                    b.ToTable("product_types", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_product_types_kind", "\"kind\" IN ('MainProduct', 'Component')");
+                        });
                 });
 
             modelBuilder.Entity("ElectronicService.Domain.Catalog.ProductTypes.ProductTypeCharacteristic", b =>
@@ -3023,6 +3331,117 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                     b.ToTable("user_permission_overrides", (string)null);
                 });
 
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Components.ComponentCompatibilityConstraint", b =>
+                {
+                    b.HasOne("ElectronicService.Domain.Catalog.Characteristics.CharacteristicDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("CharacteristicDefinitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ElectronicService.Domain.Catalog.Components.ComponentOffer", null)
+                        .WithMany("Constraints")
+                        .HasForeignKey("ComponentOfferId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.OwnsOne("ElectronicService.Domain.Catalog.ValueObjects.CharacteristicValue", "ExpectedValue", b1 =>
+                        {
+                            b1.Property<Guid>("ComponentCompatibilityConstraintId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<bool?>("BooleanValue")
+                                .HasColumnType("boolean")
+                                .HasColumnName("expected_boolean");
+
+                            b1.Property<string>("DataType")
+                                .IsRequired()
+                                .HasMaxLength(32)
+                                .HasColumnType("character varying(32)")
+                                .HasColumnName("expected_data_type");
+
+                            b1.Property<decimal?>("NumberValue")
+                                .HasPrecision(18, 4)
+                                .HasColumnType("numeric(18,4)")
+                                .HasColumnName("expected_number");
+
+                            b1.Property<string>("TextValue")
+                                .HasMaxLength(1000)
+                                .HasColumnType("character varying(1000)")
+                                .HasColumnName("expected_text");
+
+                            b1.HasKey("ComponentCompatibilityConstraintId");
+
+                            b1.ToTable("component_compatibility_constraints");
+
+                            b1.WithOwner()
+                                .HasForeignKey("ComponentCompatibilityConstraintId");
+                        });
+
+                    b.Navigation("ExpectedValue")
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Components.ComponentNeedDefinition", b =>
+                {
+                    b.HasOne("ElectronicService.Domain.Catalog.ProductTypes.ProductType", null)
+                        .WithMany()
+                        .HasForeignKey("MainProductTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Components.ComponentOffer", b =>
+                {
+                    b.HasOne("ElectronicService.Domain.Catalog.Products.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ComponentProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ElectronicService.Domain.Catalog.Components.ComponentNeedDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("NeedDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Components.ProductComponentNeedState", b =>
+                {
+                    b.HasOne("ElectronicService.Domain.Catalog.Components.ComponentNeedDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("NeedDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ElectronicService.Domain.Catalog.Products.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Components.ProductSelectedComponent", b =>
+                {
+                    b.HasOne("ElectronicService.Domain.Catalog.Products.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ComponentProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ElectronicService.Domain.Catalog.Products.Product", null)
+                        .WithMany()
+                        .HasForeignKey("MainProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ElectronicService.Domain.Catalog.Components.ComponentNeedDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("NeedDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("ElectronicService.Domain.Catalog.Dictionaries.CatalogAssistantDictionarySuggestion", b =>
                 {
                     b.HasOne("ElectronicService.Domain.Catalog.Characteristics.CharacteristicDefinition", null)
@@ -3251,6 +3670,33 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                     b.HasOne("ElectronicService.Domain.Catalog.Products.Product", null)
                         .WithMany()
                         .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.PriceCalculations.CatalogPriceCalculationLineComponent", b =>
+                {
+                    b.HasOne("ElectronicService.Domain.Catalog.PriceCalculations.CatalogPriceCalculationLine", null)
+                        .WithMany("Components")
+                        .HasForeignKey("CalculationLineId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ElectronicService.Domain.Catalog.Products.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ComponentProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ElectronicService.Domain.Catalog.Manufacturers.Manufacturer", null)
+                        .WithMany()
+                        .HasForeignKey("ManufacturerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ElectronicService.Domain.Catalog.Components.ComponentNeedDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("NeedDefinitionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -3730,6 +4176,11 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Components.ComponentOffer", b =>
+                {
+                    b.Navigation("Constraints");
+                });
+
             modelBuilder.Entity("ElectronicService.Domain.Catalog.ImportBatches.CatalogImportBatch", b =>
                 {
                     b.Navigation("File")
@@ -3741,6 +4192,11 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                     b.Navigation("Lines");
 
                     b.Navigation("ManufacturerDiscounts");
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.PriceCalculations.CatalogPriceCalculationLine", b =>
+                {
+                    b.Navigation("Components");
                 });
 
             modelBuilder.Entity("ElectronicService.Domain.Catalog.PriceLists.CatalogPriceList", b =>

@@ -34,6 +34,15 @@ public sealed class ProductAuditRecorder
             cancellationToken);
     }
 
+    public Task<Result<
+        IReadOnlyDictionary<Guid, ProductAuditSnapshot>,
+        DomainError>> CaptureManyAsync(
+            IReadOnlyCollection<Product> products,
+            CancellationToken cancellationToken = default)
+    {
+        return _snapshotBuilder.BuildManyAsync(products, cancellationToken);
+    }
+
     public async Task<Result<
         ProductAuditRecordOutcome,
         DomainError>> RecordManualChangeAsync(
@@ -81,18 +90,39 @@ public sealed class ProductAuditRecorder
                     afterSnapshotResult.Error);
         }
 
-        var afterSnapshot =
-            afterSnapshotResult.Value;
+        return RecordPreparedManualChange(
+            product,
+            changedByUserId,
+            operation,
+            beforeSnapshot,
+            afterSnapshotResult.Value);
+    }
 
-        /*
-         * Не создаём audit entry и не вызываем
-         * SaveChanges для операции, которая
-         * ничего не изменила.
-         */
-        if (!ProductAuditSnapshotComparer
-                .HasMeaningfulChanges(
-                    beforeSnapshot,
-                    afterSnapshot))
+    public Result<ProductAuditRecordOutcome, DomainError> RecordPreparedManualChange(
+        Product product,
+        Guid changedByUserId,
+        ProductAuditOperation operation,
+        ProductAuditSnapshot beforeSnapshot,
+        ProductAuditSnapshot afterSnapshot)
+    {
+        ArgumentNullException.ThrowIfNull(product);
+        ArgumentNullException.ThrowIfNull(beforeSnapshot);
+        ArgumentNullException.ThrowIfNull(afterSnapshot);
+
+        if (changedByUserId == Guid.Empty)
+        {
+            return CatalogErrors.CurrentUserIsRequired();
+        }
+
+        if (beforeSnapshot.ProductId != product.Id
+            || afterSnapshot.ProductId != product.Id)
+        {
+            return GeneralErrors.ValueIsInvalid(nameof(beforeSnapshot));
+        }
+
+        if (!ProductAuditSnapshotComparer.HasMeaningfulChanges(
+                beforeSnapshot,
+                afterSnapshot))
         {
             return Result.Success<
                 ProductAuditRecordOutcome,
@@ -105,9 +135,7 @@ public sealed class ProductAuditRecorder
             ProductAuditSnapshotSerializer
                 .Serialize(beforeSnapshot);
 
-        var afterJson =
-            ProductAuditSnapshotSerializer
-                .Serialize(afterSnapshot);
+        var afterJson = ProductAuditSnapshotSerializer.Serialize(afterSnapshot);
 
         var auditEntryResult =
             ProductAuditEntry.Create(

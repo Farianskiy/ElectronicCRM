@@ -256,6 +256,12 @@ export default function CatalogImportReviewsPage() {
                         <p className="mt-1 break-all text-xs text-slate-600">
                           {item.batchId}
                         </p>
+
+                        <p className="mt-1 text-xs font-medium text-teal-300">
+                          {item.importMode === "CreateOnly"
+                            ? "Добавление новых"
+                            : "Обновление характеристик"}
+                        </p>
                       </td>
 
                       <td className="px-4 py-4">
