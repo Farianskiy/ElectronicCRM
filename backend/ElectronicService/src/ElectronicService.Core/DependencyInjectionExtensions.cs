@@ -65,6 +65,7 @@ using ElectronicService.Core.Catalog.PriceCalculations.UpdateCatalogPriceCalcula
 using ElectronicService.Core.Catalog.PriceLists.ActivateCatalogPriceList;
 using ElectronicService.Core.Catalog.PriceLists.ApplyCatalogPriceListIssueGroup;
 using ElectronicService.Core.Catalog.PriceLists.BulkUpdateCatalogPriceListRows;
+using ElectronicService.Core.Catalog.PriceLists.ExcludeCatalogPriceListUnmatchedRows;
 using ElectronicService.Core.Catalog.PriceLists.GetCatalogPriceList;
 using ElectronicService.Core.Catalog.PriceLists.GetCatalogPriceListIssueGroups;
 using ElectronicService.Core.Catalog.PriceLists.GetCatalogPriceListRows;
@@ -230,6 +231,7 @@ public static class DependencyInjectionExtensions
         services.AddScoped<UpdateCatalogPriceListRowCommandHandler>();
         services.AddScoped<BulkUpdateCatalogPriceListRowsCommandHandler>();
         services.AddScoped<ApplyCatalogPriceListIssueGroupCommandHandler>();
+        services.AddScoped<ExcludeCatalogPriceListUnmatchedRowsCommandHandler>();
         services.AddScoped<AnalyzeCatalogImportBatchCommandHandler>();
         services.AddScoped<GetCatalogImportBatchQueryHandler>();
         services.AddScoped<GetCatalogImportRowsQueryHandler>();

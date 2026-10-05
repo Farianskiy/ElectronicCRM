@@ -491,6 +491,92 @@ public sealed class CatalogPriceListRepository
         }
     }
 
+    public async Task<Result<int, DomainError>>
+        ExcludeProductNotFoundRowsAndRefreshStatisticsAsync(
+            CatalogPriceList priceList,
+            CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(priceList);
+
+        await using var transaction =
+            await _dbContext.Database
+                .BeginTransactionAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+        try
+        {
+            var excludedRowsCount =
+                await _dbContext.CatalogPriceListRows
+                    .Where(row =>
+                        row.PriceListId == priceList.Id
+                        && row.MatchStatus
+                            == CatalogPriceListRowMatchStatus.ProductNotFound)
+                    .ExecuteDeleteAsync(cancellationToken)
+                    .ConfigureAwait(false);
+
+            var rowsCount =
+                await _dbContext.CatalogPriceListRows
+                    .CountAsync(
+                        row => row.PriceListId == priceList.Id,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+            var validRowsCount =
+                await _dbContext.CatalogPriceListRows
+                    .CountAsync(
+                        row =>
+                            row.PriceListId == priceList.Id
+                            && row.Status == CatalogPriceListRowStatus.Valid,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+            var statisticsResult =
+                priceList.RefreshRowsStatistics(
+                    rowsCount,
+                    validRowsCount,
+                    rowsCount - validRowsCount);
+
+            if (statisticsResult.IsFailure)
+            {
+                await transaction
+                    .RollbackAsync(cancellationToken)
+                    .ConfigureAwait(false);
+
+                return Result.Failure<int, DomainError>(
+                    statisticsResult.Error);
+            }
+
+            await _dbContext
+                .SaveChangesAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            await transaction
+                .CommitAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            return Result.Success<int, DomainError>(
+                excludedRowsCount);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            await transaction
+                .RollbackAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            return Result.Failure<int, DomainError>(
+                CatalogPriceListErrors.RowUpdateFailed());
+        }
+        catch (DbUpdateException)
+        {
+            await transaction
+                .RollbackAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            return Result.Failure<int, DomainError>(
+                CatalogPriceListErrors.RowUpdateFailed());
+        }
+    }
+
     private sealed record CatalogPriceListIssueGroupRowDbResult(
     Guid RowId,
     string IssueCode,

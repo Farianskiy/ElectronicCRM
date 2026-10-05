@@ -7,6 +7,7 @@ import { useState, type FormEvent } from "react";
 import {
   activateCatalogPriceList,
   bulkUpdateCatalogPriceListRows,
+  excludeCatalogPriceListUnmatchedRows,
   getCatalogPriceList,
   getCatalogPriceListRows,
   processCatalogPriceList,
@@ -27,6 +28,7 @@ import {
   type CatalogPriceListRowMatchStatus,
   type CatalogPriceListRowStatus,
   type CatalogPriceListStatus,
+  type ExcludeCatalogPriceListUnmatchedRowsResponse,
   type UpdateCatalogPriceListRowRequest,
 } from "@/features/catalogPriceLists/model/types";
 import { CatalogPriceListIssueGroupsPanel } from "@/features/catalogPriceLists/ui/CatalogPriceListIssueGroupsPanel";
@@ -386,6 +388,8 @@ export default function CatalogPriceListDetailsPage() {
   const [bulkEditorOpen, setBulkEditorOpen] = useState(false);
   const [activeSelectionGroup, setActiveSelectionGroup] =
     useState<CatalogPriceListRowSelectionGroup | null>(null);
+  const [exclusionResult, setExclusionResult] =
+    useState<ExcludeCatalogPriceListUnmatchedRowsResponse | null>(null);
 
   const priceListQuery = useQuery({
     queryKey: catalogPriceListQueryKeys.details(priceListId),
@@ -429,6 +433,9 @@ export default function CatalogPriceListDetailsPage() {
         queryKey: catalogPriceListQueryKeys.rowsRoot(priceListId),
       }),
       queryClient.invalidateQueries({
+        queryKey: catalogPriceListQueryKeys.issueGroupsRoot(priceListId),
+      }),
+      queryClient.invalidateQueries({
         queryKey: catalogPriceListQueryKeys.versionsRoot,
       }),
     ]);
@@ -468,6 +475,15 @@ export default function CatalogPriceListDetailsPage() {
   const activateMutation = useMutation({
     mutationFn: activateCatalogPriceList,
     onSuccess: refreshPriceList,
+  });
+
+  const excludeUnmatchedRowsMutation = useMutation({
+    mutationFn: excludeCatalogPriceListUnmatchedRows,
+    onSuccess: async (result) => {
+      setExclusionResult(result);
+      clearRowEditingContext();
+      await refreshPriceList();
+    },
   });
 
   const updateRowMutation = useMutation({
@@ -532,6 +548,11 @@ export default function CatalogPriceListDetailsPage() {
 
   const canEdit =
     priceList?.status === "NeedsCorrection" || priceList?.status === "Ready";
+
+  const canExcludeUnmatchedRows =
+    priceList?.status === "NeedsCorrection" &&
+    priceList.validRowsCount > 0 &&
+    priceList.errorRowsCount > 0;
 
   function clearRowEditingContext(): void {
     setSelectedRowIds(new Set<string>());
@@ -670,6 +691,17 @@ export default function CatalogPriceListDetailsPage() {
     }
   }
 
+  function handleExcludeUnmatchedRows(): void {
+    const confirmed = window.confirm(
+      "Исключить из этой версии все строки, для которых товар не найден в каталоге? Строки с найденными артикулами и их цены останутся. Отменить это действие можно повторной обработкой исходного файла.",
+    );
+
+    if (confirmed) {
+      setExclusionResult(null);
+      excludeUnmatchedRowsMutation.mutate(priceListId);
+    }
+  }
+
   if (priceListQuery.isLoading) {
     return (
       <div
@@ -731,6 +763,20 @@ export default function CatalogPriceListDetailsPage() {
             </AppButton>
           )}
 
+          {canExcludeUnmatchedRows && (
+            <AppButton
+              type="button"
+              variant="secondary"
+              loading={excludeUnmatchedRowsMutation.isPending}
+              disabled={
+                processMutation.isPending || activateMutation.isPending
+              }
+              onClick={handleExcludeUnmatchedRows}
+            >
+              Исключить ненайденные
+            </AppButton>
+          )}
+
           {canActivate && (
             <AppButton
               type="button"
@@ -745,15 +791,30 @@ export default function CatalogPriceListDetailsPage() {
         </>
       }
     >
-      {(processMutation.isError || activateMutation.isError) && (
+      {(processMutation.isError ||
+        activateMutation.isError ||
+        excludeUnmatchedRowsMutation.isError) && (
         <section
           role="alert"
           className="rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-4 text-sm text-[var(--app-danger)]"
         >
           {getApiErrorMessage(
-            processMutation.error ?? activateMutation.error,
+            processMutation.error ??
+              activateMutation.error ??
+              excludeUnmatchedRowsMutation.error,
             "Не удалось выполнить действие с прайс-листом.",
           )}
+        </section>
+      )}
+
+      {exclusionResult && (
+        <section
+          role="status"
+          className="rounded-2xl border border-[var(--app-success-border)] bg-[var(--app-success-soft)] p-4 text-sm text-[var(--app-success)]"
+        >
+          Ненайденные позиции исключены: {exclusionResult.excludedRowsCount}.
+          В прайсе осталось {exclusionResult.rowsCount} строк; ошибок: {" "}
+          {exclusionResult.errorRowsCount}.
         </section>
       )}
 

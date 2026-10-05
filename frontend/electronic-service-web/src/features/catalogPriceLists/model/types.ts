@@ -257,3 +257,12 @@ export interface ApplyCatalogPriceListIssueGroupResponse {
   validRowsCount: number;
   errorRowsCount: number;
 }
+
+export interface ExcludeCatalogPriceListUnmatchedRowsResponse {
+  priceListId: string;
+  priceListStatus: CatalogPriceListStatus;
+  excludedRowsCount: number;
+  rowsCount: number;
+  validRowsCount: number;
+  errorRowsCount: number;
+}
