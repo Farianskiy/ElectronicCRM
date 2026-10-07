@@ -382,15 +382,18 @@ export function TechnicalProductCharacteristicsEditor({
                   )}
                 </div>
 
-                <p className="mt-1 text-xs leading-5 text-[var(--app-muted)] [overflow-wrap:anywhere]">
-                  {characteristic.code} · {characteristic.dataType}
-                </p>
+                {!characteristic.isRequired && (
+                  <p className="mt-1 text-xs leading-5 text-[var(--app-muted)]">
+                    Необязательная
+                  </p>
+                )}
               </div>
 
               <div className="min-w-0">
                 {characteristic.code === POLES_CHARACTERISTIC_CODE ? (
                   <AppSelect
                     ariaLabel={label}
+                    expandInFlow
                     value={fieldValue}
                     onChange={(value) =>
                       handleValueChange(characteristic.code, value)
@@ -403,6 +406,7 @@ export function TechnicalProductCharacteristicsEditor({
                 ) : characteristic.dataType === "Boolean" ? (
                   <AppSelect
                     ariaLabel={label}
+                    expandInFlow
                     value={fieldValue}
                     onChange={(value) =>
                       handleValueChange(characteristic.code, value)

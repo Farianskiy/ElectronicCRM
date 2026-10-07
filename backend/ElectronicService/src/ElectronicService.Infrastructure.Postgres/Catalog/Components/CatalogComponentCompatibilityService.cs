@@ -638,6 +638,83 @@ public sealed class CatalogComponentCompatibilityService
         return new ProductComponentCompatibilityResult(product.Id, results);
     }
 
+    public async Task<UnitResult<DomainError>> ValidateManualSelectionAsync(
+        Guid mainProductId,
+        Guid needDefinitionId,
+        Guid componentProductId,
+        CancellationToken cancellationToken = default)
+    {
+        var mainProduct = await _dbContext.Products
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                product => product.Id == mainProductId,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        if (mainProduct is null)
+        {
+            return UnitResult.Failure(
+                CatalogErrors.ProductNotFound(mainProductId.ToString()));
+        }
+
+        var mainProductType = await _dbContext.ProductTypes
+            .AsNoTracking()
+            .FirstAsync(
+                productType => productType.Id == mainProduct.ProductTypeId,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        if (mainProductType.Kind != ProductTypeKind.MainProduct)
+        {
+            return UnitResult.Failure(
+                ComponentCompatibilityErrors.MainProductRequired());
+        }
+
+        var need = await _dbContext.ComponentNeedDefinitions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                item => item.Id == needDefinitionId,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        if (need is null)
+        {
+            return UnitResult.Failure(
+                ComponentCompatibilityErrors.NeedNotFound(needDefinitionId));
+        }
+
+        if (need.MainProductTypeId != mainProduct.ProductTypeId)
+        {
+            return UnitResult.Failure(
+                ComponentCompatibilityErrors.NeedDoesNotBelongToProductType());
+        }
+
+        var component = await _dbContext.Products
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                product => product.Id == componentProductId,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        if (component is null)
+        {
+            return UnitResult.Failure(
+                CatalogErrors.ProductNotFound(componentProductId.ToString()));
+        }
+
+        var componentType = await _dbContext.ProductTypes
+            .AsNoTracking()
+            .FirstAsync(
+                productType => productType.Id == component.ProductTypeId,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        return componentType.Kind == ProductTypeKind.Component
+            ? UnitResult.Success<DomainError>()
+            : UnitResult.Failure(
+                ComponentCompatibilityErrors.ComponentProductRequired());
+    }
+
     private static SelectedComponentResult MapSelectedComponent(
         ProductSelectedComponent selection,
         Domain.Catalog.Products.Product component)

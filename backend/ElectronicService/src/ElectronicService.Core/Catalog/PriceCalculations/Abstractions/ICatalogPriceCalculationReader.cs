@@ -51,8 +51,8 @@ public sealed record CatalogPriceCalculationLineDetails(
     Guid ProductId,
     Guid ManufacturerId,
     string ManufacturerName,
-    Guid PriceListId,
-    Guid PriceListRowId,
+    Guid? PriceListId,
+    Guid? PriceListRowId,
     string Article,
     string Name,
     string? Unit,
@@ -68,7 +68,10 @@ public sealed record CatalogPriceCalculationLineDetails(
     decimal TotalAmount,
     DateTime CreatedAtUtc,
     DateTime? UpdatedAtUtc,
-    IReadOnlyList<CatalogPriceCalculationLineComponentDetails> Components);
+    IReadOnlyList<CatalogPriceCalculationLineComponentDetails> Components,
+    string ProductTypeCode = "",
+    string ProductTypeName = "",
+    IReadOnlyList<CatalogPriceCalculationProductCharacteristicDetails>? Characteristics = null);
 
 public sealed record CatalogPriceCalculationLineComponentDetails(
     Guid ComponentLineId,
@@ -79,6 +82,7 @@ public sealed record CatalogPriceCalculationLineComponentDetails(
     string ManufacturerName,
     string Article,
     string Name,
+    CatalogPriceCalculationLineComponentSelectionSource SelectionSource,
     int QuantityPerUnit,
     decimal TotalQuantity,
     decimal BasePriceAmount,
@@ -86,7 +90,18 @@ public sealed record CatalogPriceCalculationLineComponentDetails(
     decimal ProjectPriceAmount,
     decimal TotalAmount,
     DateTime CreatedAtUtc,
-    DateTime? UpdatedAtUtc);
+    DateTime? UpdatedAtUtc,
+    string ProductTypeCode = "",
+    string ProductTypeName = "",
+    IReadOnlyList<CatalogPriceCalculationProductCharacteristicDetails>? Characteristics = null);
+
+public sealed record CatalogPriceCalculationProductCharacteristicDetails(
+    string Code,
+    string Name,
+    string DataType,
+    string? Unit,
+    bool IsRequired,
+    string? Value);
 
 public sealed record CatalogPriceCalculationDiscountDetails(
     Guid DiscountId,

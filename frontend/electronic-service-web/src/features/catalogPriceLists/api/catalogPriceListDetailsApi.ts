@@ -15,6 +15,7 @@ import type {
   ApplyCatalogPriceListIssueGroupResponse,
   GetCatalogPriceListIssueGroupsParams,
   GetCatalogPriceListIssueGroupsResponse,
+  ExcludeCatalogPriceListUnmatchedRowsResponse,
 } from "../model/types";
 
 export async function getCatalogPriceList(
@@ -153,6 +154,17 @@ export async function applyCatalogPriceListIssueGroup(
     await httpClient.put<ApplyCatalogPriceListIssueGroupResponse>(
       `/api/catalog/price-lists/${priceListId}/issue-groups/${encodeURIComponent(groupKey)}`,
       request,
+    );
+
+  return response.data;
+}
+
+export async function excludeCatalogPriceListUnmatchedRows(
+  priceListId: string,
+): Promise<ExcludeCatalogPriceListUnmatchedRowsResponse> {
+  const response =
+    await httpClient.delete<ExcludeCatalogPriceListUnmatchedRowsResponse>(
+      `/api/catalog/price-lists/${priceListId}/unmatched-rows`,
     );
 
   return response.data;

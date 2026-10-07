@@ -47,7 +47,10 @@ public sealed class StartCatalogImportReviewCommandHandler
                 CatalogImportErrors.CurrentUserNotFound());
         }
 
-        if (!currentUser.CanReviewCatalogImports())
+        if (!await _userRepository.HasPermissionAsync(
+                currentUser,
+                ElectronicService.Domain.Users.Enums.UserPermissionCode.CatalogImportsReview,
+                cancellationToken).ConfigureAwait(false))
         {
             return Result.Failure<StartCatalogImportReviewResult, DomainError>(
                 CatalogImportErrors.UserCannotReviewCatalogImports());

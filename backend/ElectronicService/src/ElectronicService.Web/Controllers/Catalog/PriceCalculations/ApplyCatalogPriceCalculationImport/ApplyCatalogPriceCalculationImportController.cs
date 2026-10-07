@@ -14,7 +14,7 @@ public sealed class ApplyCatalogPriceCalculationImportController
     : ControllerBase
 {
     private const string ProblemTitle =
-        "Не удалось добавить позиции из файла в проект.";
+        "Не удалось применить изменения из файла.";
 
     [HttpPost("{calculationId:guid}/import-apply")]
     [ProducesResponseType(
@@ -51,26 +51,103 @@ public sealed class ApplyCatalogPriceCalculationImportController
             return this.ToCurrentUserProblem();
         }
 
-        if (request.Rows is null || request.Rows.Count == 0)
+        if ((request.Rows is null || request.Rows.Count == 0)
+            && (request.ComponentRows is null || request.ComponentRows.Count == 0)
+            && (request.CharacteristicRows is null || request.CharacteristicRows.Count == 0))
         {
             return Problem(
                 detail:
-                    "Нет сопоставленных строк для добавления.",
+                    "В файле нет изменений, которые можно применить.",
                 statusCode:
                     StatusCodes.Status400BadRequest,
                 title: ProblemTitle);
         }
 
+        var commandRows = new List<ApplyCatalogPriceCalculationImportRow>(
+            request.Rows?.Count ?? 0);
+
+        foreach (var row in request.Rows ?? [])
+        {
+            if (!Enum.TryParse<CatalogPriceCalculationImportAction>(
+                    row.Action,
+                    ignoreCase: true,
+                    out var action)
+                || !Enum.IsDefined(action))
+            {
+                return Problem(
+                    detail: $"Неизвестное действие импорта: '{row.Action}'.",
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: ProblemTitle);
+            }
+
+            commandRows.Add(
+                new ApplyCatalogPriceCalculationImportRow(
+                    action,
+                    row.ProductId,
+                    row.ExistingLineId,
+                    row.Quantity));
+        }
+
+        var componentCommandRows =
+            new List<ApplyCatalogPriceCalculationComponentImportRow>(
+                request.ComponentRows?.Count ?? 0);
+
+        foreach (var row in request.ComponentRows ?? [])
+        {
+            if (!Enum.TryParse<CatalogPriceCalculationImportAction>(
+                    row.Action,
+                    ignoreCase: true,
+                    out var action)
+                || !Enum.IsDefined(action))
+            {
+                return Problem(
+                    detail: $"Неизвестное действие импорта комплектующего: '{row.Action}'.",
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: ProblemTitle);
+            }
+
+            componentCommandRows.Add(
+                new ApplyCatalogPriceCalculationComponentImportRow(
+                    action,
+                    row.MainLineId,
+                    row.ExistingComponentLineId,
+                    row.NeedDefinitionId,
+                    row.ComponentProductId,
+                    row.QuantityPerUnit));
+        }
+
+        var characteristicCommandRows =
+            new List<ApplyCatalogPriceCalculationCharacteristicImportRow>(
+                request.CharacteristicRows?.Count ?? 0);
+
+        foreach (var row in request.CharacteristicRows ?? [])
+        {
+            if (!Enum.TryParse<CatalogPriceCalculationCharacteristicImportAction>(
+                    row.Action,
+                    ignoreCase: true,
+                    out var action)
+                || !Enum.IsDefined(action))
+            {
+                return Problem(
+                    detail: $"Неизвестное действие импорта характеристики: '{row.Action}'.",
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: ProblemTitle);
+            }
+
+            characteristicCommandRows.Add(
+                new ApplyCatalogPriceCalculationCharacteristicImportRow(
+                    action,
+                    row.ProductId,
+                    row.CharacteristicCode,
+                    row.Value));
+        }
+
         var command =
             new ApplyCatalogPriceCalculationImportCommand(
                 calculationId,
-                request.Rows
-                    .Select(
-                        row =>
-                            new ApplyCatalogPriceCalculationImportRow(
-                                row.ProductId,
-                                row.Quantity))
-                    .ToArray(),
+                commandRows,
+                componentCommandRows,
+                characteristicCommandRows,
                 currentUserProvider.UserId.Value);
 
         var result =
@@ -89,6 +166,13 @@ public sealed class ApplyCatalogPriceCalculationImportController
             new ApplyCatalogPriceCalculationImportResponse(
                 result.Value.CalculationId,
                 result.Value.AddedLinesCount,
+                result.Value.UpdatedLinesCount,
+                result.Value.RemovedLinesCount,
+                result.Value.AddedComponentsCount,
+                result.Value.UpdatedComponentsCount,
+                result.Value.RemovedComponentsCount,
+                result.Value.UpdatedCharacteristicsCount,
+                result.Value.RemovedCharacteristicsCount,
                 result.Value.CalculationTotalAmount));
     }
 }

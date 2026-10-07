@@ -65,9 +65,17 @@ public sealed class CatalogActiveProductPriceReader
                 row.BasePriceAmount!.Value,
                 row.MrcPriceAmount);
 
-        return await query
+        var activeSources = await query
             .Take(take)
             .ToArrayAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (activeSources.Length == 1)
+        {
+            return activeSources;
+        }
+
+        return await FindCatalogSourcesAsync([productId], cancellationToken)
             .ConfigureAwait(false);
     }
 
@@ -132,7 +140,66 @@ public sealed class CatalogActiveProductPriceReader
                 row.BasePriceAmount!.Value,
                 row.MrcPriceAmount);
 
-        return await query
+        var activeSources = await query
+            .ToArrayAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var activeByProductId = activeSources
+            .GroupBy(source => source.ProductId)
+            .ToDictionary(group => group.Key, group => group.ToArray());
+        var catalogFallbackIds = distinctProductIds
+            .Where(productId =>
+                !activeByProductId.TryGetValue(productId, out var sources)
+                || sources.Length != 1)
+            .ToArray();
+        var catalogSources = await FindCatalogSourcesAsync(
+                catalogFallbackIds,
+                cancellationToken)
+            .ConfigureAwait(false);
+        var catalogByProductId = catalogSources.ToDictionary(
+            source => source.ProductId);
+
+        return distinctProductIds
+            .Select(productId =>
+            {
+                if (activeByProductId.TryGetValue(productId, out var sources)
+                    && sources.Length == 1)
+                {
+                    return sources[0];
+                }
+
+                return catalogByProductId.GetValueOrDefault(productId);
+            })
+            .Where(source => source is not null)
+            .Cast<CatalogActiveProductPriceSource>()
+            .ToArray();
+    }
+
+    private async Task<CatalogActiveProductPriceSource[]> FindCatalogSourcesAsync(
+        Guid[] productIds,
+        CancellationToken cancellationToken)
+    {
+        if (productIds.Length == 0)
+        {
+            return [];
+        }
+
+        return await (
+                from product in _dbContext.Products.AsNoTracking()
+                join manufacturer in _dbContext.Manufacturers.AsNoTracking()
+                    on product.ManufacturerId equals manufacturer.Id
+                where productIds.Contains(product.Id)
+                select new CatalogActiveProductPriceSource(
+                    product.Id,
+                    manufacturer.Id,
+                    manufacturer.Name,
+                    null,
+                    null,
+                    product.Article.Value,
+                    product.Name.Value,
+                    null,
+                    product.Price.Amount,
+                    null))
             .ToArrayAsync(cancellationToken)
             .ConfigureAwait(false);
     }

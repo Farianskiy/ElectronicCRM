@@ -296,8 +296,8 @@ public sealed class CatalogPriceCalculation : AggregateRoot
     public Result<Guid, DomainError> AddLine(
         Guid productId,
         Guid manufacturerId,
-        Guid priceListId,
-        Guid priceListRowId,
+        Guid? priceListId,
+        Guid? priceListRowId,
         string article,
         string name,
         string manufacturerName,
@@ -318,15 +318,13 @@ public sealed class CatalogPriceCalculation : AggregateRoot
         var duplicateExists =
             _lines.Any(
                 line =>
-                    line.PriceListRowId
-                    == priceListRowId);
+                    line.ProductId == productId);
 
         if (duplicateExists)
         {
             return Result.Failure<Guid, DomainError>(
                 CatalogPriceCalculationErrors
-                    .DuplicatePriceListRow(
-                        priceListRowId));
+                    .DuplicateProduct(productId));
         }
 
         var discountPercent =
@@ -477,6 +475,7 @@ public sealed class CatalogPriceCalculation : AggregateRoot
         string article,
         string name,
         string manufacturerName,
+        CatalogPriceCalculationLineComponentSelectionSource selectionSource,
         int quantityPerUnit,
         decimal basePriceAmount)
     {
@@ -533,6 +532,7 @@ public sealed class CatalogPriceCalculation : AggregateRoot
                 article,
                 name,
                 manufacturerName,
+                selectionSource,
                 quantityPerUnit,
                 basePriceAmount,
                 discountPercent);

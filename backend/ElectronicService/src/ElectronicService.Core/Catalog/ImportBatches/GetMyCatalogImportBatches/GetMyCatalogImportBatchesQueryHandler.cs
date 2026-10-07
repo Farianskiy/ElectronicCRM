@@ -3,6 +3,7 @@ using ElectronicService.Core.Catalog.ImportBatches.Abstractions;
 using ElectronicService.Core.Users;
 using ElectronicService.Domain.Catalog.ImportBatches;
 using ElectronicService.Domain.Common;
+using ElectronicService.Domain.Users.Enums;
 
 namespace ElectronicService.Core.Catalog.ImportBatches.GetMyCatalogImportBatches;
 
@@ -88,8 +89,15 @@ public sealed class GetMyCatalogImportBatchesQueryHandler
                 cancellationToken)
             .ConfigureAwait(false);
 
+        var canReviewImports = await _userRepository
+            .HasPermissionAsync(
+                currentUser,
+                UserPermissionCode.CatalogImportsReview,
+                cancellationToken)
+            .ConfigureAwait(false);
+
         var items = batches
-            .Select(batch => CreateItem(batch, currentUser))
+            .Select(batch => CreateItem(batch, currentUser, canReviewImports))
             .ToArray();
 
         var totalPages = totalCount == 0
@@ -109,7 +117,8 @@ public sealed class GetMyCatalogImportBatchesQueryHandler
 
     private static MyCatalogImportBatchItemResult CreateItem(
         CatalogImportBatch batch,
-        ElectronicService.Domain.Users.User currentUser)
+        ElectronicService.Domain.Users.User currentUser,
+        bool canReviewImports)
     {
         var canEdit =
             currentUser.CanEditCatalogImport()
@@ -120,7 +129,7 @@ public sealed class GetMyCatalogImportBatchesQueryHandler
             && batch.Status == CatalogImportBatchStatus.Ready;
 
         var canApply =
-            currentUser.CanApplyCatalogImport()
+            canReviewImports
             && batch.Status == CatalogImportBatchStatus.Ready;
 
         var canDelete =

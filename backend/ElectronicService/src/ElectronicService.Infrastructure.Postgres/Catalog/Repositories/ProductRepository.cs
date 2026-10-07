@@ -14,6 +14,30 @@ public sealed class ProductRepository : IProductRepository
         _dbContext = dbContext;
     }
 
+    public void Add(Product product)
+    {
+        ArgumentNullException.ThrowIfNull(product);
+
+        _dbContext.Products.Add(product);
+    }
+
+    public Task<bool> ExistsByArticleAndManufacturerAsync(
+        string article,
+        Guid manufacturerId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(article);
+
+        var normalizedArticle = article.Trim();
+
+        return _dbContext.Products
+            .AsNoTracking()
+            .AnyAsync(
+                product => product.ManufacturerId == manufacturerId
+                    && product.Article.Value == normalizedArticle,
+                cancellationToken);
+    }
+
     public Task<Product?> GetByIdAsync(
         Guid productId,
         CancellationToken cancellationToken = default)

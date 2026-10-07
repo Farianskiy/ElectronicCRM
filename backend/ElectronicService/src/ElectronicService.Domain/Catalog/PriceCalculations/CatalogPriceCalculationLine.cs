@@ -25,8 +25,8 @@ public sealed class CatalogPriceCalculationLine
         Guid calculationId,
         Guid productId,
         Guid manufacturerId,
-        Guid priceListId,
-        Guid priceListRowId,
+        Guid? priceListId,
+        Guid? priceListRowId,
         string article,
         string name,
         string manufacturerName,
@@ -77,13 +77,13 @@ public sealed class CatalogPriceCalculationLine
         private set;
     }
 
-    public Guid PriceListId
+    public Guid? PriceListId
     {
         get;
         private set;
     }
 
-    public Guid PriceListRowId
+    public Guid? PriceListRowId
     {
         get;
         private set;
@@ -186,8 +186,8 @@ public sealed class CatalogPriceCalculationLine
             Guid calculationId,
             Guid productId,
             Guid manufacturerId,
-            Guid priceListId,
-            Guid priceListRowId,
+            Guid? priceListId,
+            Guid? priceListRowId,
             string article,
             string name,
             string manufacturerName,
@@ -224,7 +224,7 @@ public sealed class CatalogPriceCalculationLine
                         nameof(manufacturerId)));
         }
 
-        if (priceListId == Guid.Empty)
+        if (priceListId.HasValue != priceListRowId.HasValue)
         {
             return Result.Failure<
                 CatalogPriceCalculationLine,
@@ -233,7 +233,7 @@ public sealed class CatalogPriceCalculationLine
                         nameof(priceListId)));
         }
 
-        if (priceListRowId == Guid.Empty)
+        if (priceListId == Guid.Empty || priceListRowId == Guid.Empty)
         {
             return Result.Failure<
                 CatalogPriceCalculationLine,
@@ -457,6 +457,7 @@ public sealed class CatalogPriceCalculationLine
         string article,
         string name,
         string manufacturerName,
+        CatalogPriceCalculationLineComponentSelectionSource selectionSource,
         int quantityPerUnit,
         decimal basePriceAmount,
         decimal discountPercent)
@@ -488,6 +489,7 @@ public sealed class CatalogPriceCalculationLine
                 article,
                 name,
                 manufacturerName,
+                selectionSource,
                 quantityPerUnit,
                 basePriceAmount,
                 discountPercent,

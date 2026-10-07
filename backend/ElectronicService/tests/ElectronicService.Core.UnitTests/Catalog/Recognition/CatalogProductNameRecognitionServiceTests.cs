@@ -16,7 +16,8 @@ public sealed class CatalogProductNameRecognitionServiceTests
         var service = CreateService(reader);
 
         var result = await service.RecognizeAsync(
-            CreateRequest("NB1 63 1п 10А B 6кА CHINT"));
+            CreateRequest("NB1 63 1п 10А B 6кА CHINT"),
+            TestContext.Current.CancellationToken);
 
         var characteristic = Assert.Single(result.Characteristics);
 
@@ -35,7 +36,8 @@ public sealed class CatalogProductNameRecognitionServiceTests
         var service = CreateService(reader);
 
         var result = await service.RecognizeAsync(
-            CreateRequest("NB1 63 1п 10А B 6кА CHINT"));
+            CreateRequest("NB1 63 1п 10А B 6кА CHINT"),
+            TestContext.Current.CancellationToken);
 
         var characteristic = Assert.Single(result.Characteristics);
 
@@ -51,7 +53,8 @@ public sealed class CatalogProductNameRecognitionServiceTests
         var service = CreateService(reader);
 
         var result = await service.RecognizeAsync(
-            CreateRequest("NB10 63 1п 10А B 6кА CHINT"));
+            CreateRequest("NB10 63 1п 10А B 6кА CHINT"),
+            TestContext.Current.CancellationToken);
 
         Assert.Empty(result.Characteristics);
         Assert.Empty(result.Conflicts);
@@ -64,8 +67,12 @@ public sealed class CatalogProductNameRecognitionServiceTests
             CreateProductSeriesTerm("NB1", "NB1"));
         var service = CreateService(reader);
 
-        await service.RecognizeAsync(CreateRequest("NB1 first"));
-        await service.RecognizeAsync(CreateRequest("NB1 second"));
+        await service.RecognizeAsync(
+            CreateRequest("NB1 first"),
+            TestContext.Current.CancellationToken);
+        await service.RecognizeAsync(
+            CreateRequest("NB1 second"),
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(1, reader.ApprovedTermsReadCount);
     }
@@ -75,7 +82,8 @@ public sealed class CatalogProductNameRecognitionServiceTests
     {
         return new CatalogProductNameRecognitionService(
             Array.Empty<ICatalogCharacteristicRecognitionStrategy>(),
-            reader);
+            reader,
+            new EmptyRecognitionProfileReader());
     }
 
     private static CatalogProductNameRecognitionRequest CreateRequest(string productName)
@@ -92,6 +100,8 @@ public sealed class CatalogProductNameRecognitionServiceTests
     {
         return new CatalogDictionaryTermResult(
             Guid.NewGuid(),
+            null,
+            null,
             phrase,
             phrase.ToUpperInvariant(),
             "Characteristic",
@@ -99,7 +109,31 @@ public sealed class CatalogProductNameRecognitionServiceTests
             targetValue,
             100,
             "Approved",
-            "Seed");
+            "Seed",
+            DateTime.UtcNow,
+            DateTime.UtcNow,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
+    }
+
+    private sealed class EmptyRecognitionProfileReader
+        : ICatalogCharacteristicRecognitionProfileReader
+    {
+        public Task<IReadOnlyCollection<
+            CatalogCharacteristicRecognitionProfileResult>> GetProfilesAsync(
+                Guid productTypeId,
+                CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            return Task.FromResult<IReadOnlyCollection<
+                CatalogCharacteristicRecognitionProfileResult>>([]);
+        }
     }
 
     private sealed class FakeCatalogDictionaryReader : ICatalogDictionaryReader

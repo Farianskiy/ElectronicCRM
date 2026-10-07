@@ -44,6 +44,7 @@ public sealed class AddCatalogPriceCalculationLineComponentController : Controll
             request.NeedDefinitionId,
             request.ComponentProductId,
             request.QuantityPerUnit,
+            request.ManualSelection,
             currentUserProvider.UserId.Value);
 
         var result = await handler
@@ -67,6 +68,7 @@ public sealed class AddCatalogPriceCalculationLineComponentController : Controll
             value.ManufacturerName,
             value.Article,
             value.Name,
+            value.SelectionSource.ToString(),
             value.QuantityPerUnit,
             value.BasePriceAmount,
             value.DiscountPercent,

@@ -28,15 +28,17 @@ public sealed class AdminRoleClaimsTransformation : IClaimsTransformation
             return principal;
         }
 
-        if (principal.IsInRole("SystemDeveloper"))
+        foreach (var claim in identity.FindAll(PermissionClaimTypes.Permission).ToArray())
         {
-            foreach (var role in SystemDeveloperRoles.Where(role => !principal.IsInRole(role)))
-            {
-                identity.AddClaim(new Claim(ClaimTypes.Role, role));
-            }
+            identity.RemoveClaim(claim);
         }
 
-        foreach (var claim in identity.FindAll(PermissionClaimTypes.Permission).ToArray())
+        foreach (var claim in identity.FindAll(PermissionClaimTypes.ActiveUser).ToArray())
+        {
+            identity.RemoveClaim(claim);
+        }
+
+        foreach (var claim in identity.FindAll(ClaimTypes.Role).ToArray())
         {
             identity.RemoveClaim(claim);
         }
@@ -53,6 +55,17 @@ public sealed class AdminRoleClaimsTransformation : IClaimsTransformation
         if (user is null || user.Status != UserStatus.Active)
         {
             return principal;
+        }
+
+        identity.AddClaim(new Claim(PermissionClaimTypes.ActiveUser, bool.TrueString));
+        identity.AddClaim(new Claim(ClaimTypes.Role, user.Type.ToString()));
+
+        if (user.IsSystemDeveloper)
+        {
+            foreach (var role in SystemDeveloperRoles)
+            {
+                identity.AddClaim(new Claim(ClaimTypes.Role, role));
+            }
         }
 
         var permissions = UserPermissionCatalog.GetDefaults(user.Type).ToHashSet();

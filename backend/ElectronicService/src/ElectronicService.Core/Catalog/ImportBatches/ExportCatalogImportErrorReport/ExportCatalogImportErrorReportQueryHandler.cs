@@ -91,7 +91,10 @@ public sealed class ExportCatalogImportErrorReportQueryHandler
             batch.CreatedByUserId == currentUser.Id;
 
         var canReview =
-            currentUser.CanReviewCatalogImports();
+            await _userRepository.HasPermissionAsync(
+                currentUser,
+                ElectronicService.Domain.Users.Enums.UserPermissionCode.CatalogImportsReview,
+                cancellationToken).ConfigureAwait(false);
 
         if (!isOwner && !canReview)
         {

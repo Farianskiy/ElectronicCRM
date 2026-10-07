@@ -18,5 +18,7 @@ public enum ProductAuditOperation
 
     ImportApplied = 9,
 
-    BulkUpdated = 10
+    BulkUpdated = 10,
+
+    ProductCreated = 11
 }

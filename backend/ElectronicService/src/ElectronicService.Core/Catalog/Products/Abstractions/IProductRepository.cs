@@ -4,6 +4,13 @@ namespace ElectronicService.Core.Catalog.Products.Abstractions;
 
 public interface IProductRepository
 {
+    void Add(Product product);
+
+    Task<bool> ExistsByArticleAndManufacturerAsync(
+        string article,
+        Guid manufacturerId,
+        CancellationToken cancellationToken = default);
+
     Task<Product?> GetByIdAsync(
         Guid productId,
         CancellationToken cancellationToken = default);

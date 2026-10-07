@@ -39,6 +39,26 @@ internal sealed class FakeProductRepository : IProductRepository
         _products[product.Id] = product;
     }
 
+    public void Add(Product product)
+    {
+        AddExisting(product);
+    }
+
+    public Task<bool> ExistsByArticleAndManufacturerAsync(
+        string article,
+        Guid manufacturerId,
+        CancellationToken cancellationToken = default)
+    {
+        var exists = _products.Values.Any(product =>
+            product.ManufacturerId == manufacturerId
+            && string.Equals(
+                product.Article.Value,
+                article.Trim(),
+                StringComparison.OrdinalIgnoreCase));
+
+        return Task.FromResult(exists);
+    }
+
     public Task<Product?> GetByIdAsync(
         Guid productId,
         CancellationToken cancellationToken = default)

@@ -1,3 +1,5 @@
+using ElectronicService.Domain.Catalog.ProductTypes;
+
 namespace ElectronicService.Core.Catalog.PriceCalculations.SearchCatalogPriceCalculationProducts;
 
 public sealed record SearchCatalogPriceCalculationProductsQuery(
@@ -5,4 +7,6 @@ public sealed record SearchCatalogPriceCalculationProductsQuery(
     Guid CurrentUserId,
     string? Search,
     int Page,
-    int PageSize);
+    int PageSize,
+    ProductTypeKind? ProductKind,
+    string? ProductTypeCode);

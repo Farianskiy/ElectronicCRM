@@ -19,6 +19,7 @@ import { getCatalogImportRowFilterStatusLabel } from "../../model/catalogImportR
 import { catalogImportQueryKeys } from "../../model/queryKeys";
 import {
   catalogImportRowFilterStatuses,
+  type AnalyzeCatalogImportBatchResponse,
   type CatalogImportRow,
   type CatalogImportRowFilterStatus,
   type CatalogImportRowIssue,
@@ -35,12 +36,16 @@ import {
   CatalogImportNameLegend,
   CatalogImportRowName,
 } from "./CatalogImportRowName";
+import { CatalogImportTrainingSummary } from "./CatalogImportTrainingSummary";
 
 interface CatalogImportRowsPreviewProps {
   batchId: string;
   productTypeId?: string | null;
   expectedVersion: number;
   canEditRows: boolean;
+  onAnalysisChange: (
+    analysis: AnalyzeCatalogImportBatchResponse | null,
+  ) => void;
 }
 
 const pageSize = 25;
@@ -124,7 +129,7 @@ function getProblemCodeTitle(code: string): string {
       return "Найдено несколько производителей";
 
     case "characteristic.required":
-      return "Не заполнена обязательная характеристика";
+      return "Характеристика пока не определена";
 
     case "characteristic.invalid":
       return "Некорректное значение характеристики";
@@ -295,6 +300,7 @@ export function CatalogImportRowsPreview({
   productTypeId,
   expectedVersion,
   canEditRows,
+  onAnalysisChange,
 }: CatalogImportRowsPreviewProps) {
   const [status, setStatus] = useState<CatalogImportRowFilterStatus | null>(
     null,
@@ -727,6 +733,12 @@ export function CatalogImportRowsPreview({
           )}
         </div>
       </div>
+
+      <CatalogImportTrainingSummary
+        batchId={batchId}
+        canReanalyze={canEditRows}
+        onAnalysisChange={onAnalysisChange}
+      />
 
       <section
         aria-labelledby="catalog-import-technical-summary-title"

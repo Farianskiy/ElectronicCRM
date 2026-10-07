@@ -129,6 +129,17 @@ public sealed class TrainingExampleLifecycleTests(PostgreSqlFixture fixture)
         var before = await service.ListAsync(filter, ct);
         Assert.True(before.IsSuccess);
         Assert.Single(before.Value.Items);
+        var summary = await service.GetImportSummaryAsync(batchId, ct);
+        Assert.True(summary.IsSuccess);
+        Assert.Equal(1, summary.Value.ActiveExamplesCount);
+        Assert.Equal(0, summary.Value.EvaluationExamplesCount);
+        Assert.Equal(0, summary.Value.RevokedExamplesCount);
+        var summaryGroup = Assert.Single(summary.Value.Groups);
+        Assert.Equal(example.ManufacturerId, summaryGroup.ManufacturerId);
+        Assert.Equal(example.ProductTypeId, summaryGroup.ProductTypeId);
+        Assert.Equal(example.CharacteristicDefinitionId, summaryGroup.CharacteristicDefinitionId);
+        Assert.Equal(1, summaryGroup.ActiveExamplesCount);
+        Assert.Equal(1, summaryGroup.DistinctValuesCount);
         await using var output = new MemoryStream();
         var export = await service.ExportAsync(filter, output, ct);
         Assert.True(export.IsSuccess);
@@ -147,6 +158,9 @@ public sealed class TrainingExampleLifecycleTests(PostgreSqlFixture fixture)
         var afterCleanup = await service.GetAsync(example.Id, ct);
         Assert.True(afterCleanup.IsSuccess);
         Assert.Null(afterCleanup.Value.ImportBatchId);
+        Assert.Equal(
+            "training.not_found",
+            (await service.GetImportSummaryAsync(batchId, ct)).Error.Code);
         Assert.True((await service.RevokeAsync(example.Id, "Ошибка разметки", ct)).IsSuccess);
         var first = (await service.GetAsync(example.Id, ct)).Value;
         Assert.True((await service.RevokeAsync(example.Id, "Повтор", ct)).IsSuccess);
@@ -179,13 +193,16 @@ public sealed class TrainingExampleLifecycleTests(PostgreSqlFixture fixture)
     {
         var ct = TestContext.Current.CancellationToken;
         await using var db = fixture.CreateDbContext();
-        var (owner, example, _) = await SeedAsync(db, ct);
+        var (owner, example, batchId) = await SeedAsync(db, ct);
         var stranger = TestDataFactory.CreateTechnicalUser(email: $"stranger-{Guid.NewGuid():N}@example.com");
         db.Users.Add(stranger);
         await db.SaveChangesAsync(ct);
         var other = Service(db, stranger.Id);
         var filter = new TrainingExampleFilter(ManufacturerId: example.ManufacturerId);
         Assert.Empty((await other.ListAsync(filter, ct)).Value.Items);
+        Assert.Equal(
+            "training.not_found",
+            (await other.GetImportSummaryAsync(batchId, ct)).Error.Code);
         Assert.Equal("training.not_found", (await other.GetAsync(example.Id, ct)).Error.Code);
         Assert.Equal("training.not_found", (await other.RevokeAsync(example.Id, "Чужой пример", ct)).Error.Code);
         await using var output = new MemoryStream();

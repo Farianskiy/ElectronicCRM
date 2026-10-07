@@ -320,6 +320,15 @@ public static class CatalogErrors
             "Обновите данные и повторите операцию.");
     }
 
+    public static DomainError ProductAlreadyExists(
+        string article,
+        Guid manufacturerId)
+    {
+        return new DomainError(
+            "catalog.product.already_exists",
+            $"Товар с артикулом '{article}' уже существует у производителя '{manufacturerId}'.");
+    }
+
     public static DomainError BulkProductsRequired()
     {
         return new DomainError(

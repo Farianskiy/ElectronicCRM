@@ -1356,11 +1356,11 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("name");
 
-                    b.Property<Guid>("PriceListId")
+                    b.Property<Guid?>("PriceListId")
                         .HasColumnType("uuid")
                         .HasColumnName("price_list_id");
 
-                    b.Property<Guid>("PriceListRowId")
+                    b.Property<Guid?>("PriceListRowId")
                         .HasColumnType("uuid")
                         .HasColumnName("price_list_row_id");
 
@@ -1498,6 +1498,12 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                     b.Property<int>("QuantityPerUnit")
                         .HasColumnType("integer")
                         .HasColumnName("quantity_per_unit");
+
+                    b.Property<string>("SelectionSource")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("selection_source");
 
                     b.Property<decimal>("TotalAmount")
                         .HasPrecision(22, 2)
@@ -3658,14 +3664,12 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                     b.HasOne("ElectronicService.Domain.Catalog.PriceLists.CatalogPriceList", null)
                         .WithMany()
                         .HasForeignKey("PriceListId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("ElectronicService.Domain.Catalog.PriceLists.CatalogPriceListRow", null)
                         .WithMany()
                         .HasForeignKey("PriceListRowId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("ElectronicService.Domain.Catalog.Products.Product", null)
                         .WithMany()

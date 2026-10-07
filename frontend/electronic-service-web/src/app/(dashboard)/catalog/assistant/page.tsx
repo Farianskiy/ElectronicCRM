@@ -400,7 +400,9 @@ export default function CatalogAssistantPage() {
       return productId && line.quantity !== null && line.quantity > 0
         ? [
             {
+              action: "Add" as const,
               productId,
+              existingLineId: null,
               quantity: line.quantity,
             },
           ]
@@ -414,6 +416,8 @@ export default function CatalogAssistantPage() {
     applyBatchMutation.mutate({
       calculationId: selectedCalculationId,
       rows,
+      componentRows: [],
+      characteristicRows: [],
     });
   }
 

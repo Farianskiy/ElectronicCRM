@@ -160,6 +160,8 @@ public sealed class SearchCatalogPriceCalculationProductsQueryHandler
                     query.Search,
                     (int)skipValue,
                     query.PageSize,
+                    query.ProductKind,
+                    query.ProductTypeCode,
                     cancellationToken)
                 .ConfigureAwait(false);
 

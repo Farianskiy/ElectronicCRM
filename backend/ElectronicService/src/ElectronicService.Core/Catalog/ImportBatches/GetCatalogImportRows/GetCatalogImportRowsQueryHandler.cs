@@ -179,8 +179,10 @@ public sealed class
 
         var canRead =
             isOwner
-            || currentUser
-                .CanReviewCatalogImports();
+            || await _userRepository.HasPermissionAsync(
+                currentUser,
+                ElectronicService.Domain.Users.Enums.UserPermissionCode.CatalogImportsReview,
+                cancellationToken).ConfigureAwait(false);
 
         if (!canRead)
         {

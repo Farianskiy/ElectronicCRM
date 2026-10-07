@@ -52,6 +52,14 @@ export async function searchCatalogPriceCalculationProducts(
   queryParams.set("page", params.page.toString());
   queryParams.set("pageSize", params.pageSize.toString());
 
+  if (params.productKind) {
+    queryParams.set("productKind", params.productKind);
+  }
+
+  if (params.productTypeCode?.trim()) {
+    queryParams.set("productTypeCode", params.productTypeCode.trim());
+  }
+
   const response =
     await httpClient.get<SearchCatalogPriceCalculationProductsResponse>(
       `/api/catalog/price-calculations/${params.calculationId}/products?${queryParams.toString()}`,
@@ -102,6 +110,7 @@ export async function addCatalogPriceCalculationLineComponent(request: {
   needDefinitionId: string;
   componentProductId: string;
   quantityPerUnit: number;
+  manualSelection?: boolean;
 }): Promise<void> {
   await httpClient.post(
     `/api/catalog/price-calculations/${request.calculationId}/lines/${request.lineId}/components`,
@@ -109,6 +118,7 @@ export async function addCatalogPriceCalculationLineComponent(request: {
       needDefinitionId: request.needDefinitionId,
       componentProductId: request.componentProductId,
       quantityPerUnit: request.quantityPerUnit,
+      manualSelection: request.manualSelection ?? false,
     },
   );
 }
@@ -191,6 +201,8 @@ export async function applyCatalogPriceCalculationImport(
       `/api/catalog/price-calculations/${request.calculationId}/import-apply`,
       {
         rows: request.rows,
+        componentRows: request.componentRows,
+        characteristicRows: request.characteristicRows,
       },
     );
 

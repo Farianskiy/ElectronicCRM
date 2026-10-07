@@ -22,10 +22,15 @@ import {
 } from "@/features/catalogPriceCalculations/api/catalogPriceCalculationEditorApi";
 import { exportCatalogPriceCalculation } from "@/features/catalogPriceCalculations/api/exportCatalogPriceCalculation";
 import { getProductComponentCompatibility } from "@/features/componentCompatibility/api/getProductComponentCompatibility";
+import { getCatalogProductTypes } from "@/features/catalogMetadata/api/getCatalogProductTypes";
+import { CreateCatalogProductDialog } from "@/features/catalogProducts/ui/CreateCatalogProductDialog";
 import { useCurrentUserAccess } from "@/features/auth/model/CurrentUserAccessContext";
 import { catalogPriceCalculationQueryKeys } from "@/features/catalogPriceCalculations/model/queryKeys";
 import type {
   CatalogPriceCalculationDetails,
+  CatalogPriceCalculationCharacteristicImportPreviewRow,
+  CatalogPriceCalculationComponentImportRowStatus,
+  CatalogPriceCalculationCharacteristicImportRowStatus,
   CatalogPriceCalculationImportRowStatus,
   CatalogPriceCalculationLine,
   CatalogPriceCalculationLineComponent,
@@ -33,6 +38,7 @@ import type {
   CatalogPriceCalculationProductSearchItem,
   CatalogPriceCalculationStatus,
 } from "@/features/catalogPriceCalculations/model/types";
+import type { CreateCatalogProductResponse } from "@/features/catalogProducts/model/types";
 import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
 import { formatDate, formatPrice } from "@/shared/lib/formatters";
 import { AppButton } from "@/shared/ui/AppButton";
@@ -40,6 +46,16 @@ import { AppInput } from "@/shared/ui/AppInput";
 import { PageWorkspace } from "@/shared/ui/PageWorkspace";
 
 const productSearchPageSize = 20;
+
+interface MissingCatalogProductDraft {
+  article: string;
+  name: string;
+  manufacturerName: string | null;
+  kind: "MainProduct" | "Component";
+  priceAmount: number | null;
+  projectQuantity: number | null;
+  source: "projectImport" | "search" | "componentSearch";
+}
 
 function getStatusLabel(status: CatalogPriceCalculationStatus): string {
   switch (status) {
@@ -62,8 +78,14 @@ function getImportStatusLabel(
   status: CatalogPriceCalculationImportRowStatus,
 ): string {
   switch (status) {
-    case "Matched":
-      return "Сопоставлена";
+    case "New":
+      return "Будет добавлена";
+    case "QuantityChanged":
+      return "Изменится количество";
+    case "Removed":
+      return "Будет удалена";
+    case "Unchanged":
+      return "Без изменений";
     case "Invalid":
       return "Некорректная";
     case "ProductNotFound":
@@ -80,9 +102,118 @@ function getImportStatusLabel(
 function getImportStatusClassName(
   status: CatalogPriceCalculationImportRowStatus,
 ): string {
-  return status === "Matched"
-    ? "border-[var(--app-success-border)] bg-[var(--app-success-soft)] text-[var(--app-success)]"
-    : "border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] text-[var(--app-danger)]";
+  if (status === "New") {
+    return "border-[var(--app-success-border)] bg-[var(--app-success-soft)] text-[var(--app-success)]";
+  }
+
+  if (status === "QuantityChanged" || status === "Removed") {
+    return "border-[var(--app-warning-border)] bg-[var(--app-warning-soft)] text-[var(--app-warning)]";
+  }
+
+  if (status === "Unchanged") {
+    return "border-[var(--app-border)] bg-[var(--app-surface)] text-[var(--app-muted)]";
+  }
+
+  return "border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] text-[var(--app-danger)]";
+}
+
+function getComponentImportStatusLabel(
+  status: CatalogPriceCalculationComponentImportRowStatus,
+): string {
+  switch (status) {
+    case "New":
+      return "Будет добавлено";
+    case "QuantityChanged":
+      return "Изменится количество";
+    case "Removed":
+      return "Будет удалено";
+    case "Unchanged":
+      return "Без изменений";
+    case "Invalid":
+      return "Некорректная строка";
+    case "MainLineNotFound":
+      return "Основной товар не найден";
+    case "ComponentNotFound":
+      return "Комплектующее не найдено";
+    case "NeedNotFound":
+      return "Потребность не найдена";
+    case "ActivePriceNotFound":
+      return "Нет активной цены";
+    case "ActivePriceAmbiguous":
+      return "Несколько цен";
+  }
+}
+
+function getComponentImportStatusClassName(
+  status: CatalogPriceCalculationComponentImportRowStatus,
+): string {
+  if (status === "New") {
+    return "border-[var(--app-success-border)] bg-[var(--app-success-soft)] text-[var(--app-success)]";
+  }
+
+  if (status === "QuantityChanged" || status === "Removed") {
+    return "border-[var(--app-warning-border)] bg-[var(--app-warning-soft)] text-[var(--app-warning)]";
+  }
+
+  if (status === "Unchanged") {
+    return "border-[var(--app-border)] bg-[var(--app-surface)] text-[var(--app-muted)]";
+  }
+
+  return "border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] text-[var(--app-danger)]";
+}
+
+function getCharacteristicImportStatusLabel(
+  status: CatalogPriceCalculationCharacteristicImportRowStatus,
+): string {
+  switch (status) {
+    case "Changed":
+      return "Будет изменена";
+    case "Removed":
+      return "Будет очищена";
+    case "Unchanged":
+      return "Без изменений";
+    case "Invalid":
+      return "Некорректное значение";
+    case "ProductNotFound":
+      return "Товар не найден";
+    case "CharacteristicNotFound":
+      return "Характеристика не найдена";
+  }
+}
+
+function getCharacteristicImportStatusClassName(
+  status: CatalogPriceCalculationCharacteristicImportRowStatus,
+): string {
+  if (status === "Changed" || status === "Removed") {
+    return "border-[var(--app-warning-border)] bg-[var(--app-warning-soft)] text-[var(--app-warning)]";
+  }
+
+  if (status === "Unchanged") {
+    return "border-[var(--app-border)] bg-[var(--app-surface)] text-[var(--app-muted)]";
+  }
+
+  return "border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] text-[var(--app-danger)]";
+}
+
+function formatCharacteristicImportValue(
+  value: string | null,
+  dataType: string,
+): string {
+  if (value === null || value.trim().length === 0) {
+    return "Не задано";
+  }
+
+  if (dataType === "Boolean") {
+    if (value.toLowerCase() === "true") {
+      return "Да";
+    }
+
+    if (value.toLowerCase() === "false") {
+      return "Нет";
+    }
+  }
+
+  return value;
 }
 
 function StatusBadge({ status }: { status: CatalogPriceCalculationStatus }) {
@@ -111,8 +242,16 @@ function ProductSearchRow({
   product: CatalogPriceCalculationProductSearchItem;
   currency: string;
   isAdding: boolean;
-  onAdd: (productId: string) => void;
+  onAdd: (productId: string, quantity: number) => void;
 }) {
+  const [quantity, setQuantity] = useState("1");
+  const isAvailable = product.priceStatus === "Available";
+  const parsedQuantity = Number(quantity.replace(",", "."));
+  const unavailableReason =
+    product.priceStatus === "ActivePriceAmbiguous"
+      ? "Найдено несколько активных цен"
+      : "Нет активной цены";
+
   return (
     <tr className="bg-[var(--app-panel)] align-top">
       <td className="px-4 py-4">
@@ -128,7 +267,12 @@ function ProductSearchRow({
       </td>
 
       <td className="whitespace-nowrap px-4 py-4 tabular-nums text-[var(--app-text)]">
-        {formatPrice(product.basePriceAmount, currency)}
+        {product.basePriceAmount === null
+          ? "—"
+          : formatPrice(product.basePriceAmount, currency)}
+        <p className="mt-1 text-xs font-normal text-[var(--app-muted)]">
+          {product.priceListRowId ? "Из активного прайса" : "Из карточки каталога"}
+        </p>
       </td>
 
       <td className="whitespace-nowrap px-4 py-4 tabular-nums text-[var(--app-muted)]">
@@ -138,15 +282,34 @@ function ProductSearchRow({
       </td>
 
       <td className="px-4 py-4">
-        <AppButton
-          type="button"
-          variant="primary"
-          size="sm"
-          loading={isAdding}
-          onClick={() => onAdd(product.productId)}
-        >
-          Добавить
-        </AppButton>
+        {isAvailable ? (
+          <div className="flex min-w-[190px] items-center gap-2">
+            <AppInput
+              type="number"
+              min="0.001"
+              step="0.001"
+              value={quantity}
+              aria-label={`Количество ${product.name} в проекте`}
+              disabled={isAdding}
+              onChange={(event) => setQuantity(event.target.value)}
+              className="w-24"
+            />
+            <AppButton
+              type="button"
+              variant="primary"
+              size="sm"
+              loading={isAdding}
+              disabled={!Number.isFinite(parsedQuantity) || parsedQuantity <= 0}
+              onClick={() => onAdd(product.productId, parsedQuantity)}
+            >
+              Добавить
+            </AppButton>
+          </div>
+        ) : (
+          <span className="inline-flex max-w-56 rounded-xl border border-[var(--app-warning-border)] bg-[var(--app-warning-soft)] px-3 py-2 text-xs font-medium leading-5 text-[var(--app-warning)]">
+            {unavailableReason}
+          </span>
+        )}
       </td>
     </tr>
   );
@@ -180,6 +343,17 @@ function CalculationComponentRow({
       <td className="border-l-4 border-l-[var(--app-accent)] px-4 py-4 pl-8">
         <span className="inline-flex rounded-full border border-[var(--app-accent-border)] bg-[var(--app-accent-soft)] px-2 py-0.5 text-[11px] font-semibold text-[var(--app-accent)]">
           Комплектующее
+        </span>
+        <span
+          className={`ml-2 inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold ${
+            component.selectionSource === "Manual"
+              ? "border-[var(--app-warning-border)] bg-[var(--app-warning-soft)] text-[var(--app-warning)]"
+              : "border-[var(--app-success-border)] bg-[var(--app-success-soft)] text-[var(--app-success)]"
+          }`}
+        >
+          {component.selectionSource === "Manual"
+            ? "Выбрано вручную"
+            : "Совместимость подтверждена"}
         </span>
         <p className="mt-2 font-medium text-[var(--app-text)]">
           {component.name}
@@ -268,13 +442,17 @@ function CalculationComponentRow({
 }
 
 function ComponentPickerRow({
+  calculationId,
   line,
   currency,
   editable,
   addingKey,
   onAdd,
+  canCreateProducts,
+  onCreateComponent,
   onClose,
 }: {
+  calculationId: string;
   line: CatalogPriceCalculationLine;
   currency: string;
   editable: boolean;
@@ -283,15 +461,55 @@ function ComponentPickerRow({
     needDefinitionId: string,
     componentProductId: string,
     quantityPerUnit: number,
+    manualSelection: boolean,
   ) => void;
+  canCreateProducts: boolean;
+  onCreateComponent: (article: string) => void;
   onClose: () => void;
 }) {
   const [quantities, setQuantities] = useState<Record<string, string>>({});
+  const [mode, setMode] = useState<"recommended" | "catalog">("recommended");
+  const [manualNeedId, setManualNeedId] = useState("");
+  const [manualSearchInput, setManualSearchInput] = useState("");
+  const [manualSearch, setManualSearch] = useState("");
+  const [manualProductTypeCode, setManualProductTypeCode] = useState("");
+  const [manualPage, setManualPage] = useState(1);
   const compatibilityQuery = useQuery({
     queryKey: ["product-component-compatibility", line.productId],
     queryFn: () => getProductComponentCompatibility(line.productId),
   });
+  const needs = compatibilityQuery.data?.needs ?? [];
+  const effectiveMode = needs.length === 0 ? "catalog" : mode;
+  const effectiveManualNeedId = manualNeedId || needs[0]?.needDefinitionId || "";
+  const productTypesQuery = useQuery({
+    queryKey: ["catalog-product-types"],
+    queryFn: getCatalogProductTypes,
+    enabled: mode === "catalog",
+  });
+  const manualProductsQuery = useQuery({
+    queryKey: [
+      "price-calculation-component-search",
+      calculationId,
+      manualSearch,
+      manualProductTypeCode,
+      manualPage,
+    ],
+    queryFn: () =>
+      searchCatalogPriceCalculationProducts({
+        calculationId,
+        search: manualSearch,
+        page: manualPage,
+        pageSize: 20,
+        productKind: "Component",
+        productTypeCode: manualProductTypeCode || undefined,
+      }),
+    enabled: mode === "catalog" && Boolean(effectiveManualNeedId),
+  });
   const columnCount = editable ? 11 : 10;
+  const componentProductTypes = (productTypesQuery.data ?? []).filter(
+    (productType) => productType.kind === "Component",
+  );
+  const manualTotalPages = Math.max(1, manualProductsQuery.data?.totalPages ?? 0);
 
   return (
     <tr className="bg-[var(--app-panel)]">
@@ -300,7 +518,7 @@ function ComponentPickerRow({
           <div className="flex items-start justify-between gap-4">
             <div>
               <h3 className="font-semibold text-[var(--app-text)]">
-                Совместимые комплектующие
+                Добавить комплектующее
               </h3>
               <p className="mt-1 text-sm text-[var(--app-muted)]">
                 Количество задаётся на одну единицу основного товара.
@@ -308,6 +526,26 @@ function ComponentPickerRow({
             </div>
             <AppButton type="button" variant="ghost" size="sm" onClick={onClose}>
               Закрыть
+            </AppButton>
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <AppButton
+              type="button"
+              variant={effectiveMode === "recommended" ? "primary" : "secondary"}
+              size="sm"
+              disabled={needs.length === 0}
+              onClick={() => setMode("recommended")}
+            >
+              Рекомендуемые
+            </AppButton>
+            <AppButton
+              type="button"
+              variant={effectiveMode === "catalog" ? "primary" : "secondary"}
+              size="sm"
+              onClick={() => setMode("catalog")}
+            >
+              Найти в каталоге
             </AppButton>
           </div>
 
@@ -332,8 +570,9 @@ function ComponentPickerRow({
             </p>
           )}
 
-          <div className="mt-4 grid gap-4">
-            {compatibilityQuery.data?.needs.map((need) => {
+          {effectiveMode === "recommended" && (
+            <div className="mt-4 grid gap-4">
+            {needs.map((need) => {
               const availableComponents = need.compatibleComponents.filter(
                 (candidate) =>
                   !line.components.some(
@@ -407,6 +646,7 @@ function ComponentPickerRow({
                                     need.needDefinitionId,
                                     candidate.productId,
                                     quantity,
+                                    false,
                                   )
                                 }
                               >
@@ -421,7 +661,232 @@ function ComponentPickerRow({
                 </section>
               );
             })}
-          </div>
+            </div>
+          )}
+
+          {effectiveMode === "catalog" && (
+            <div className="mt-4 grid gap-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-panel)] p-4">
+              <div className="rounded-xl border border-[var(--app-warning-border)] bg-[var(--app-warning-soft)] px-4 py-3 text-sm text-[var(--app-warning)]">
+                Ручной поиск не подтверждает совместимость. Добавленная позиция будет отмечена как выбранная вручную.
+              </div>
+
+              {needs.length === 0 ? (
+                <div className="grid gap-3">
+                  <div className="rounded-xl border border-[var(--app-warning-border)] bg-[var(--app-warning-soft)] p-4">
+                    <p className="font-medium text-[var(--app-warning)]">
+                      Комплектующее пока нельзя привязать к этому товару
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">
+                      Для этого типа товара не настроено ни одного назначения
+                      комплектующего. Назначение задаётся один раз для всего
+                      типа — например «Дополнительный контакт» или «Катушка».
+                      После настройки здесь появятся поиск и рекомендации.
+                    </p>
+                  </div>
+                  {canCreateProducts && (
+                    <div className="flex flex-col gap-3 sm:flex-row">
+                      <AppInput
+                        value={manualSearchInput}
+                        placeholder="Артикул нового комплектующего"
+                        onChange={(event) =>
+                          setManualSearchInput(event.target.value)
+                        }
+                      />
+                      <AppButton
+                        type="button"
+                        variant="secondary"
+                        disabled={manualSearchInput.trim().length === 0}
+                        onClick={() =>
+                          onCreateComponent(manualSearchInput.trim())
+                        }
+                      >
+                        Создать карточку комплектующего
+                      </AppButton>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div className="grid gap-3 lg:grid-cols-[minmax(220px,0.8fr)_minmax(260px,1fr)_minmax(220px,0.8fr)_auto]">
+                    <select
+                      value={effectiveManualNeedId}
+                      onChange={(event) => {
+                        setManualNeedId(event.target.value);
+                        setManualPage(1);
+                      }}
+                      aria-label="Какую потребность закрывает комплектующее"
+                      className="min-h-11 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] px-3 text-sm text-[var(--app-text)]"
+                    >
+                      {needs.map((need) => (
+                        <option key={need.needDefinitionId} value={need.needDefinitionId}>
+                          {need.name}
+                        </option>
+                      ))}
+                    </select>
+
+                    <AppInput
+                      value={manualSearchInput}
+                      placeholder="Название, артикул или производитель"
+                      onChange={(event) => setManualSearchInput(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          setManualSearch(manualSearchInput.trim());
+                          setManualPage(1);
+                        }
+                      }}
+                    />
+
+                    <select
+                      value={manualProductTypeCode}
+                      onChange={(event) => {
+                        setManualProductTypeCode(event.target.value);
+                        setManualPage(1);
+                      }}
+                      aria-label="Тип комплектующего"
+                      className="min-h-11 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] px-3 text-sm text-[var(--app-text)]"
+                    >
+                      <option value="">Все типы комплектующих</option>
+                      {componentProductTypes.map((productType) => (
+                        <option key={productType.id} value={productType.code}>
+                          {productType.name}
+                        </option>
+                      ))}
+                    </select>
+
+                    <AppButton
+                      type="button"
+                      variant="secondary"
+                      onClick={() => {
+                        setManualSearch(manualSearchInput.trim());
+                        setManualPage(1);
+                      }}
+                    >
+                      Найти
+                    </AppButton>
+                  </div>
+
+                  {manualProductsQuery.isLoading && (
+                    <p className="text-sm text-[var(--app-muted)]">Ищем комплектующие...</p>
+                  )}
+
+                  {manualProductsQuery.isError && (
+                    <p className="text-sm text-[var(--app-danger)]">
+                      {getApiErrorMessage(manualProductsQuery.error, "Не удалось найти комплектующие.")}
+                    </p>
+                  )}
+
+                  {manualProductsQuery.data?.items.length === 0 && (
+                    <div className="flex flex-col gap-3 rounded-xl border border-dashed border-[var(--app-border-strong)] p-4 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="text-sm text-[var(--app-muted)]">
+                        По заданным условиям ничего не найдено.
+                      </p>
+                      {canCreateProducts && manualSearch.trim().length > 0 && (
+                        <AppButton
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => onCreateComponent(manualSearch.trim())}
+                        >
+                          Добавить комплектующее в каталог
+                        </AppButton>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="grid gap-2">
+                    {manualProductsQuery.data?.items.map((candidate) => {
+                      const candidateKey = `manual:${effectiveManualNeedId}:${candidate.productId}`;
+                      const quantityValue = quantities[candidateKey] ?? "1";
+                      const quantity = Number(quantityValue);
+                      const isAlreadyAdded = line.components.some(
+                        (component) =>
+                          component.needDefinitionId === effectiveManualNeedId &&
+                          component.componentProductId === candidate.productId,
+                      );
+                      const hasActivePrice = candidate.priceStatus === "Available";
+
+                      return (
+                        <div
+                          key={candidate.productId}
+                          className="flex flex-col gap-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-3 lg:flex-row lg:items-center lg:justify-between"
+                        >
+                          <div className="min-w-0">
+                            <p className="font-medium text-[var(--app-text)]">{candidate.name}</p>
+                            <p className="mt-1 text-xs text-[var(--app-muted)]">
+                              {candidate.article} · {candidate.manufacturerName} · {candidate.productTypeName} · {candidate.basePriceAmount === null
+                                ? candidate.priceStatus === "ActivePriceAmbiguous"
+                                  ? "несколько активных цен"
+                                  : "нет активной цены"
+                                : formatPrice(candidate.basePriceAmount, currency)}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <AppInput
+                              type="number"
+                              min="1"
+                              max="1000000"
+                              step="1"
+                              value={quantityValue}
+                              aria-label={`Количество ${candidate.name} на единицу товара`}
+                              onChange={(event) =>
+                                setQuantities((current) => ({
+                                  ...current,
+                                  [candidateKey]: event.target.value,
+                                }))
+                              }
+                              className="w-24"
+                            />
+                            <AppButton
+                              type="button"
+                              variant="primary"
+                              size="sm"
+                              loading={addingKey === candidateKey}
+                              disabled={isAlreadyAdded || !hasActivePrice || !Number.isInteger(quantity) || quantity < 1}
+                              onClick={() => onAdd(effectiveManualNeedId, candidate.productId, quantity, true)}
+                            >
+                              {isAlreadyAdded
+                                ? "Добавлено"
+                                : hasActivePrice
+                                  ? "Добавить"
+                                  : "Недоступно"}
+                            </AppButton>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {(manualProductsQuery.data?.totalPages ?? 0) > 1 && (
+                    <div className="flex items-center justify-between gap-3">
+                      <AppButton
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        disabled={manualPage <= 1}
+                        onClick={() => setManualPage((page) => Math.max(1, page - 1))}
+                      >
+                        Назад
+                      </AppButton>
+                      <span className="text-xs text-[var(--app-muted)]">
+                        Страница {manualPage} из {manualTotalPages}
+                      </span>
+                      <AppButton
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        disabled={manualPage >= manualTotalPages}
+                        onClick={() => setManualPage((page) => Math.min(manualTotalPages, page + 1))}
+                      >
+                        Вперёд
+                      </AppButton>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>
       </td>
     </tr>
@@ -429,6 +894,7 @@ function ComponentPickerRow({
 }
 
 function CalculationLineRow({
+  calculationId,
   line,
   currency,
   editable,
@@ -440,9 +906,12 @@ function CalculationLineRow({
   onChangeQuantity,
   onRemove,
   onAddComponent,
+  canCreateProducts,
+  onCreateComponent,
   onChangeComponentQuantity,
   onRemoveComponent,
 }: {
+  calculationId: string;
   line: CatalogPriceCalculationLine;
   currency: string;
   editable: boolean;
@@ -458,7 +927,10 @@ function CalculationLineRow({
     needDefinitionId: string,
     componentProductId: string,
     quantityPerUnit: number,
+    manualSelection: boolean,
   ) => void;
+  canCreateProducts: boolean;
+  onCreateComponent: (article: string) => void;
   onChangeComponentQuantity: (
     lineId: string,
     componentLineId: string,
@@ -620,18 +1092,22 @@ function CalculationLineRow({
 
       {showComponentPicker && (
         <ComponentPickerRow
+          calculationId={calculationId}
           line={line}
           currency={currency}
           editable={editable}
           addingKey={addingComponentKey}
-          onAdd={(needDefinitionId, componentProductId, quantityPerUnit) =>
+          onAdd={(needDefinitionId, componentProductId, quantityPerUnit, manualSelection) =>
             onAddComponent(
               line.lineId,
               needDefinitionId,
               componentProductId,
               quantityPerUnit,
+              manualSelection,
             )
           }
+          canCreateProducts={canCreateProducts}
+          onCreateComponent={onCreateComponent}
           onClose={() => setShowComponentPicker(false)}
         />
       )}
@@ -925,6 +1401,7 @@ export default function CatalogPriceCalculationPage() {
   const queryClient = useQueryClient();
   const { hasPermission } = useCurrentUserAccess();
   const canExport = hasPermission("PriceCalculationsExport");
+  const canEditProducts = hasPermission("ProductsEdit");
 
   const calculationId = params.calculationId ?? "";
 
@@ -932,6 +1409,13 @@ export default function CatalogPriceCalculationPage() {
   const [appliedSearch, setAppliedSearch] = useState("");
   const [searchPage, setSearchPage] = useState(1);
   const [projectImportFile, setProjectImportFile] = useState<File | null>(null);
+  const [importPreviewSection, setImportPreviewSection] = useState<
+    "positions" | "components" | "characteristics"
+  >("positions");
+  const [showUnchangedCharacteristics, setShowUnchangedCharacteristics] =
+    useState(false);
+  const [missingProductDraft, setMissingProductDraft] =
+    useState<MissingCatalogProductDraft | null>(null);
 
   const calculationQuery = useQuery({
     queryKey: catalogPriceCalculationQueryKeys.details(calculationId),
@@ -1027,23 +1511,127 @@ export default function CatalogPriceCalculationPage() {
 
   const importPreviewMutation = useMutation({
     mutationFn: previewCatalogPriceCalculationImport,
+    onSuccess: (preview) => {
+      const hasPositionChanges = preview.rows.some(
+        (row) => row.status !== "Unchanged",
+      );
+      const hasComponentChanges = preview.componentRows.some(
+        (row) => row.status !== "Unchanged",
+      );
+      const hasCharacteristicChanges = preview.characteristicRows.some(
+        (row) => row.status !== "Unchanged",
+      );
+
+      if (hasPositionChanges) {
+        setImportPreviewSection("positions");
+      } else if (hasComponentChanges) {
+        setImportPreviewSection("components");
+      } else if (hasCharacteristicChanges) {
+        setImportPreviewSection("characteristics");
+      } else {
+        setImportPreviewSection("positions");
+      }
+    },
   });
 
   const importApplyMutation = useMutation({
     mutationFn: applyCatalogPriceCalculationImport,
-    onSuccess: refreshCalculation,
+    onSuccess: async () => {
+      await refreshCalculation();
+
+      if (projectImportFile) {
+        importPreviewMutation.mutate({
+          calculationId,
+          file: projectImportFile,
+        });
+      }
+    },
   });
 
-  const matchedImportRows = useMemo(
+  const actionableImportRows = useMemo(
     () =>
       (importPreviewMutation.data?.rows ?? []).filter(
         (row) =>
-          row.status === "Matched" &&
           row.productId !== null &&
-          row.quantity !== null,
+          (row.status === "New" ||
+            row.status === "QuantityChanged" ||
+            row.status === "Removed"),
       ),
     [importPreviewMutation.data?.rows],
   );
+
+  const actionableComponentImportRows = useMemo(
+    () =>
+      (importPreviewMutation.data?.componentRows ?? []).filter(
+        (row) =>
+          row.mainLineId !== null &&
+          row.needDefinitionId !== null &&
+          row.componentProductId !== null &&
+          (row.status === "New" ||
+            row.status === "QuantityChanged" ||
+            row.status === "Removed"),
+      ),
+    [importPreviewMutation.data?.componentRows],
+  );
+
+  const actionableCharacteristicImportRows = useMemo(
+    () =>
+      (importPreviewMutation.data?.characteristicRows ?? []).filter(
+        (row) =>
+          row.productId !== null &&
+          (row.status === "Changed" || row.status === "Removed"),
+      ),
+    [importPreviewMutation.data?.characteristicRows],
+  );
+
+  const characteristicImportView = useMemo(() => {
+    const rows = importPreviewMutation.data?.characteristicRows ?? [];
+    const unchangedCount = rows.filter(
+      (row) => row.status === "Unchanged",
+    ).length;
+    const visibleRows = showUnchangedCharacteristics
+      ? rows
+      : rows.filter((row) => row.status !== "Unchanged");
+    const groups = new Map<
+      string,
+      {
+        key: string;
+        rowNumber: number;
+        productName: string;
+        article: string;
+        productTypeName: string;
+        rows: CatalogPriceCalculationCharacteristicImportPreviewRow[];
+      }
+    >();
+
+    for (const row of visibleRows) {
+      const key = row.productId ?? `${row.rowNumber}:${row.article}`;
+      const existingGroup = groups.get(key);
+
+      if (existingGroup) {
+        existingGroup.rows.push(row);
+        continue;
+      }
+
+      groups.set(key, {
+        key,
+        rowNumber: row.rowNumber,
+        productName: row.productName,
+        article: row.article,
+        productTypeName: row.productTypeName,
+        rows: [row],
+      });
+    }
+
+    return {
+      groups: Array.from(groups.values()),
+      unchangedCount,
+      attentionCount: rows.length - unchangedCount,
+    };
+  }, [
+    importPreviewMutation.data?.characteristicRows,
+    showUnchangedCharacteristics,
+  ]);
 
   const manufacturers = useMemo(() => {
     const result = new Map<string, string>();
@@ -1099,18 +1687,92 @@ export default function CatalogPriceCalculationPage() {
   }
 
   function handleApplyImport(): void {
-    const rows = matchedImportRows.map((row) => ({
+    const rows = actionableImportRows.map((row) => ({
+      action:
+        row.status === "New"
+          ? ("Add" as const)
+          : row.status === "QuantityChanged"
+            ? ("UpdateQuantity" as const)
+            : ("Remove" as const),
       productId: row.productId as string,
-      quantity: row.quantity as number,
+      existingLineId: row.existingLineId,
+      quantity: row.status === "Removed" ? null : row.quantity,
     }));
 
-    if (rows.length === 0) {
+    const componentRows = actionableComponentImportRows.map((row) => ({
+      action:
+        row.status === "New"
+          ? ("Add" as const)
+          : row.status === "QuantityChanged"
+            ? ("UpdateQuantity" as const)
+            : ("Remove" as const),
+      mainLineId: row.mainLineId as string,
+      existingComponentLineId: row.existingComponentLineId,
+      needDefinitionId: row.needDefinitionId as string,
+      componentProductId: row.componentProductId as string,
+      quantityPerUnit: row.status === "Removed" ? null : row.quantityPerUnit,
+    }));
+
+    const characteristicRows = actionableCharacteristicImportRows.map(
+      (row) => ({
+        action: row.status === "Removed" ? ("Remove" as const) : ("Set" as const),
+        productId: row.productId as string,
+        characteristicCode: row.characteristicCode,
+        value: row.status === "Removed" ? null : row.newValue,
+      }),
+    );
+
+    if (
+      rows.length === 0 &&
+      componentRows.length === 0 &&
+      characteristicRows.length === 0
+    ) {
       return;
     }
 
     importApplyMutation.mutate({
       calculationId,
       rows,
+      componentRows,
+      characteristicRows,
+    });
+  }
+
+  async function refreshAfterProductCreation(
+    product: CreateCatalogProductResponse,
+    projectQuantity: number | null,
+  ): Promise<void> {
+    const source = missingProductDraft?.source;
+    setMissingProductDraft(null);
+
+    await queryClient.invalidateQueries({
+      queryKey: catalogPriceCalculationQueryKeys.productsRoot(calculationId),
+    });
+
+    if (source === "search") {
+      addLineMutation.mutate({
+        calculationId,
+        productId: product.productId,
+        quantity: projectQuantity ?? 1,
+      });
+      return;
+    }
+
+    if (source === "componentSearch") {
+      await queryClient.invalidateQueries({
+        queryKey: ["price-calculation-component-search", calculationId],
+      });
+      return;
+    }
+
+    if (source !== "projectImport" || !projectImportFile) {
+      return;
+    }
+
+    importApplyMutation.reset();
+    importPreviewMutation.mutate({
+      calculationId,
+      file: projectImportFile,
     });
   }
 
@@ -1128,11 +1790,11 @@ export default function CatalogPriceCalculationPage() {
     });
   }
 
-  function handleAdd(productId: string): void {
+  function handleAdd(productId: string, quantity: number): void {
     addLineMutation.mutate({
       calculationId,
       productId,
-      quantity: 1,
+      quantity,
     });
   }
 
@@ -1164,6 +1826,7 @@ export default function CatalogPriceCalculationPage() {
     needDefinitionId: string,
     componentProductId: string,
     quantityPerUnit: number,
+    manualSelection: boolean,
   ): void {
     addComponentMutation.mutate({
       calculationId,
@@ -1171,6 +1834,7 @@ export default function CatalogPriceCalculationPage() {
       needDefinitionId,
       componentProductId,
       quantityPerUnit,
+      manualSelection,
     });
   }
 
@@ -1275,7 +1939,7 @@ export default function CatalogPriceCalculationPage() {
     <PageWorkspace
       eyebrow="Расчёт цен"
       title={calculation.title}
-      description={`Создан ${formatDate(calculation.createdAtUtc)}. Цены получены из активных прайс-листов и изменяются только backend.`}
+      description={`Создан ${formatDate(calculation.createdAtUtc)}. Цена берётся из активного прайса, а при его отсутствии — из карточки каталога.`}
       status={<StatusBadge status={calculation.status} />}
       contentClassName="grid min-w-0 gap-6"
       actions={
@@ -1392,6 +2056,8 @@ export default function CatalogPriceCalculationPage() {
                 disabled={importPreviewMutation.isPending}
                 onChange={(event) => {
                   setProjectImportFile(event.target.files?.[0] ?? null);
+                  setImportPreviewSection("positions");
+                  setShowUnchangedCharacteristics(false);
                   importPreviewMutation.reset();
                   importApplyMutation.reset();
                 }}
@@ -1423,7 +2089,13 @@ export default function CatalogPriceCalculationPage() {
 
           {importPreviewMutation.data && (
             <div className="mt-6 grid gap-5">
-              <div className="grid gap-3 sm:grid-cols-3">
+              {importPreviewMutation.data.warning && (
+                <div className="rounded-2xl border border-[var(--app-warning-border)] bg-[var(--app-warning-soft)] p-4 text-sm text-[var(--app-warning)]">
+                  {importPreviewMutation.data.warning}
+                </div>
+              )}
+
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
                 <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
                   <p className="text-sm text-[var(--app-muted)]">
                     Прочитано строк
@@ -1436,11 +2108,32 @@ export default function CatalogPriceCalculationPage() {
 
                 <div className="rounded-2xl border border-[var(--app-success-border)] bg-[var(--app-success-soft)] p-4">
                   <p className="text-sm text-[var(--app-success)]">
-                    Сопоставлено
+                    Будет добавлено
                   </p>
 
                   <p className="mt-2 text-2xl font-bold tabular-nums text-[var(--app-success)]">
-                    {importPreviewMutation.data.matchedRowsCount}
+                    {importPreviewMutation.data.addedRowsCount}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-[var(--app-warning-border)] bg-[var(--app-warning-soft)] p-4">
+                  <p className="text-sm text-[var(--app-warning)]">Изменится</p>
+                  <p className="mt-2 text-2xl font-bold tabular-nums text-[var(--app-warning)]">
+                    {importPreviewMutation.data.updatedRowsCount}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-[var(--app-warning-border)] bg-[var(--app-warning-soft)] p-4">
+                  <p className="text-sm text-[var(--app-warning)]">Удалится</p>
+                  <p className="mt-2 text-2xl font-bold tabular-nums text-[var(--app-warning)]">
+                    {importPreviewMutation.data.removedRowsCount}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
+                  <p className="text-sm text-[var(--app-muted)]">Без изменений</p>
+                  <p className="mt-2 text-2xl font-bold tabular-nums text-[var(--app-text)]">
+                    {importPreviewMutation.data.unchangedRowsCount}
                   </p>
                 </div>
 
@@ -1455,8 +2148,8 @@ export default function CatalogPriceCalculationPage() {
 
               <div className="flex flex-col gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm leading-6 text-[var(--app-muted)]">
-                  В проект попадут только сопоставленные позиции. Строки с
-                  ошибками будут пропущены.
+                  Проверьте список ниже. После подтверждения добавления,
+                  изменения количества и удаления будут применены одной операцией.
                 </p>
 
                 <AppButton
@@ -1464,12 +2157,14 @@ export default function CatalogPriceCalculationPage() {
                   variant="primary"
                   loading={importApplyMutation.isPending}
                   disabled={
-                    matchedImportRows.length === 0 ||
+                    (actionableImportRows.length === 0 &&
+                      actionableComponentImportRows.length === 0 &&
+                      actionableCharacteristicImportRows.length === 0) ||
                     importApplyMutation.isSuccess
                   }
                   onClick={handleApplyImport}
                 >
-                  Добавить сопоставленные позиции в проект
+                  Применить показанные изменения
                 </AppButton>
               </div>
 
@@ -1480,7 +2175,7 @@ export default function CatalogPriceCalculationPage() {
                 >
                   {getApiErrorMessage(
                     importApplyMutation.error,
-                    "Не удалось добавить позиции из файла в проект.",
+                    "Не удалось применить изменения из файла.",
                   )}
                 </div>
               )}
@@ -1490,12 +2185,64 @@ export default function CatalogPriceCalculationPage() {
                   role="status"
                   className="rounded-2xl border border-[var(--app-success-border)] bg-[var(--app-success-soft)] p-4 text-sm text-[var(--app-success)]"
                 >
-                  Добавлено позиций: {importApplyMutation.data.addedLinesCount}.
-                  Строки с ошибками не добавлялись.
+                  Добавлено: {importApplyMutation.data.addedLinesCount}, изменено: {" "}
+                  {importApplyMutation.data.updatedLinesCount}, удалено: {" "}
+                  {importApplyMutation.data.removedLinesCount}. Комплектующих добавлено: {" "}
+                  {importApplyMutation.data.addedComponentsCount}, изменено: {" "}
+                  {importApplyMutation.data.updatedComponentsCount}, удалено: {" "}
+                  {importApplyMutation.data.removedComponentsCount}.
+                  Характеристик изменено: {" "}
+                  {importApplyMutation.data.updatedCharacteristicsCount}, очищено: {" "}
+                  {importApplyMutation.data.removedCharacteristicsCount}. Строки с ошибками не применялись.
                 </div>
               )}
 
-              <div className="overflow-x-auto rounded-2xl border border-[var(--app-border)]">
+              <div
+                role="tablist"
+                aria-label="Разделы проверки файла"
+                className="flex flex-wrap gap-2 rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-2"
+              >
+                <AppButton
+                  type="button"
+                  size="sm"
+                  variant={
+                    importPreviewSection === "positions" ? "primary" : "secondary"
+                  }
+                  onClick={() => setImportPreviewSection("positions")}
+                >
+                  Позиции ({importPreviewMutation.data.rows.length})
+                </AppButton>
+                <AppButton
+                  type="button"
+                  size="sm"
+                  variant={
+                    importPreviewSection === "components" ? "primary" : "secondary"
+                  }
+                  disabled={importPreviewMutation.data.componentRows.length === 0}
+                  onClick={() => setImportPreviewSection("components")}
+                >
+                  Комплектующие ({importPreviewMutation.data.componentRows.length})
+                </AppButton>
+                <AppButton
+                  type="button"
+                  size="sm"
+                  variant={
+                    importPreviewSection === "characteristics"
+                      ? "primary"
+                      : "secondary"
+                  }
+                  disabled={
+                    importPreviewMutation.data.characteristicRows.length === 0
+                  }
+                  onClick={() => setImportPreviewSection("characteristics")}
+                >
+                  Характеристики ({importPreviewMutation.data.characteristicRows.length})
+                </AppButton>
+              </div>
+
+              <div
+                className={`${importPreviewSection === "positions" ? "" : "hidden"} overflow-x-auto rounded-2xl border border-[var(--app-border)]`}
+              >
                 <table className="w-full min-w-[1450px] border-collapse text-left text-sm">
                   <thead className="bg-[var(--app-surface)] text-[var(--app-muted)]">
                     <tr>
@@ -1551,9 +2298,13 @@ export default function CatalogPriceCalculationPage() {
                           </td>
 
                           <td className="px-4 py-4 tabular-nums text-[var(--app-text)]">
-                            {row.quantity === null
-                              ? "—"
-                              : formatQuantity(row.quantity)}
+                            {row.status === "QuantityChanged"
+                              ? `${formatQuantity(row.currentQuantity ?? 0)} → ${formatQuantity(row.quantity ?? 0)}`
+                              : row.status === "Removed"
+                                ? `${formatQuantity(row.currentQuantity ?? 0)} → удаление`
+                                : row.quantity === null
+                                  ? "—"
+                                  : formatQuantity(row.quantity)}
                           </td>
 
                           <td className="px-4 py-4 tabular-nums text-[var(--app-text)]">
@@ -1597,6 +2348,32 @@ export default function CatalogPriceCalculationPage() {
                                 {row.message}
                               </p>
                             )}
+
+                            {canEditProducts &&
+                              row.status === "ProductNotFound" &&
+                              row.article && (
+                                <AppButton
+                                  type="button"
+                                  size="sm"
+                                  variant="secondary"
+                                  className="mt-3"
+                                  onClick={() =>
+                                    setMissingProductDraft({
+                                      article: row.article,
+                                      name:
+                                        row.sourceName?.trim() || row.article,
+                                      manufacturerName:
+                                        row.sourceManufacturer,
+                                      kind: "MainProduct",
+                                      priceAmount: row.basePriceAmount,
+                                      projectQuantity: null,
+                                      source: "projectImport",
+                                    })
+                                  }
+                                >
+                                  Добавить в каталог
+                                </AppButton>
+                              )}
                           </td>
                         </tr>
                       ))}
@@ -1604,7 +2381,244 @@ export default function CatalogPriceCalculationPage() {
                 </table>
               </div>
 
-              {importPreviewMutation.data.rows.length > 100 && (
+              {importPreviewSection === "components" &&
+                importPreviewMutation.data.componentRows.length > 0 && (
+                <div className="grid gap-3">
+                  <div>
+                    <h3 className="text-lg font-semibold text-[var(--app-text)]">
+                      Комплектующие
+                    </h3>
+                    <p className="mt-1 text-sm text-[var(--app-muted)]">
+                      Изменения из листа «Комплектующие» применяются вместе с
+                      основными позициями.
+                    </p>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-2xl border border-[var(--app-border)]">
+                    <table className="w-full min-w-[1100px] border-collapse text-left text-sm">
+                      <thead className="bg-[var(--app-surface)] text-[var(--app-muted)]">
+                        <tr>
+                          <th className="px-4 py-3 font-medium">Строка</th>
+                          <th className="px-4 py-3 font-medium">Основной товар</th>
+                          <th className="px-4 py-3 font-medium">Потребность</th>
+                          <th className="px-4 py-3 font-medium">Комплектующее</th>
+                          <th className="px-4 py-3 font-medium">Количество на единицу</th>
+                          <th className="px-4 py-3 font-medium">Результат</th>
+                        </tr>
+                      </thead>
+
+                      <tbody className="divide-y divide-[var(--app-border)]">
+                        {importPreviewMutation.data.componentRows
+                          .slice(0, 100)
+                          .map((row) => (
+                            <tr
+                              key={`${row.rowNumber}-${row.mainProductArticle}-${row.componentArticle}`}
+                              className="bg-[var(--app-panel)] align-top"
+                            >
+                              <td className="px-4 py-4 tabular-nums text-[var(--app-muted)]">
+                                {row.rowNumber}
+                              </td>
+                              <td className="px-4 py-4 font-medium text-[var(--app-text)]">
+                                {row.mainProductArticle || "—"}
+                              </td>
+                              <td className="px-4 py-4 text-[var(--app-text)]">
+                                {row.needName || "—"}
+                              </td>
+                              <td className="px-4 py-4 font-medium text-[var(--app-text)]">
+                                {row.componentArticle || "—"}
+                              </td>
+                              <td className="px-4 py-4 tabular-nums text-[var(--app-text)]">
+                                {row.status === "QuantityChanged"
+                                  ? `${row.currentQuantityPerUnit ?? 0} → ${row.quantityPerUnit ?? 0}`
+                                  : row.status === "Removed"
+                                    ? `${row.currentQuantityPerUnit ?? 0} → удаление`
+                                    : row.quantityPerUnit ?? "—"}
+                              </td>
+                              <td className="px-4 py-4">
+                                <span
+                                  className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getComponentImportStatusClassName(row.status)}`}
+                                >
+                                  {getComponentImportStatusLabel(row.status)}
+                                </span>
+
+                                {row.message && (
+                                  <p className="mt-2 max-w-80 text-xs leading-5 text-[var(--app-muted)]">
+                                    {row.message}
+                                  </p>
+                                )}
+
+                                {canEditProducts &&
+                                  row.status === "ComponentNotFound" &&
+                                  row.componentArticle && (
+                                    <AppButton
+                                      type="button"
+                                      size="sm"
+                                      variant="secondary"
+                                      className="mt-3"
+                                      onClick={() =>
+                                        setMissingProductDraft({
+                                          article: row.componentArticle,
+                                          name: row.componentArticle,
+                                          manufacturerName: null,
+                                          kind: "Component",
+                                          priceAmount: null,
+                                          projectQuantity: null,
+                                          source: "projectImport",
+                                        })
+                                      }
+                                    >
+                                      Добавить в каталог
+                                    </AppButton>
+                                  )}
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {importPreviewMutation.data.componentRows.length > 100 && (
+                    <p className="text-sm text-[var(--app-muted)]">
+                      Показаны первые 100 комплектующих из {" "}
+                      {importPreviewMutation.data.componentRows.length}.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {importPreviewSection === "characteristics" &&
+                importPreviewMutation.data.characteristicRows.length > 0 && (
+                <div className="grid gap-3">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold text-[var(--app-text)]">
+                        Изменения характеристик
+                      </h3>
+                      <p className="mt-1 text-sm text-[var(--app-muted)]">
+                        По умолчанию показаны только изменения и ошибки. Они
+                        применятся к карточкам каталога после подтверждения.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full border border-[var(--app-warning-border)] bg-[var(--app-warning-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--app-warning)]">
+                        Требуют внимания: {characteristicImportView.attentionCount}
+                      </span>
+                      <span className="rounded-full border border-[var(--app-border)] bg-[var(--app-surface)] px-3 py-1.5 text-xs font-semibold text-[var(--app-muted)]">
+                        Без изменений: {characteristicImportView.unchangedCount}
+                      </span>
+                      {characteristicImportView.unchangedCount > 0 && (
+                        <AppButton
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          onClick={() =>
+                            setShowUnchangedCharacteristics((current) => !current)
+                          }
+                        >
+                          {showUnchangedCharacteristics
+                            ? "Скрыть без изменений"
+                            : "Показать без изменений"}
+                        </AppButton>
+                      )}
+                    </div>
+                  </div>
+
+                  {characteristicImportView.groups.length === 0 ? (
+                    <div className="rounded-2xl border border-[var(--app-success-border)] bg-[var(--app-success-soft)] p-4 text-sm text-[var(--app-success)]">
+                      Характеристики товаров не изменились.
+                    </div>
+                  ) : (
+                    <div className="grid gap-4">
+                      {characteristicImportView.groups.slice(0, 100).map((group) => (
+                        <section
+                          key={group.key}
+                          className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-panel)]"
+                        >
+                          <div className="flex flex-col gap-1 border-b border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                              <p className="font-semibold text-[var(--app-text)]">
+                                {group.productName || "Товар не найден"}
+                              </p>
+                              <p className="mt-1 text-xs text-[var(--app-muted)]">
+                                {group.article || "Без артикула"}
+                                {group.productTypeName
+                                  ? ` · ${group.productTypeName}`
+                                  : ""}
+                              </p>
+                            </div>
+                            <span className="text-xs text-[var(--app-muted)]">
+                              Строка Excel: {group.rowNumber}
+                            </span>
+                          </div>
+
+                          <div className="divide-y divide-[var(--app-border)]">
+                            {group.rows.map((row) => (
+                              <div
+                                key={`${row.rowNumber}-${row.characteristicCode}`}
+                                className="grid gap-3 px-4 py-4 lg:grid-cols-[minmax(220px,1fr)_minmax(260px,1.2fr)_minmax(220px,0.8fr)] lg:items-center"
+                              >
+                                <div>
+                                  <p className="font-medium text-[var(--app-text)]">
+                                    {row.characteristicName || "Характеристика"}
+                                    {row.unit ? `, ${row.unit}` : ""}
+                                  </p>
+                                  <p className="mt-1 text-xs text-[var(--app-muted)]">
+                                    {row.isRequired
+                                      ? "Обязательная"
+                                      : "Необязательная"}
+                                  </p>
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-2 text-sm">
+                                  <span className="rounded-lg bg-[var(--app-surface)] px-3 py-2 text-[var(--app-muted)]">
+                                    {formatCharacteristicImportValue(
+                                      row.currentValue,
+                                      row.dataType,
+                                    )}
+                                  </span>
+                                  <span className="text-[var(--app-muted)]">→</span>
+                                  <span className="rounded-lg bg-[var(--app-accent-soft)] px-3 py-2 font-medium text-[var(--app-text)]">
+                                    {row.status === "Removed"
+                                      ? "Очистить"
+                                      : formatCharacteristicImportValue(
+                                          row.newValue,
+                                          row.dataType,
+                                        )}
+                                  </span>
+                                </div>
+
+                                <div>
+                                  <span
+                                    className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getCharacteristicImportStatusClassName(row.status)}`}
+                                  >
+                                    {getCharacteristicImportStatusLabel(row.status)}
+                                  </span>
+                                  {row.message && row.status !== "Unchanged" && (
+                                    <p className="mt-2 text-xs leading-5 text-[var(--app-muted)]">
+                                      {row.message}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </section>
+                      ))}
+                    </div>
+                  )}
+
+                  {characteristicImportView.groups.length > 100 && (
+                    <p className="text-sm text-[var(--app-muted)]">
+                      Показаны первые 100 товаров из {" "}
+                      {characteristicImportView.groups.length}.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {importPreviewSection === "positions" &&
+                importPreviewMutation.data.rows.length > 100 && (
                 <p className="text-sm text-[var(--app-muted)]">
                   Показаны первые 100 строк из{" "}
                   {importPreviewMutation.data.rows.length}. Все строки файла
@@ -1629,8 +2643,9 @@ export default function CatalogPriceCalculationPage() {
           </h2>
 
           <p className="mt-2 text-sm text-[var(--app-muted)]">
-            Поиск показывает только товары с корректной строкой в активном
-            прайсе производителя.
+            Поиск выполняется по всему каталогу. Если для товара есть одна
+            актуальная цена в прайсе, используется она; иначе расчёт возьмёт
+            цену из карточки товара.
           </p>
 
           <form
@@ -1676,7 +2691,7 @@ export default function CatalogPriceCalculationPage() {
                     <tr>
                       <th className="px-4 py-3 font-medium">Товар</th>
                       <th className="px-4 py-3 font-medium">Производитель</th>
-                      <th className="px-4 py-3 font-medium">Прайс 100%</th>
+                      <th className="px-4 py-3 font-medium">Базовая цена</th>
                       <th className="px-4 py-3 font-medium">МРЦ</th>
                       <th className="px-4 py-3 font-medium">Действие</th>
                     </tr>
@@ -1733,9 +2748,31 @@ export default function CatalogPriceCalculationPage() {
               </nav>
             </>
           ) : appliedSearch.length > 0 && productsQuery.isSuccess ? (
-            <p className="mt-5 rounded-2xl border border-dashed border-[var(--app-border-strong)] p-5 text-sm text-[var(--app-muted)]">
-              В активных прайсах подходящие товары не найдены.
-            </p>
+            <div className="mt-5 flex flex-col gap-3 rounded-2xl border border-dashed border-[var(--app-border-strong)] p-5 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-[var(--app-muted)]">
+                В каталоге подходящие товары не найдены.
+              </p>
+              {canEditProducts && (
+                <AppButton
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() =>
+                    setMissingProductDraft({
+                      article: appliedSearch,
+                      name: appliedSearch,
+                      manufacturerName: null,
+                      kind: "MainProduct",
+                      priceAmount: 0,
+                      projectQuantity: 1,
+                      source: "search",
+                    })
+                  }
+                >
+                  Добавить товар в каталог
+                </AppButton>
+              )}
+            </div>
           ) : null}
         </section>
       )}
@@ -1805,7 +2842,7 @@ export default function CatalogPriceCalculationPage() {
                   <th className="px-4 py-3 font-medium">Количество</th>
                   <th className="px-4 py-3 font-medium">На складе</th>
                   <th className="px-4 py-3 font-medium">Дефицит</th>
-                  <th className="px-4 py-3 font-medium">Прайс 100%</th>
+                  <th className="px-4 py-3 font-medium">Базовая цена</th>
                   <th className="px-4 py-3 font-medium">МРЦ</th>
                   <th className="px-4 py-3 font-medium">Скидка</th>
                   <th className="px-4 py-3 font-medium">Проектная цена</th>
@@ -1820,6 +2857,7 @@ export default function CatalogPriceCalculationPage() {
                 {calculation.lines.map((line) => (
                   <CalculationLineRow
                     key={`${line.lineId}-${line.quantity}`}
+                    calculationId={calculationId}
                     line={line}
                     currency={calculation.currency}
                     editable={editable}
@@ -1846,12 +2884,24 @@ export default function CatalogPriceCalculationPage() {
                     addingComponentKey={
                       addComponentMutation.isPending &&
                       addComponentMutation.variables?.lineId === line.lineId
-                        ? `${addComponentMutation.variables.needDefinitionId}:${addComponentMutation.variables.componentProductId}`
+                        ? `${addComponentMutation.variables.manualSelection ? "manual:" : ""}${addComponentMutation.variables.needDefinitionId}:${addComponentMutation.variables.componentProductId}`
                         : undefined
                     }
                     onChangeQuantity={handleChangeQuantity}
                     onRemove={handleRemoveLine}
                     onAddComponent={handleAddComponent}
+                    canCreateProducts={canEditProducts}
+                    onCreateComponent={(article) =>
+                      setMissingProductDraft({
+                        article,
+                        name: article,
+                        manufacturerName: null,
+                        kind: "Component",
+                        priceAmount: 0,
+                        projectQuantity: null,
+                        source: "componentSearch",
+                      })
+                    }
                     onChangeComponentQuantity={
                       handleChangeComponentQuantity
                     }
@@ -1874,6 +2924,19 @@ export default function CatalogPriceCalculationPage() {
           </div>
         )}
       </section>
+
+      {missingProductDraft && (
+        <CreateCatalogProductDialog
+          article={missingProductDraft.article}
+          name={missingProductDraft.name}
+          manufacturerName={missingProductDraft.manufacturerName}
+          kind={missingProductDraft.kind}
+          priceAmount={missingProductDraft.priceAmount}
+          projectQuantity={missingProductDraft.projectQuantity}
+          onClose={() => setMissingProductDraft(null)}
+          onCreated={refreshAfterProductCreation}
+        />
+      )}
     </PageWorkspace>
   );
 }

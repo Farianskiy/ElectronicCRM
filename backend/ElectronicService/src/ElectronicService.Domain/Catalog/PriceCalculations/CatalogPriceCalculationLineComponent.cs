@@ -20,6 +20,7 @@ public sealed class CatalogPriceCalculationLineComponent
         string article,
         string name,
         string manufacturerName,
+        CatalogPriceCalculationLineComponentSelectionSource selectionSource,
         int quantityPerUnit,
         decimal basePriceAmount,
         decimal discountPercent,
@@ -34,6 +35,7 @@ public sealed class CatalogPriceCalculationLineComponent
         Article = article;
         Name = name;
         ManufacturerName = manufacturerName;
+        SelectionSource = selectionSource;
         QuantityPerUnit = quantityPerUnit;
         BasePriceAmount = basePriceAmount;
         DiscountPercent = discountPercent;
@@ -94,6 +96,12 @@ public sealed class CatalogPriceCalculationLineComponent
         private set;
     } = string.Empty;
 
+    public CatalogPriceCalculationLineComponentSelectionSource SelectionSource
+    {
+        get;
+        private set;
+    }
+
     public int QuantityPerUnit
     {
         get;
@@ -153,6 +161,7 @@ public sealed class CatalogPriceCalculationLineComponent
             string article,
             string name,
             string manufacturerName,
+            CatalogPriceCalculationLineComponentSelectionSource selectionSource,
             int quantityPerUnit,
             decimal basePriceAmount,
             decimal discountPercent,
@@ -270,6 +279,7 @@ public sealed class CatalogPriceCalculationLineComponent
             articleResult.Value,
             nameResult.Value,
             manufacturerNameResult.Value,
+            selectionSource,
             quantityPerUnit,
             decimal.Round(
                 basePriceAmount,

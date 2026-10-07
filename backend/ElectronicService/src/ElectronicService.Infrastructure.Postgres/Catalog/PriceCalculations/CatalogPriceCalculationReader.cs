@@ -128,6 +128,7 @@ public sealed class CatalogPriceCalculationReader
                     component.ManufacturerName,
                     component.Article,
                     component.Name,
+                    component.SelectionSource,
                     component.QuantityPerUnit,
                     component.TotalQuantity,
                     component.BasePriceAmount,
@@ -139,12 +140,127 @@ public sealed class CatalogPriceCalculationReader
             .ToArrayAsync(cancellationToken)
             .ConfigureAwait(false);
 
+        var projectProductIds = storedLines
+            .Select(line => line.ProductId)
+            .Concat(storedComponents.Select(component =>
+                component.Details.ComponentProductId))
+            .Distinct()
+            .ToArray();
+
+        var productTypeReferences = await (
+                from product in _dbContext.Products.AsNoTracking()
+                join productType in _dbContext.ProductTypes.AsNoTracking()
+                    on product.ProductTypeId equals productType.Id
+                where projectProductIds.Contains(product.Id)
+                select new
+                {
+                    ProductId = product.Id,
+                    ProductTypeId = productType.Id,
+                    productType.Code,
+                    productType.Name
+                })
+            .ToDictionaryAsync(
+                item => item.ProductId,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        var projectProductTypeIds = productTypeReferences.Values
+            .Select(item => item.ProductTypeId)
+            .Distinct()
+            .ToArray();
+
+        var characteristicDefinitions = await (
+                from relation in _dbContext.ProductTypeCharacteristics.AsNoTracking()
+                join definition in _dbContext.CharacteristicDefinitions.AsNoTracking()
+                    on relation.CharacteristicDefinitionId equals definition.Id
+                where projectProductTypeIds.Contains(relation.ProductTypeId)
+                select new
+                {
+                    relation.ProductTypeId,
+                    DefinitionId = definition.Id,
+                    definition.Code,
+                    definition.Name,
+                    DataType = definition.DataType.ToString(),
+                    definition.Unit,
+                    relation.IsRequired
+                })
+            .ToArrayAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var characteristicValues = await _dbContext.ProductCharacteristics
+            .AsNoTracking()
+            .Where(item => projectProductIds.Contains(item.ProductId))
+            .Select(item => new
+            {
+                item.ProductId,
+                DefinitionId = item.CharacteristicDefinitionId,
+                item.Value.DataType,
+                item.Value.TextValue,
+                item.Value.NumberValue,
+                item.Value.BooleanValue
+            })
+            .ToArrayAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var characteristicValuesByKey = characteristicValues.ToDictionary(
+            item => (item.ProductId, item.DefinitionId),
+            item => item.DataType switch
+            {
+                ElectronicService.Domain.Catalog.Characteristics.CharacteristicDataType.Text =>
+                    item.TextValue,
+                ElectronicService.Domain.Catalog.Characteristics.CharacteristicDataType.Number =>
+                    item.NumberValue?.ToString(
+                        System.Globalization.CultureInfo.InvariantCulture),
+                ElectronicService.Domain.Catalog.Characteristics.CharacteristicDataType.Boolean =>
+                    item.BooleanValue?.ToString(
+                        System.Globalization.CultureInfo.InvariantCulture),
+                _ => null
+            });
+
+        IReadOnlyList<CatalogPriceCalculationProductCharacteristicDetails>
+            GetCharacteristics(Guid productId)
+        {
+            if (!productTypeReferences.TryGetValue(productId, out var productType))
+            {
+                return [];
+            }
+
+            return characteristicDefinitions
+                .Where(item => item.ProductTypeId == productType.ProductTypeId)
+                .OrderByDescending(item => item.IsRequired)
+                .ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(item =>
+                    new CatalogPriceCalculationProductCharacteristicDetails(
+                        item.Code,
+                        item.Name,
+                        item.DataType,
+                        item.Unit,
+                        item.IsRequired,
+                        characteristicValuesByKey.GetValueOrDefault(
+                            (productId, item.DefinitionId))))
+                .ToArray();
+        }
+
         var componentsByLineId = storedComponents
             .GroupBy(component => component.CalculationLineId)
             .ToDictionary(
                 group => group.Key,
                 group => (IReadOnlyList<CatalogPriceCalculationLineComponentDetails>)group
-                    .Select(component => component.Details)
+                    .Select(component =>
+                    {
+                        var details = component.Details;
+                        productTypeReferences.TryGetValue(
+                            details.ComponentProductId,
+                            out var productType);
+
+                        return details with
+                        {
+                            ProductTypeCode = productType?.Code ?? string.Empty,
+                            ProductTypeName = productType?.Name ?? string.Empty,
+                            Characteristics = GetCharacteristics(
+                                details.ComponentProductId)
+                        };
+                    })
                     .ToArray());
 
         var lines = storedLines
@@ -163,6 +279,10 @@ public sealed class CatalogPriceCalculationReader
                     components.Sum(component => component.TotalAmount),
                     2,
                     MidpointRounding.AwayFromZero);
+
+                productTypeReferences.TryGetValue(
+                    line.ProductId,
+                    out var productType);
 
                 return new CatalogPriceCalculationLineDetails(
                     line.LineId,
@@ -186,7 +306,10 @@ public sealed class CatalogPriceCalculationReader
                     line.TotalAmount,
                     line.CreatedAtUtc,
                     line.UpdatedAtUtc,
-                    components);
+                    components,
+                    productType?.Code ?? string.Empty,
+                    productType?.Name ?? string.Empty,
+                    GetCharacteristics(line.ProductId));
             })
             .ToArray();
 
@@ -335,8 +458,8 @@ public sealed class CatalogPriceCalculationReader
         Guid ProductId,
         Guid ManufacturerId,
         string ManufacturerName,
-        Guid PriceListId,
-        Guid PriceListRowId,
+        Guid? PriceListId,
+        Guid? PriceListRowId,
         string Article,
         string Name,
         string? Unit,

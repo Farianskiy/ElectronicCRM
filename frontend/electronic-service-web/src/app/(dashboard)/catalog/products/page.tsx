@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import Link from "next/link";
 import type { FormEvent } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { searchCatalogProducts } from "@/features/catalogProducts/api/searchCatalogProducts";
 import { formatPrice } from "@/shared/lib/formatters";
 import { PageWorkspace } from "@/shared/ui/PageWorkspace";
@@ -30,6 +30,7 @@ import {
   createCatalogProductBulkEditorHref,
   hasCatalogProductBulkEditorFilters,
 } from "@/features/catalogProducts/model/bulkEditorFilters";
+import { ComponentCompatibilityImportPanel } from "@/features/componentCompatibility/ui/ComponentCompatibilityImportPanel";
 
 function getErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
@@ -225,6 +226,7 @@ export default function CatalogProductsPage() {
   const canEditProducts = hasPermission("ProductsEdit");
   const canManagePrices = hasPermission("PricesManage");
   const canManageStock = hasPermission("StockManage");
+  const canManageDictionaries = hasPermission("DictionariesManage");
   const canBulkEdit = canEditProducts || canManagePrices || canManageStock;
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
@@ -244,6 +246,52 @@ export default function CatalogProductsPage() {
 
   const [page, setPage] = useState(1);
   const pageSize = 20;
+
+  useEffect(() => {
+    function applyGlobalSearch(value: string): void {
+      const normalizedSearch = value.trim();
+
+      if (normalizedSearch.length === 0) {
+        return;
+      }
+
+      setSearch(normalizedSearch);
+      setAppliedFilters((current) => ({
+        ...current,
+        search: normalizedSearch,
+      }));
+      setPage(1);
+    }
+
+    const searchFromUrl = new URLSearchParams(window.location.search).get(
+      "search",
+    );
+
+    if (searchFromUrl) {
+      applyGlobalSearch(searchFromUrl);
+    }
+
+    function handleGlobalSearch(event: Event): void {
+      if (
+        event instanceof CustomEvent &&
+        typeof event.detail === "string"
+      ) {
+        applyGlobalSearch(event.detail);
+      }
+    }
+
+    window.addEventListener(
+      "electronic-crm-global-product-search",
+      handleGlobalSearch,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "electronic-crm-global-product-search",
+        handleGlobalSearch,
+      );
+    };
+  }, []);
 
   const productTypesQuery = useQuery({
     queryKey: ["catalog-product-types"],
@@ -489,6 +537,8 @@ export default function CatalogProductsPage() {
           )}
         </section>
       )}
+
+      {canManageDictionaries && <ComponentCompatibilityImportPanel />}
 
       <section
         aria-labelledby="catalog-filters-title"

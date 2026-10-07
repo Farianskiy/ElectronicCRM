@@ -1,3 +1,4 @@
+using System.Globalization;
 using ClosedXML.Excel;
 using ElectronicService.Core.Catalog.PriceCalculations.Abstractions;
 using ElectronicService.Core.Catalog.PriceCalculations.ExportCatalogPriceCalculation;
@@ -11,6 +12,7 @@ public sealed class CatalogPriceCalculationWorkbookExporter : ICatalogPriceCalcu
     private static readonly XLColor SummaryColor = XLColor.FromHtml("#E6FFFB");
     private static readonly XLColor ShortageColor = XLColor.FromHtml("#FEE2E2");
     private static readonly XLColor TotalColor = XLColor.FromHtml("#DCFCE7");
+    private static readonly XLColor CharacteristicInputColor = XLColor.FromHtml("#FFF7CC");
 
     public byte[] Export(CatalogPriceCalculationDetails calculation, DateTime generatedAtUtc)
     {
@@ -20,6 +22,9 @@ public sealed class CatalogPriceCalculationWorkbookExporter : ICatalogPriceCalcu
         WriteSummaryWorksheet(workbook, calculation, generatedAtUtc);
         WriteLinesWorksheet(workbook, calculation);
         WriteComponentsWorksheet(workbook, calculation);
+        var characteristicColumns = CreateCharacteristicColumns(calculation);
+        WriteCharacteristicsWorksheet(workbook, calculation, characteristicColumns);
+        WriteMetadataWorksheet(workbook, calculation, characteristicColumns);
 
         using var stream = new MemoryStream();
         workbook.SaveAs(stream);
@@ -153,7 +158,9 @@ public sealed class CatalogPriceCalculationWorkbookExporter : ICatalogPriceCalcu
             "Основной товар",
             "Комплектующие",
             "Итого по позиции",
-            "Стоимость дефицита"
+            "Стоимость дефицита",
+            "ID строки",
+            "ID товара"
         };
 
         for (var index = 0; index < headers.Length; index++)
@@ -188,6 +195,8 @@ public sealed class CatalogPriceCalculationWorkbookExporter : ICatalogPriceCalcu
             worksheet.Cell(currentRow, 14).Value = line.ComponentsTotalAmount;
             worksheet.Cell(currentRow, 15).Value = line.TotalAmount;
             worksheet.Cell(currentRow, 16).Value = line.ShortageQuantity * line.ProjectPriceAmount;
+            worksheet.Cell(currentRow, 17).Value = line.LineId.ToString();
+            worksheet.Cell(currentRow, 18).Value = line.ProductId.ToString();
 
             if (line.ShortageQuantity > 0m)
             {
@@ -212,6 +221,7 @@ public sealed class CatalogPriceCalculationWorkbookExporter : ICatalogPriceCalcu
         worksheet.Column(4).Width = 24;
         worksheet.Column(5).Width = 10;
         worksheet.Columns(6, 16).Width = 18;
+        worksheet.Columns(17, 18).Hide();
 
         var usedRange = worksheet.RangeUsed();
 
@@ -220,6 +230,39 @@ public sealed class CatalogPriceCalculationWorkbookExporter : ICatalogPriceCalcu
             usedRange.Style.Alignment.Vertical = XLAlignmentVerticalValues.Top;
             usedRange.Style.Alignment.WrapText = true;
         }
+    }
+
+    private static void WriteMetadataWorksheet(
+        XLWorkbook workbook,
+        CatalogPriceCalculationDetails calculation,
+        IReadOnlyList<CharacteristicColumn> characteristicColumns)
+    {
+        var worksheet = workbook.Worksheets.Add("_Metadata");
+
+        worksheet.Cell("A1").Value = "Format";
+        worksheet.Cell("B1").Value = "ElectronicCRM.PriceCalculation";
+        worksheet.Cell("A2").Value = "Version";
+        worksheet.Cell("B2").Value = 4;
+        worksheet.Cell("A3").Value = "CalculationId";
+        worksheet.Cell("B3").Value = calculation.CalculationId.ToString();
+        worksheet.Cell("A4").Value = "CalculationUpdatedAtUtc";
+        worksheet.Cell("B4").Value = calculation.UpdatedAtUtc ?? calculation.CreatedAtUtc;
+        worksheet.Cell("B4").Style.DateFormat.Format = "yyyy-MM-dd HH:mm:ss";
+
+        var currentRow = 6;
+
+        foreach (var column in characteristicColumns)
+        {
+            worksheet.Cell(currentRow, 1).Value = "CharacteristicColumn";
+            worksheet.Cell(currentRow, 2).Value = column.ColumnNumber;
+            worksheet.Cell(currentRow, 3).Value = ToSafeExcelText(column.Code);
+            worksheet.Cell(currentRow, 4).Value = ToSafeExcelText(column.Name);
+            worksheet.Cell(currentRow, 5).Value = ToSafeExcelText(column.DataType);
+            worksheet.Cell(currentRow, 6).Value = ToSafeExcelText(column.Unit);
+            currentRow++;
+        }
+
+        worksheet.Hide();
     }
 
     private static void WriteComponentsWorksheet(
@@ -236,6 +279,7 @@ public sealed class CatalogPriceCalculationWorkbookExporter : ICatalogPriceCalcu
             "Основной товар",
             "Количество основного товара",
             "Потребность",
+            "Способ выбора",
             "Артикул комплектующего",
             "Комплектующее",
             "Производитель",
@@ -244,7 +288,11 @@ public sealed class CatalogPriceCalculationWorkbookExporter : ICatalogPriceCalcu
             "Прайс 100%",
             "Скидка, %",
             "Проектная цена",
-            "Сумма"
+            "Сумма",
+            "ID строки основного товара",
+            "ID строки комплектующего",
+            "ID потребности",
+            "ID товара комплектующего"
         };
 
         for (var index = 0; index < headers.Length; index++)
@@ -268,15 +316,23 @@ public sealed class CatalogPriceCalculationWorkbookExporter : ICatalogPriceCalcu
                 worksheet.Cell(currentRow, 3).Value = ToSafeExcelText(line.Name);
                 worksheet.Cell(currentRow, 4).Value = line.Quantity;
                 worksheet.Cell(currentRow, 5).Value = ToSafeExcelText(component.NeedName);
-                worksheet.Cell(currentRow, 6).Value = ToSafeExcelText(component.Article);
-                worksheet.Cell(currentRow, 7).Value = ToSafeExcelText(component.Name);
-                worksheet.Cell(currentRow, 8).Value = ToSafeExcelText(component.ManufacturerName);
-                worksheet.Cell(currentRow, 9).Value = component.QuantityPerUnit;
-                worksheet.Cell(currentRow, 10).Value = component.TotalQuantity;
-                worksheet.Cell(currentRow, 11).Value = component.BasePriceAmount;
-                worksheet.Cell(currentRow, 12).Value = component.DiscountPercent / 100m;
-                worksheet.Cell(currentRow, 13).Value = component.ProjectPriceAmount;
-                worksheet.Cell(currentRow, 14).Value = component.TotalAmount;
+                worksheet.Cell(currentRow, 6).Value = component.SelectionSource
+                    == CatalogPriceCalculationLineComponentSelectionSource.Manual
+                    ? "Выбрано вручную"
+                    : "По рекомендации";
+                worksheet.Cell(currentRow, 7).Value = ToSafeExcelText(component.Article);
+                worksheet.Cell(currentRow, 8).Value = ToSafeExcelText(component.Name);
+                worksheet.Cell(currentRow, 9).Value = ToSafeExcelText(component.ManufacturerName);
+                worksheet.Cell(currentRow, 10).Value = component.QuantityPerUnit;
+                worksheet.Cell(currentRow, 11).Value = component.TotalQuantity;
+                worksheet.Cell(currentRow, 12).Value = component.BasePriceAmount;
+                worksheet.Cell(currentRow, 13).Value = component.DiscountPercent / 100m;
+                worksheet.Cell(currentRow, 14).Value = component.ProjectPriceAmount;
+                worksheet.Cell(currentRow, 15).Value = component.TotalAmount;
+                worksheet.Cell(currentRow, 16).Value = line.LineId.ToString();
+                worksheet.Cell(currentRow, 17).Value = component.ComponentLineId.ToString();
+                worksheet.Cell(currentRow, 18).Value = component.NeedDefinitionId.ToString();
+                worksheet.Cell(currentRow, 19).Value = component.ComponentProductId.ToString();
 
                 currentRow++;
             }
@@ -290,9 +346,10 @@ public sealed class CatalogPriceCalculationWorkbookExporter : ICatalogPriceCalcu
         }
         else
         {
-            worksheet.Range(2, 4, currentRow - 1, 11).Style.NumberFormat.Format = "#,##0.00";
-            worksheet.Range(2, 12, currentRow - 1, 12).Style.NumberFormat.Format = "0.00%";
-            worksheet.Range(2, 13, currentRow - 1, 14).Style.NumberFormat.Format = "#,##0.00";
+            worksheet.Range(2, 4, currentRow - 1, 4).Style.NumberFormat.Format = "#,##0.00";
+            worksheet.Range(2, 10, currentRow - 1, 12).Style.NumberFormat.Format = "#,##0.00";
+            worksheet.Range(2, 13, currentRow - 1, 13).Style.NumberFormat.Format = "0.00%";
+            worksheet.Range(2, 14, currentRow - 1, 15).Style.NumberFormat.Format = "#,##0.00";
             worksheet.Range(1, 1, currentRow - 1, headers.Length).SetAutoFilter();
         }
 
@@ -302,10 +359,12 @@ public sealed class CatalogPriceCalculationWorkbookExporter : ICatalogPriceCalcu
         worksheet.Column(3).Width = 42;
         worksheet.Column(4).Width = 20;
         worksheet.Column(5).Width = 30;
-        worksheet.Column(6).Width = 24;
-        worksheet.Column(7).Width = 42;
-        worksheet.Column(8).Width = 24;
-        worksheet.Columns(9, 14).Width = 18;
+        worksheet.Column(6).Width = 22;
+        worksheet.Column(7).Width = 24;
+        worksheet.Column(8).Width = 42;
+        worksheet.Column(9).Width = 24;
+        worksheet.Columns(10, 15).Width = 18;
+        worksheet.Columns(16, 19).Hide();
 
         var usedRange = worksheet.RangeUsed();
 
@@ -314,6 +373,216 @@ public sealed class CatalogPriceCalculationWorkbookExporter : ICatalogPriceCalcu
             usedRange.Style.Alignment.Vertical = XLAlignmentVerticalValues.Top;
             usedRange.Style.Alignment.WrapText = true;
         }
+    }
+
+    private static void WriteCharacteristicsWorksheet(
+        XLWorkbook workbook,
+        CatalogPriceCalculationDetails calculation,
+        IReadOnlyList<CharacteristicColumn> characteristicColumns)
+    {
+        var worksheet = workbook.Worksheets.Add("Характеристики");
+        worksheet.ShowGridLines = false;
+
+        var fixedHeaders = new[]
+        {
+            "Назначение",
+            "Артикул",
+            "Наименование",
+            "Производитель",
+            "Тип товара"
+        };
+
+        for (var index = 0; index < fixedHeaders.Length; index++)
+        {
+            worksheet.Cell(1, index + 1).Value = fixedHeaders[index];
+        }
+
+        foreach (var column in characteristicColumns)
+        {
+            worksheet.Cell(1, column.ColumnNumber).Value =
+                ToSafeExcelText(GetCharacteristicColumnLabel(column));
+        }
+
+        var productIdColumn = fixedHeaders.Length + characteristicColumns.Count + 1;
+        worksheet.Cell(1, productIdColumn).Value = "ID товара";
+        ConfigureHeader(worksheet.Range(1, 1, 1, productIdColumn));
+
+        var currentRow = 2;
+
+        foreach (var product in CreateCharacteristicProducts(calculation))
+        {
+            worksheet.Cell(currentRow, 1).Value = product.Purpose;
+            worksheet.Cell(currentRow, 2).Value = ToSafeExcelText(product.Article);
+            worksheet.Cell(currentRow, 3).Value = ToSafeExcelText(product.Name);
+            worksheet.Cell(currentRow, 4).Value =
+                ToSafeExcelText(product.ManufacturerName);
+            worksheet.Cell(currentRow, 5).Value =
+                ToSafeExcelText(product.ProductTypeName);
+
+            var characteristicsByCode = product.Characteristics
+                .GroupBy(item => item.Code, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.First(),
+                    StringComparer.OrdinalIgnoreCase);
+
+            foreach (var column in characteristicColumns)
+            {
+                if (!characteristicsByCode.TryGetValue(column.Code, out var characteristic))
+                {
+                    continue;
+                }
+
+                var cell = worksheet.Cell(currentRow, column.ColumnNumber);
+                cell.Style.Fill.BackgroundColor = CharacteristicInputColor;
+                WriteCharacteristicValue(cell, characteristic);
+            }
+
+            worksheet.Cell(currentRow, productIdColumn).Value =
+                product.ProductId.ToString();
+            currentRow++;
+        }
+
+        if (currentRow == 2)
+        {
+            worksheet.Cell(3, 1).Value = "В проекте нет товаров.";
+            worksheet.Range(3, 1, 3, productIdColumn).Merge();
+            worksheet.Cell(3, 1).Style.Font.FontColor = XLColor.Gray;
+        }
+        else
+        {
+            worksheet.Range(1, 1, currentRow - 1, productIdColumn)
+                .SetAutoFilter();
+        }
+
+        worksheet.SheetView.FreezeRows(1);
+        worksheet.Columns(1, 2).Width = 22;
+        worksheet.Column(3).Width = 42;
+        worksheet.Column(4).Width = 24;
+        worksheet.Column(5).Width = 30;
+
+        foreach (var column in characteristicColumns)
+        {
+            worksheet.Column(column.ColumnNumber).Width = 24;
+        }
+
+        worksheet.Column(productIdColumn).Hide();
+
+        var usedRange = worksheet.RangeUsed();
+
+        if (usedRange is not null)
+        {
+            usedRange.Style.Alignment.Vertical = XLAlignmentVerticalValues.Top;
+            usedRange.Style.Alignment.WrapText = true;
+        }
+    }
+
+    private static CharacteristicColumn[] CreateCharacteristicColumns(
+        CatalogPriceCalculationDetails calculation)
+    {
+        return CreateCharacteristicProducts(calculation)
+            .SelectMany(item => item.Characteristics)
+            .GroupBy(item => item.Code, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(item => item.Code, StringComparer.OrdinalIgnoreCase)
+            .Select((item, index) => new CharacteristicColumn(
+                6 + index,
+                item.Code,
+                item.Name,
+                item.DataType,
+                item.Unit))
+            .ToArray();
+    }
+
+    private static List<CharacteristicProductExportItem>
+        CreateCharacteristicProducts(CatalogPriceCalculationDetails calculation)
+    {
+        var result = new List<CharacteristicProductExportItem>();
+        var writtenProductIds = new HashSet<Guid>();
+
+        foreach (var line in calculation.Lines
+                     .OrderBy(item => item.ManufacturerName, StringComparer.OrdinalIgnoreCase)
+                     .ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase))
+        {
+            if (writtenProductIds.Add(line.ProductId))
+            {
+                result.Add(new CharacteristicProductExportItem(
+                    "Основной товар",
+                    line.ProductId,
+                    line.Article,
+                    line.Name,
+                    line.ManufacturerName,
+                    line.ProductTypeName,
+                    line.Characteristics ?? []));
+            }
+
+            foreach (var component in line.Components
+                         .OrderBy(item => item.ManufacturerName, StringComparer.OrdinalIgnoreCase)
+                         .ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                if (!writtenProductIds.Add(component.ComponentProductId))
+                {
+                    continue;
+                }
+
+                result.Add(new CharacteristicProductExportItem(
+                    "Комплектующее",
+                    component.ComponentProductId,
+                    component.Article,
+                    component.Name,
+                    component.ManufacturerName,
+                    component.ProductTypeName,
+                    component.Characteristics ?? []));
+            }
+        }
+
+        return result;
+    }
+
+    private static string GetCharacteristicColumnLabel(CharacteristicColumn column)
+    {
+        return string.IsNullOrWhiteSpace(column.Unit)
+            ? column.Name
+            : $"{column.Name}, {column.Unit}";
+    }
+
+    private static string? GetCharacteristicDisplayValue(
+        CatalogPriceCalculationProductCharacteristicDetails characteristic)
+    {
+        if (!string.Equals(characteristic.DataType, "Boolean", StringComparison.OrdinalIgnoreCase))
+        {
+            return characteristic.Value;
+        }
+
+        return characteristic.Value?.Trim().ToUpperInvariant() switch
+        {
+            "TRUE" => "Да",
+            "FALSE" => "Нет",
+            _ => characteristic.Value
+        };
+    }
+
+    private static void WriteCharacteristicValue(
+        IXLCell cell,
+        CatalogPriceCalculationProductCharacteristicDetails characteristic)
+    {
+        if (string.Equals(
+                characteristic.DataType,
+                "Number",
+                StringComparison.OrdinalIgnoreCase)
+            && decimal.TryParse(
+                characteristic.Value,
+                NumberStyles.Number,
+                CultureInfo.InvariantCulture,
+                out var number))
+        {
+            cell.Value = number;
+            cell.Style.NumberFormat.Format = "#,##0.############";
+            return;
+        }
+
+        cell.Value = ToSafeExcelText(GetCharacteristicDisplayValue(characteristic));
     }
 
     private static List<ManufacturerExportItem> CreateManufacturerExportItems(
@@ -400,4 +669,20 @@ public sealed class CatalogPriceCalculationWorkbookExporter : ICatalogPriceCalcu
         decimal ShortageQuantity,
         decimal TotalAmount,
         decimal ShortageAmount);
+
+    private sealed record CharacteristicColumn(
+        int ColumnNumber,
+        string Code,
+        string Name,
+        string DataType,
+        string? Unit);
+
+    private sealed record CharacteristicProductExportItem(
+        string Purpose,
+        Guid ProductId,
+        string Article,
+        string Name,
+        string ManufacturerName,
+        string ProductTypeName,
+        IReadOnlyList<CatalogPriceCalculationProductCharacteristicDetails> Characteristics);
 }

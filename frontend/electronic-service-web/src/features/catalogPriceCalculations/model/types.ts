@@ -54,8 +54,8 @@ export interface CatalogPriceCalculationLine {
   productId: string;
   manufacturerId: string;
   manufacturerName: string;
-  priceListId: string;
-  priceListRowId: string;
+  priceListId: string | null;
+  priceListRowId: string | null;
   article: string;
   name: string;
   unit?: string | null;
@@ -83,6 +83,7 @@ export interface CatalogPriceCalculationLineComponent {
   manufacturerName: string;
   article: string;
   name: string;
+  selectionSource: "Recommended" | "Manual";
   quantityPerUnit: number;
   totalQuantity: number;
   basePriceAmount: number;
@@ -146,15 +147,21 @@ export interface UpdateCatalogPriceCalculationCardResponse {
 
 export interface CatalogPriceCalculationProductSearchItem {
   productId: string;
+  productTypeCode: string;
+  productTypeName: string;
   manufacturerId: string;
   manufacturerName: string;
-  priceListId: string;
-  priceListRowId: string;
+  priceStatus:
+    | "Available"
+    | "ActivePriceNotFound"
+    | "ActivePriceAmbiguous";
+  priceListId: string | null;
+  priceListRowId: string | null;
   priceListEffectiveDate?: string | null;
   article: string;
   name: string;
   unit?: string | null;
-  basePriceAmount: number;
+  basePriceAmount: number | null;
   mrcPriceAmount?: number | null;
 }
 
@@ -163,6 +170,8 @@ export interface SearchCatalogPriceCalculationProductsParams {
   search: string;
   page: number;
   pageSize: number;
+  productKind?: "MainProduct" | "Component";
+  productTypeCode?: string;
 }
 
 export interface SearchCatalogPriceCalculationProductsResponse {
@@ -174,7 +183,10 @@ export interface SearchCatalogPriceCalculationProductsResponse {
 }
 
 export const catalogPriceCalculationImportRowStatuses = [
-  "Matched",
+  "New",
+  "QuantityChanged",
+  "Removed",
+  "Unchanged",
   "Invalid",
   "ProductNotFound",
   "ProductAmbiguous",
@@ -191,6 +203,8 @@ export interface CatalogPriceCalculationImportPreviewRow {
   sourceName: string | null;
   sourceManufacturer: string | null;
   quantity: number | null;
+  existingLineId: string | null;
+  currentQuantity: number | null;
   status: CatalogPriceCalculationImportRowStatus;
   message: string | null;
   productId: string | null;
@@ -206,6 +220,62 @@ export interface CatalogPriceCalculationImportPreviewRow {
   mrcPriceAmount: number | null;
 }
 
+export const catalogPriceCalculationComponentImportRowStatuses = [
+  "New",
+  "QuantityChanged",
+  "Removed",
+  "Unchanged",
+  "Invalid",
+  "MainLineNotFound",
+  "ComponentNotFound",
+  "NeedNotFound",
+  "ActivePriceNotFound",
+  "ActivePriceAmbiguous",
+] as const;
+
+export type CatalogPriceCalculationComponentImportRowStatus =
+  (typeof catalogPriceCalculationComponentImportRowStatuses)[number];
+
+export interface CatalogPriceCalculationComponentImportPreviewRow {
+  rowNumber: number;
+  mainProductArticle: string;
+  needName: string;
+  componentArticle: string;
+  quantityPerUnit: number | null;
+  mainLineId: string | null;
+  existingComponentLineId: string | null;
+  needDefinitionId: string | null;
+  componentProductId: string | null;
+  currentQuantityPerUnit: number | null;
+  status: CatalogPriceCalculationComponentImportRowStatus;
+  message: string | null;
+}
+
+export type CatalogPriceCalculationCharacteristicImportRowStatus =
+  | "Changed"
+  | "Removed"
+  | "Unchanged"
+  | "Invalid"
+  | "ProductNotFound"
+  | "CharacteristicNotFound";
+
+export interface CatalogPriceCalculationCharacteristicImportPreviewRow {
+  rowNumber: number;
+  productId: string | null;
+  article: string;
+  productName: string;
+  productTypeName: string;
+  characteristicCode: string;
+  characteristicName: string;
+  dataType: string;
+  unit: string | null;
+  isRequired: boolean;
+  currentValue: string | null;
+  newValue: string | null;
+  status: CatalogPriceCalculationCharacteristicImportRowStatus;
+  message: string | null;
+}
+
 export interface PreviewCatalogPriceCalculationImportRequest {
   calculationId: string;
   file: File;
@@ -215,19 +285,50 @@ export interface PreviewCatalogPriceCalculationImportResponse {
   readRowsCount: number;
   matchedRowsCount: number;
   skippedRowsCount: number;
+  addedRowsCount: number;
+  updatedRowsCount: number;
+  removedRowsCount: number;
+  unchangedRowsCount: number;
+  isProjectWorkbook: boolean;
+  warning: string | null;
   rows: CatalogPriceCalculationImportPreviewRow[];
+  componentRows: CatalogPriceCalculationComponentImportPreviewRow[];
+  characteristicRows: CatalogPriceCalculationCharacteristicImportPreviewRow[];
 }
 
 export interface ApplyCatalogPriceCalculationImportRequest {
   calculationId: string;
   rows: Array<{
+    action: "Add" | "UpdateQuantity" | "Remove";
     productId: string;
-    quantity: number;
+    existingLineId: string | null;
+    quantity: number | null;
+  }>;
+  componentRows: Array<{
+    action: "Add" | "UpdateQuantity" | "Remove";
+    mainLineId: string;
+    existingComponentLineId: string | null;
+    needDefinitionId: string;
+    componentProductId: string;
+    quantityPerUnit: number | null;
+  }>;
+  characteristicRows: Array<{
+    action: "Set" | "Remove";
+    productId: string;
+    characteristicCode: string;
+    value: string | null;
   }>;
 }
 
 export interface ApplyCatalogPriceCalculationImportResponse {
   calculationId: string;
   addedLinesCount: number;
+  updatedLinesCount: number;
+  removedLinesCount: number;
+  addedComponentsCount: number;
+  updatedComponentsCount: number;
+  removedComponentsCount: number;
+  updatedCharacteristicsCount: number;
+  removedCharacteristicsCount: number;
   calculationTotalAmount: number;
 }

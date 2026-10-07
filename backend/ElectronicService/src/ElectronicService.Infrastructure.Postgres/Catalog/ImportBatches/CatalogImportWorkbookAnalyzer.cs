@@ -225,8 +225,7 @@ public sealed class CatalogImportWorkbookAnalyzer
 
             var mappingRequired =
                 IsMappingRequired(
-                    columnCandidates,
-                    productType);
+                    columnCandidates);
 
             var definitionsById =
                 characteristicDefinitions
@@ -910,8 +909,7 @@ public sealed class CatalogImportWorkbookAnalyzer
     }
 
     private static bool IsMappingRequired(
-        IReadOnlyCollection<ColumnCandidate> candidates,
-        ProductType? productType)
+        IReadOnlyCollection<ColumnCandidate> candidates)
     {
         /*
          * Неизвестную или неподтверждённую колонку
@@ -943,34 +941,11 @@ public sealed class CatalogImportWorkbookAnalyzer
         }
 
         /*
-         * Если общий тип пакета не выбран,
-         * проверку его Excel-характеристик
-         * выполнять нельзя и не требуется.
+         * Характеристики не обязаны находиться в отдельных Excel-колонках.
+         * После базового сопоставления система пытается извлечь их из
+         * наименования с помощью активных правил распознавания.
          */
-        if (productType is null)
-        {
-            return false;
-        }
-
-        /*
-         * Старый сценарий с явно выбранным
-         * единым типом пока сохраняем.
-         */
-        return productType.Characteristics
-            .Where(characteristic =>
-                characteristic.IsRequired)
-            .Select(characteristic =>
-                characteristic
-                    .CharacteristicDefinitionId)
-            .Any(requiredDefinitionId =>
-                !candidates.Any(candidate =>
-                    candidate.TargetKind
-                        == CatalogImportColumnTargetKind
-                            .Characteristic
-                    && candidate
-                        .CharacteristicDefinitionId
-                        == requiredDefinitionId
-                    && candidate.IsConfirmed));
+        return false;
     }
 
     private static Dictionary<int, string>
@@ -1362,15 +1337,6 @@ public sealed class CatalogImportWorkbookAnalyzer
                             CatalogImportColumnTargetKind.Name,
                             candidates)));
             }
-            else
-            {
-                AddRequiredCharacteristicIssues(
-                    productType,
-                    rawValues,
-                    candidates,
-                    definitionsById,
-                    issues);
-            }
         }
 
         CatalogImportRowStatus status;
@@ -1456,76 +1422,6 @@ public sealed class CatalogImportWorkbookAnalyzer
                         CatalogImportColumnTargetKind
                             .Manufacturer,
                         candidates)));
-        }
-    }
-
-    private static void
-        AddRequiredCharacteristicIssues(
-            ProductType productType,
-            Dictionary<int, string> rawValues,
-            IReadOnlyCollection<ColumnCandidate>
-                candidates,
-            Dictionary<
-                Guid,
-                CharacteristicDefinition>
-                definitionsById,
-            List<CatalogImportRowIssue> issues)
-    {
-        var requiredIds =
-            productType.Characteristics
-                .Where(characteristic =>
-                    characteristic.IsRequired)
-                .Select(characteristic =>
-                    characteristic
-                        .CharacteristicDefinitionId);
-
-        foreach (var definitionId
-                 in requiredIds)
-        {
-            var candidate =
-                candidates.FirstOrDefault(
-                    candidate =>
-                        candidate.TargetKind
-                        == CatalogImportColumnTargetKind
-                            .Characteristic
-                        && candidate
-                            .CharacteristicDefinitionId
-                        == definitionId);
-
-            if (candidate is null)
-            {
-                /*
-                 * Отсутствующая колонка уже должна
-                 * перевести batch в MappingRequired.
-                 */
-                continue;
-            }
-
-            rawValues.TryGetValue(
-                candidate.SourceColumnNumber,
-                out var rawValue);
-
-            if (!string.IsNullOrWhiteSpace(
-                    rawValue))
-            {
-                continue;
-            }
-
-            var displayName =
-                definitionsById.TryGetValue(
-                    definitionId,
-                    out var definition)
-                    ? definition.Name
-                    : definitionId.ToString();
-
-            issues.Add(
-                CreateIssue(
-                    "characteristic.required",
-                    $"Не заполнена обязательная " +
-                    $"характеристика " +
-                    $"'{displayName}'.",
-                    definitionId.ToString(),
-                    candidate.SourceColumnNumber));
         }
     }
 

@@ -54,6 +54,11 @@ public interface ICatalogPriceListRepository
         SaveCorrectionAndRefreshStatisticsAsync(
             CatalogPriceList priceList,
             CancellationToken cancellationToken = default);
+
+    Task<Result<int, DomainError>>
+        ExcludeProductNotFoundRowsAndRefreshStatisticsAsync(
+            CatalogPriceList priceList,
+            CancellationToken cancellationToken = default);
 }
 
 public sealed record CatalogPriceListIssueGroupBatch(

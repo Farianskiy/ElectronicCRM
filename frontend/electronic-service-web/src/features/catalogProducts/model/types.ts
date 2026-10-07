@@ -90,3 +90,25 @@ export interface CatalogProductDetails {
   characteristics: CatalogProductCharacteristic[];
   aliases: CatalogProductAlias[];
 }
+export interface CreateCatalogProductRequest {
+  article: string;
+  name: string;
+  productTypeId: string;
+  manufacturerId: string;
+  priceAmount: number;
+  stockQuantity: number;
+  characteristics: Array<{
+    code: string;
+    value: string;
+  }>;
+}
+
+export interface CreateCatalogProductResponse {
+  productId: string;
+  article: string;
+  name: string;
+  productTypeId: string;
+  manufacturerId: string;
+  priceAmount: number;
+  stockQuantity: number;
+}

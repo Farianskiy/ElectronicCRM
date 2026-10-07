@@ -13,12 +13,12 @@ public sealed class UpdateProductPriceCommandHandler
     private readonly IProductRepository
         _productRepository;
 
-    private readonly ProductAuditRecorder
+    private readonly IProductAuditRecorder
         _auditRecorder;
 
     public UpdateProductPriceCommandHandler(
         IProductRepository productRepository,
-        ProductAuditRecorder auditRecorder)
+        IProductAuditRecorder auditRecorder)
     {
         _productRepository = productRepository;
         _auditRecorder = auditRecorder;

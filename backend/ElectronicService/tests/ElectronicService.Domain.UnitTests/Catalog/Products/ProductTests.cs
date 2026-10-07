@@ -344,7 +344,9 @@ public sealed class ProductTests
             definition.Id);
 
         Assert.True(result.IsFailure);
-        Assert.Equal("general.value_is_invalid", result.Error.Code);
+        Assert.Equal(
+            "catalog.required_characteristic.cannot_be_removed",
+            result.Error.Code);
         Assert.Single(product.Characteristics);
     }
 

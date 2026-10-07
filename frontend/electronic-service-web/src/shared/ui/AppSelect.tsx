@@ -14,6 +14,7 @@ interface AppSelectProps {
   options: readonly AppSelectOption[];
   onChange: (value: string) => void;
   disabled?: boolean;
+  expandInFlow?: boolean;
 }
 
 export function AppSelect({
@@ -22,6 +23,7 @@ export function AppSelect({
   options,
   onChange,
   disabled = false,
+  expandInFlow = false,
 }: AppSelectProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const listboxId = useId();
@@ -88,9 +90,9 @@ export function AppSelect({
       return;
     }
 
-    onChange(option.value);
-    setActiveIndex(index);
     closeList();
+    setActiveIndex(index);
+    onChange(option.value);
   }
 
   function moveActiveIndex(direction: 1 | -1): void {
@@ -247,8 +249,10 @@ export function AppSelect({
           role="listbox"
           aria-label={ariaLabel}
           className={[
-            "absolute left-0 right-0 top-full z-50",
-            "mt-2 max-h-72 overflow-y-auto",
+            expandInFlow
+              ? "relative z-10 mt-2"
+              : "absolute left-0 right-0 top-full z-50 mt-2",
+            "max-h-72 overflow-y-auto",
             "rounded-2xl border border-[var(--app-border-strong)]",
             "bg-[var(--app-panel)] p-1.5",
             "shadow-2xl shadow-[var(--app-shadow)]",

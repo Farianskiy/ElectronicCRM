@@ -9,6 +9,7 @@ import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
 import { AppButton } from "@/shared/ui/AppButton";
 import {
   createRecognitionRuleSetVersion,
+  type CreateRecognitionRuleSetVersionResponse,
   type CreateRecognitionRuleSetVersionRequest,
 } from "../../api/createRecognitionRuleSetVersion";
 import { getRecognitionLiteralDrafts } from "../../api/getRecognitionLiteralDrafts";
@@ -18,10 +19,14 @@ import { recognitionRuleSetVersionsQueryRoot } from "../../api/getRecognitionRul
 
 interface CatalogRecognitionRuleSetVersionCreateProps {
   onOpenVersion?: (id: string) => void;
+  onCreated?: (version: CreateRecognitionRuleSetVersionResponse) => void;
   manufacturerId: string;
   productTypeId: string;
   characteristics: CatalogProductTypeCharacteristicMetadata[];
   disabled: boolean;
+  initialKind?: RuleKind;
+  initialCharacteristicId?: string;
+  suggestedName?: string;
 }
 
 type RuleKind = 1 | 2 | 3;
@@ -59,10 +64,16 @@ export function CatalogRecognitionRuleSetVersionCreate({
   characteristics,
   disabled,
   onOpenVersion,
+  onCreated,
+  initialKind = 3,
+  initialCharacteristicId = "",
+  suggestedName = "",
 }: CatalogRecognitionRuleSetVersionCreateProps) {
-  const [name, setName] = useState("");
-  const [kind, setKind] = useState<RuleKind>(3);
-  const [characteristicId, setCharacteristicId] = useState("");
+  const [name, setName] = useState(suggestedName);
+  const [kind, setKind] = useState<RuleKind>(initialKind);
+  const [characteristicId, setCharacteristicId] = useState(
+    initialCharacteristicId,
+  );
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<DraftOption[]>([]);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -177,10 +188,12 @@ export function CatalogRecognitionRuleSetVersionCreate({
     mutationFn: (request: CreateRecognitionRuleSetVersionRequest) =>
       createRecognitionRuleSetVersion(request),
     retry: false,
-    onSuccess: () => {
+    onSuccess: (version) => {
       void queryClient.invalidateQueries({
         queryKey: recognitionRuleSetVersionsQueryRoot,
       });
+
+      onCreated?.(version);
     },
   });
 

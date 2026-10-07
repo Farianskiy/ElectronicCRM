@@ -6,4 +6,5 @@ public sealed record AddCatalogPriceCalculationLineComponentCommand(
     Guid NeedDefinitionId,
     Guid ComponentProductId,
     int QuantityPerUnit,
+    bool ManualSelection,
     Guid CurrentUserId);

@@ -72,9 +72,13 @@ function Metrics({ metrics }: { metrics: EvaluationMetrics }) {
 export function EvaluationReportPanel({
   reportId,
   kind = "rules",
+  onCreateFreshReport,
+  creatingFreshReport = false,
 }: {
   reportId: string;
   kind?: "rules" | "dictionary";
+  onCreateFreshReport?: () => void | Promise<void>;
+  creatingFreshReport?: boolean;
 }) {
   const [page, setPage] = useState(1);
   const [replay, setReplay] = useState(false);
@@ -111,12 +115,25 @@ export function EvaluationReportPanel({
       )}
       {query.isFetching && <p role="status">Проверяем отчёт…</p>}
       <div className="flex flex-wrap gap-2">
+        {data?.readiness.state === "Stale" &&
+          !replay &&
+          onCreateFreshReport && (
+            <AppButton
+              variant="secondary"
+              disabled={query.isFetching || creatingFreshReport}
+              onClick={() => void onCreateFreshReport()}
+            >
+              {creatingFreshReport
+                ? "Создаём новый отчёт…"
+                : "Создать новый актуальный отчёт"}
+            </AppButton>
+          )}
         <AppButton
           variant="secondary"
           disabled={query.isFetching}
           onClick={() => void query.refetch()}
         >
-          Обновить проверку
+          Перечитать этот отчёт
         </AppButton>
         <AppButton
           variant="secondary"

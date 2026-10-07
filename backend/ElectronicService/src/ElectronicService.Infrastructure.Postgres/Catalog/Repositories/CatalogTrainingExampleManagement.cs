@@ -72,6 +72,159 @@ public sealed class CatalogTrainingExampleManagement(ElectronicDbContext db,
         return new TrainingExamplePage(items.Take(25).ToArray(), filter.Page, items.Length > 25);
     }
 
+    public async Task<Result<CatalogImportTrainingSummary, DomainError>> GetImportSummaryAsync(
+        Guid batchId,
+        CancellationToken cancellationToken)
+    {
+        if (batchId == Guid.Empty)
+        {
+            return new DomainError("training.invalid_request", "Некорректный пакет импорта.");
+        }
+
+        var auth = await AuthorizeAsync(cancellationToken).ConfigureAwait(false);
+
+        if (auth.IsFailure)
+        {
+            return auth.Error;
+        }
+
+        var batchExists = await db.CatalogImportBatches
+            .AsNoTracking()
+            .AnyAsync(
+                batch => batch.Id == batchId && batch.CreatedByUserId == auth.Value,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        if (!batchExists)
+        {
+            return new DomainError(
+                "training.not_found",
+                "Пакет импорта не найден или недоступен.");
+        }
+
+        var examples = Owned(auth.Value, new TrainingExampleFilter())
+            .Where(example => db.CatalogRecognitionFeedbackEntries.Any(feedback =>
+                feedback.Id == example.SourceFeedbackId &&
+                feedback.ImportBatchId == batchId));
+
+        var activeExamples = examples.ConfirmedExamples(db.CatalogRecognitionFeedbackEntries);
+
+        var activeExamplesCount = await activeExamples
+            .CountAsync(example => !example.IsEvaluationOnly, cancellationToken)
+            .ConfigureAwait(false);
+
+        var evaluationExamplesCount = await activeExamples
+            .CountAsync(example => example.IsEvaluationOnly, cancellationToken)
+            .ConfigureAwait(false);
+
+        var revokedExamplesCount = await examples
+            .CountAsync(example => example.RevokedAtUtc != null, cancellationToken)
+            .ConfigureAwait(false);
+
+        var groupedExamples = await activeExamples
+            .Where(example => !example.IsEvaluationOnly)
+            .GroupBy(example => new
+            {
+                example.ManufacturerId,
+                example.ProductTypeId,
+                example.CharacteristicDefinitionId
+            })
+            .Select(group => new
+            {
+                group.Key.ManufacturerId,
+                group.Key.ProductTypeId,
+                group.Key.CharacteristicDefinitionId,
+                ActiveExamplesCount = group.Count(),
+                DistinctValuesCount = group
+                    .Select(example => example.NormalizedValue)
+                    .Distinct()
+                    .Count()
+            })
+            .OrderByDescending(group => group.ActiveExamplesCount)
+            .ThenBy(group => group.ManufacturerId)
+            .ThenBy(group => group.ProductTypeId)
+            .ThenBy(group => group.CharacteristicDefinitionId)
+            .ToArrayAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (groupedExamples.Length == 0)
+        {
+            return new CatalogImportTrainingSummary(
+                batchId,
+                activeExamplesCount,
+                evaluationExamplesCount,
+                revokedExamplesCount,
+                []);
+        }
+
+        var manufacturerIds = groupedExamples
+            .Select(group => group.ManufacturerId)
+            .Distinct()
+            .ToArray();
+
+        var productTypeIds = groupedExamples
+            .Select(group => group.ProductTypeId)
+            .Distinct()
+            .ToArray();
+
+        var characteristicIds = groupedExamples
+            .Select(group => group.CharacteristicDefinitionId)
+            .Distinct()
+            .ToArray();
+
+        var manufacturerNames = await db.Manufacturers
+            .AsNoTracking()
+            .Where(manufacturer => manufacturerIds.Contains(manufacturer.Id))
+            .ToDictionaryAsync(
+                manufacturer => manufacturer.Id,
+                manufacturer => manufacturer.Name,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        var productTypeNames = await db.ProductTypes
+            .AsNoTracking()
+            .Where(productType => productTypeIds.Contains(productType.Id))
+            .ToDictionaryAsync(
+                productType => productType.Id,
+                productType => productType.Name,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        var characteristicNames = await db.CharacteristicDefinitions
+            .AsNoTracking()
+            .Where(characteristic => characteristicIds.Contains(characteristic.Id))
+            .ToDictionaryAsync(
+                characteristic => characteristic.Id,
+                characteristic => characteristic.Name,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        var groups = groupedExamples
+            .Select(group => new CatalogImportTrainingSummaryGroup(
+                group.ManufacturerId,
+                manufacturerNames.GetValueOrDefault(
+                    group.ManufacturerId,
+                    "Производитель удалён"),
+                group.ProductTypeId,
+                productTypeNames.GetValueOrDefault(
+                    group.ProductTypeId,
+                    "Тип удалён"),
+                group.CharacteristicDefinitionId,
+                characteristicNames.GetValueOrDefault(
+                    group.CharacteristicDefinitionId,
+                    "Характеристика удалена"),
+                group.ActiveExamplesCount,
+                group.DistinctValuesCount))
+            .ToArray();
+
+        return new CatalogImportTrainingSummary(
+            batchId,
+            activeExamplesCount,
+            evaluationExamplesCount,
+            revokedExamplesCount,
+            groups);
+    }
+
     public async Task<Result<TrainingExampleItem, DomainError>> GetAsync(Guid id, CancellationToken cancellationToken)
     {
         var auth = await AuthorizeAsync(cancellationToken).ConfigureAwait(false);

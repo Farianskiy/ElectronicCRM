@@ -1,5 +1,6 @@
 using ElectronicService.Core.Users;
 using ElectronicService.Domain.Users;
+using ElectronicService.Domain.Users.Enums;
 using ElectronicService.Domain.Users.ValueObjects;
 
 namespace ElectronicService.Core.UnitTests.TestDoubles;
@@ -92,6 +93,68 @@ internal sealed class FakeUserRepository : IUserRepository
             candidate.Email.Equals(email));
 
         return Task.FromResult(exists);
+    }
+
+    public Task<bool> HasPermissionAsync(
+        User user,
+        UserPermissionCode permission,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+
+        var hasPermission =
+            ElectronicService.Core.Users.Access.UserPermissionResolver
+                .HasPermission(user, permission);
+
+        return Task.FromResult(hasPermission);
+    }
+
+    public Task<(IReadOnlyCollection<User> Items, int TotalCount)> GetPageAsync(
+        string? search,
+        UserType? type,
+        UserStatus? status,
+        bool includeSystemDeveloper,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        IEnumerable<User> query = _users;
+
+        if (!includeSystemDeveloper)
+        {
+            query = query.Where(user => !user.IsSystemDeveloper);
+        }
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            query = query.Where(user =>
+                user.DisplayName.Value.Contains(
+                    search,
+                    StringComparison.OrdinalIgnoreCase)
+                || user.Email?.Value.Contains(
+                    search,
+                    StringComparison.OrdinalIgnoreCase) == true);
+        }
+
+        if (type.HasValue)
+        {
+            query = query.Where(user => user.Type == type.Value);
+        }
+
+        if (status.HasValue)
+        {
+            query = query.Where(user => user.Status == status.Value);
+        }
+
+        var filtered = query.ToArray();
+        var items = filtered
+            .Skip((Math.Max(page, 1) - 1) * Math.Max(pageSize, 1))
+            .Take(Math.Max(pageSize, 1))
+            .ToArray();
+
+        return Task.FromResult<(
+            IReadOnlyCollection<User> Items,
+            int TotalCount)>((items, filtered.Length));
     }
 
     public void Add(User user)

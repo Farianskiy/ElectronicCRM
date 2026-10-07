@@ -109,6 +109,13 @@ public sealed class CatalogPriceCalculationLineComponentConfiguration
             .IsRequired();
 
         builder.Property(component =>
+                component.SelectionSource)
+            .HasColumnName("selection_source")
+            .HasConversion<string>()
+            .HasMaxLength(32)
+            .IsRequired();
+
+        builder.Property(component =>
                 component.QuantityPerUnit)
             .HasColumnName("quantity_per_unit")
             .IsRequired();

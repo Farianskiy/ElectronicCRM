@@ -1,5 +1,6 @@
 using ElectronicService.Core.Catalog.PriceCalculations.Abstractions;
 using ElectronicService.Domain.Catalog.PriceLists;
+using ElectronicService.Domain.Catalog.ProductTypes;
 using ElectronicService.Infrastructure.Postgres.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -25,89 +26,64 @@ public sealed class CatalogPriceCalculationProductSearchReader
             int take,
             CancellationToken cancellationToken = default)
     {
-        var eligibleRows =
-            from row in
-                _dbContext.CatalogPriceListRows
-                    .AsNoTracking()
-            join priceList in
-                _dbContext.CatalogPriceLists
-                    .AsNoTracking()
-                on row.PriceListId
-                equals priceList.Id
-            where priceList.Status
-                      == CatalogPriceListStatus.Active
-                  && row.Status
-                      == CatalogPriceListRowStatus.Valid
-                  && row.ProductId.HasValue
-                  && row.BasePriceAmount.HasValue
-            select new
-            {
-                ProductId =
-                    row.ProductId!.Value,
-                ManufacturerId =
-                    priceList.ManufacturerId,
-                PriceListId =
-                    priceList.Id,
-                PriceListRowId =
-                    row.Id,
-                PriceListEffectiveDate =
-                    priceList.EffectiveDate,
-                row.Article,
-                row.NormalizedArticle,
-                row.Name,
-                row.NormalizedName,
-                row.Unit,
-                BasePriceAmount =
-                    row.BasePriceAmount!.Value,
-                row.MrcPriceAmount
-            };
+        return await SearchAsync(
+                search,
+                skip,
+                take,
+                productKind: null,
+                productTypeCode: null,
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
 
-        var uniquelyMatchedProductIds =
-            eligibleRows
-                .GroupBy(item =>
-                    item.ProductId)
-                .Where(group =>
-                    group.Count() == 1)
-                .Select(group =>
-                    group.Key);
-
+    public async Task<CatalogPriceCalculationProductsPage>
+        SearchAsync(
+            string? search,
+            int skip,
+            int take,
+            ProductTypeKind? productKind,
+            string? productTypeCode,
+            CancellationToken cancellationToken = default)
+    {
         var query =
-            from priceSource in eligibleRows
-            join product in
+            from product in
                 _dbContext.Products.AsNoTracking()
-                on priceSource.ProductId
-                equals product.Id
             join manufacturer in
                 _dbContext.Manufacturers.AsNoTracking()
-                on priceSource.ManufacturerId
+                on product.ManufacturerId
                 equals manufacturer.Id
-            where product.ManufacturerId
-                      == priceSource.ManufacturerId
-                  && uniquelyMatchedProductIds.Contains(
-                      priceSource.ProductId)
+            join productType in
+                _dbContext.ProductTypes.AsNoTracking()
+                on product.ProductTypeId
+                equals productType.Id
             select new
             {
-                priceSource.ProductId,
-                priceSource.ManufacturerId,
+                ProductId = product.Id,
+                ProductTypeCode = productType.Code,
+                ProductTypeName = productType.Name,
+                ProductTypeKind = productType.Kind,
+                product.ManufacturerId,
                 ManufacturerName =
                     manufacturer.Name,
                 ManufacturerNormalizedName =
                     manufacturer.NormalizedName,
-                priceSource.PriceListId,
-                priceSource.PriceListRowId,
-                priceSource.PriceListEffectiveDate,
-                priceSource.Article,
-                priceSource.NormalizedArticle,
-                priceSource.Name,
-                priceSource.NormalizedName,
-                priceSource.Unit,
-                priceSource.BasePriceAmount,
-                priceSource.MrcPriceAmount,
-                ProductArticle =
-                    product.Article.Value,
-                ProductNormalizedName =
-                    product.Name.NormalizedValue
+                Article = product.Article.Value,
+                Name = product.Name.Value,
+                CatalogPriceAmount = product.Price.Amount,
+                NormalizedName = product.Name.NormalizedValue,
+                Aliases = product.Aliases
             };
+
+        if (productKind.HasValue)
+        {
+            query = query.Where(item => item.ProductTypeKind == productKind.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(productTypeCode))
+        {
+            var normalizedProductTypeCode = productTypeCode.Trim().ToUpperInvariant();
+            query = query.Where(item => item.ProductTypeCode == normalizedProductTypeCode);
+        }
 
         var normalizedSearch =
             NormalizeSearch(search);
@@ -125,7 +101,7 @@ public sealed class CatalogPriceCalculationProductSearchReader
                 query.Where(
                     item =>
                         EF.Functions.ILike(
-                            item.NormalizedArticle,
+                            item.Article,
                             searchPattern,
                             "\\")
                         || EF.Functions.ILike(
@@ -133,17 +109,14 @@ public sealed class CatalogPriceCalculationProductSearchReader
                             searchPattern,
                             "\\")
                         || EF.Functions.ILike(
-                            item.ProductArticle,
-                            searchPattern,
-                            "\\")
-                        || EF.Functions.ILike(
-                            item.ProductNormalizedName,
-                            searchPattern,
-                            "\\")
-                        || EF.Functions.ILike(
                             item.ManufacturerNormalizedName,
                             searchPattern,
-                            "\\"));
+                            "\\")
+                        || item.Aliases.Any(
+                            alias => EF.Functions.ILike(
+                                alias.NormalizedValue,
+                                searchPattern,
+                                "\\")));
         }
 
         var totalCount =
@@ -163,12 +136,10 @@ public sealed class CatalogPriceCalculationProductSearchReader
                 : query
                     .OrderByDescending(
                         item =>
-                            item.NormalizedArticle
-                            == normalizedSearch)
-                    .ThenByDescending(
-                        item =>
-                            item.ProductArticle
-                            == normalizedSearch)
+                            EF.Functions.ILike(
+                                item.Article,
+                                EscapeLikePattern(normalizedSearch),
+                                "\\"))
                     .ThenBy(item =>
                         item.ManufacturerName)
                     .ThenBy(item =>
@@ -176,31 +147,103 @@ public sealed class CatalogPriceCalculationProductSearchReader
                     .ThenBy(item =>
                         item.Article);
 
-        var items =
+        var products =
             await orderedQuery
                 .Skip(skip)
                 .Take(take)
-                .Select(
-                    item =>
-                        new CatalogPriceCalculationProductSearchItem(
-                            item.ProductId,
-                            item.ManufacturerId,
-                            item.ManufacturerName,
-                            item.PriceListId,
-                            item.PriceListRowId,
-                            item.PriceListEffectiveDate,
-                            item.Article,
-                            item.Name,
-                            item.Unit,
-                            item.BasePriceAmount,
-                            item.MrcPriceAmount))
+                .Select(item => new
+                {
+                    item.ProductId,
+                    item.ProductTypeCode,
+                    item.ProductTypeName,
+                    item.ManufacturerId,
+                    item.ManufacturerName,
+                    item.Article,
+                    item.Name,
+                    item.CatalogPriceAmount
+                })
                 .ToArrayAsync(cancellationToken)
                 .ConfigureAwait(false);
+
+        var productIds = products
+            .Select(product => product.ProductId)
+            .ToArray();
+
+        var priceSources = productIds.Length == 0
+            ? []
+            : await (
+                from row in _dbContext.CatalogPriceListRows.AsNoTracking()
+                join priceList in _dbContext.CatalogPriceLists.AsNoTracking()
+                    on row.PriceListId equals priceList.Id
+                where productIds.Contains(row.ProductId!.Value)
+                      && row.ProductId.HasValue
+                      && priceList.Status == CatalogPriceListStatus.Active
+                      && row.Status == CatalogPriceListRowStatus.Valid
+                      && row.BasePriceAmount.HasValue
+                select new ProductPriceSource(
+                    row.ProductId!.Value,
+                    priceList.ManufacturerId,
+                    priceList.Id,
+                    row.Id,
+                    priceList.EffectiveDate,
+                    row.Article,
+                    row.Name,
+                    row.Unit,
+                    row.BasePriceAmount!.Value,
+                    row.MrcPriceAmount))
+                .ToArrayAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+        var priceSourcesByProductId = priceSources
+            .GroupBy(source => source.ProductId)
+            .ToDictionary(group => group.Key, group => group.ToArray());
+
+        var items = products
+            .Select(product =>
+            {
+                var matchingPriceSources = priceSourcesByProductId
+                    .GetValueOrDefault(product.ProductId, [])
+                    .Where(source => source.ManufacturerId == product.ManufacturerId)
+                    .ToArray();
+
+                var priceSource = matchingPriceSources.Length == 1
+                    ? matchingPriceSources[0]
+                    : null;
+
+                return new CatalogPriceCalculationProductSearchItem(
+                    product.ProductId,
+                    product.ProductTypeCode,
+                    product.ProductTypeName,
+                    product.ManufacturerId,
+                    product.ManufacturerName,
+                    CatalogPriceCalculationProductPriceStatus.Available,
+                    priceSource?.PriceListId,
+                    priceSource?.PriceListRowId,
+                    priceSource?.PriceListEffectiveDate,
+                    priceSource?.Article ?? product.Article,
+                    priceSource?.Name ?? product.Name,
+                    priceSource?.Unit,
+                    priceSource?.BasePriceAmount ?? product.CatalogPriceAmount,
+                    priceSource?.MrcPriceAmount);
+            })
+            .ToArray();
 
         return new CatalogPriceCalculationProductsPage(
             totalCount,
             items);
     }
+
+    private sealed record ProductPriceSource(
+        Guid ProductId,
+        Guid ManufacturerId,
+        Guid PriceListId,
+        Guid PriceListRowId,
+        DateOnly? PriceListEffectiveDate,
+        string Article,
+        string Name,
+        string? Unit,
+        decimal BasePriceAmount,
+        decimal? MrcPriceAmount);
 
     private static string? NormalizeSearch(
         string? search)

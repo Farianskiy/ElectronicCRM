@@ -13,7 +13,7 @@ public sealed class UpdateProductStockCommandHandlerTests
     {
         // Arrange
         var repository = new FakeProductRepository();
-        var handler = new UpdateProductStockCommandHandler(repository);
+        var handler = new UpdateProductStockCommandHandler(repository, new FakeProductAuditRecorder());
         var cancellationToken = TestContext.Current.CancellationToken;
 
         // Act
@@ -22,7 +22,7 @@ public sealed class UpdateProductStockCommandHandlerTests
 
         // Assert
         Assert.Equal("command", exception.ParamName);
-        Assert.Equal(0, repository.GetByIdCallsCount);
+        Assert.Equal(0, repository.GetByIdWithDetailsCallsCount);
         Assert.Equal(0, repository.SaveChangesCallsCount);
     }
 
@@ -33,10 +33,11 @@ public sealed class UpdateProductStockCommandHandlerTests
     {
         // Arrange
         var repository = new FakeProductRepository();
-        var handler = new UpdateProductStockCommandHandler(repository);
+        var handler = new UpdateProductStockCommandHandler(repository, new FakeProductAuditRecorder());
 
         var command = new UpdateProductStockCommand(
             Guid.Empty,
+            Guid.NewGuid(),
             10m);
 
         // Act
@@ -47,7 +48,7 @@ public sealed class UpdateProductStockCommandHandlerTests
         // Assert
         Assert.True(result.IsFailure);
         Assert.Equal("general.value_is_invalid", result.Error.Code);
-        Assert.Equal(0, repository.GetByIdCallsCount);
+        Assert.Equal(0, repository.GetByIdWithDetailsCallsCount);
         Assert.Equal(0, repository.SaveChangesCallsCount);
     }
 
@@ -58,11 +59,12 @@ public sealed class UpdateProductStockCommandHandlerTests
     {
         // Arrange
         var repository = new FakeProductRepository();
-        var handler = new UpdateProductStockCommandHandler(repository);
+        var handler = new UpdateProductStockCommandHandler(repository, new FakeProductAuditRecorder());
         var productId = Guid.NewGuid();
 
         var command = new UpdateProductStockCommand(
             productId,
+            Guid.NewGuid(),
             10m);
 
         // Act
@@ -73,8 +75,8 @@ public sealed class UpdateProductStockCommandHandlerTests
         // Assert
         Assert.True(result.IsFailure);
         Assert.Equal("catalog.product.not_found", result.Error.Code);
-        Assert.Equal(productId, repository.LastGetByIdProductId);
-        Assert.Equal(1, repository.GetByIdCallsCount);
+        Assert.Equal(productId, repository.LastGetByIdWithDetailsProductId);
+        Assert.Equal(1, repository.GetByIdWithDetailsCallsCount);
         Assert.Equal(0, repository.SaveChangesCallsCount);
     }
 
@@ -89,10 +91,11 @@ public sealed class UpdateProductStockCommandHandlerTests
 
         repository.AddExisting(product);
 
-        var handler = new UpdateProductStockCommandHandler(repository);
+        var handler = new UpdateProductStockCommandHandler(repository, new FakeProductAuditRecorder());
 
         var command = new UpdateProductStockCommand(
             product.Id,
+            Guid.NewGuid(),
             -1m);
 
         // Act
@@ -119,10 +122,11 @@ public sealed class UpdateProductStockCommandHandlerTests
 
         repository.AddExisting(product);
 
-        var handler = new UpdateProductStockCommandHandler(repository);
+        var handler = new UpdateProductStockCommandHandler(repository, new FakeProductAuditRecorder());
 
         var command = new UpdateProductStockCommand(
             product.Id,
+            Guid.NewGuid(),
             0m);
 
         // Act
@@ -149,10 +153,11 @@ public sealed class UpdateProductStockCommandHandlerTests
 
         repository.AddExisting(product);
 
-        var handler = new UpdateProductStockCommandHandler(repository);
+        var handler = new UpdateProductStockCommandHandler(repository, new FakeProductAuditRecorder());
 
         var command = new UpdateProductStockCommand(
             product.Id,
+            Guid.NewGuid(),
             12.5m);
 
         // Act
@@ -164,7 +169,7 @@ public sealed class UpdateProductStockCommandHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Equal(12.5m, product.StockQuantity.Value);
         Assert.True(product.IsAvailable);
-        Assert.Equal(1, repository.GetByIdCallsCount);
+        Assert.Equal(1, repository.GetByIdWithDetailsCallsCount);
         Assert.Equal(1, repository.SaveChangesCallsCount);
     }
 
@@ -179,11 +184,12 @@ public sealed class UpdateProductStockCommandHandlerTests
 
         repository.AddExisting(product);
 
-        var handler = new UpdateProductStockCommandHandler(repository);
+        var handler = new UpdateProductStockCommandHandler(repository, new FakeProductAuditRecorder());
         var cancellationToken = TestContext.Current.CancellationToken;
 
         var command = new UpdateProductStockCommand(
             product.Id,
+            Guid.NewGuid(),
             30m);
 
         // Act
@@ -195,7 +201,7 @@ public sealed class UpdateProductStockCommandHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Equal(
             cancellationToken,
-            repository.LastGetByIdCancellationToken);
+            repository.LastGetByIdWithDetailsCancellationToken);
         Assert.Equal(
             cancellationToken,
             repository.LastSaveChangesCancellationToken);

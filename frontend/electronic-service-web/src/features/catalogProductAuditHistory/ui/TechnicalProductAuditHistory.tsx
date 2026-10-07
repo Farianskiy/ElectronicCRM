@@ -37,6 +37,8 @@ const operationLabels: Readonly<Record<string, string>> = {
   ImportApplied: "Применены данные импорта",
 
   BulkUpdated: "Массовое изменение товара",
+
+  ProductCreated: "Товар добавлен вручную",
 };
 
 const sourceLabels: Readonly<Record<string, string>> = {

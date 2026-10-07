@@ -22,6 +22,11 @@ public interface IUserRepository
         Email email,
         CancellationToken cancellationToken = default);
 
+    Task<bool> HasPermissionAsync(
+        User user,
+        UserPermissionCode permission,
+        CancellationToken cancellationToken = default);
+
     Task<(IReadOnlyCollection<User> Items, int TotalCount)> GetPageAsync(
         string? search,
         UserType? type,

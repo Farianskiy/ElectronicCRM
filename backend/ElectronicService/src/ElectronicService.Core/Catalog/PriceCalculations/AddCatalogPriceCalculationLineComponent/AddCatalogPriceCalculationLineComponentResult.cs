@@ -1,3 +1,5 @@
+using ElectronicService.Domain.Catalog.PriceCalculations;
+
 namespace ElectronicService.Core.Catalog.PriceCalculations.AddCatalogPriceCalculationLineComponent;
 
 public sealed record AddCatalogPriceCalculationLineComponentResult(
@@ -11,6 +13,7 @@ public sealed record AddCatalogPriceCalculationLineComponentResult(
     string ManufacturerName,
     string Article,
     string Name,
+    CatalogPriceCalculationLineComponentSelectionSource SelectionSource,
     int QuantityPerUnit,
     decimal BasePriceAmount,
     decimal DiscountPercent,

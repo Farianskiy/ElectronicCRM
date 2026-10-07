@@ -13,7 +13,7 @@ public sealed class AddProductAliasCommandHandlerTests
     {
         // Arrange
         var repository = new FakeProductRepository();
-        var handler = new AddProductAliasCommandHandler(repository);
+        var handler = new AddProductAliasCommandHandler(repository, new FakeProductAuditRecorder());
         var cancellationToken = TestContext.Current.CancellationToken;
 
         // Act
@@ -33,10 +33,11 @@ public sealed class AddProductAliasCommandHandlerTests
     {
         // Arrange
         var repository = new FakeProductRepository();
-        var handler = new AddProductAliasCommandHandler(repository);
+        var handler = new AddProductAliasCommandHandler(repository, new FakeProductAuditRecorder());
 
         var command = new AddProductAliasCommand(
             Guid.Empty,
+            Guid.NewGuid(),
             "Альтернативное название");
 
         // Act
@@ -62,9 +63,10 @@ public sealed class AddProductAliasCommandHandlerTests
     {
         // Arrange
         var repository = new FakeProductRepository();
-        var handler = new AddProductAliasCommandHandler(repository);
+        var handler = new AddProductAliasCommandHandler(repository, new FakeProductAuditRecorder());
 
         var command = new AddProductAliasCommand(
+            Guid.NewGuid(),
             Guid.NewGuid(),
             alias);
 
@@ -87,11 +89,12 @@ public sealed class AddProductAliasCommandHandlerTests
     {
         // Arrange
         var repository = new FakeProductRepository();
-        var handler = new AddProductAliasCommandHandler(repository);
+        var handler = new AddProductAliasCommandHandler(repository, new FakeProductAuditRecorder());
         var productId = Guid.NewGuid();
 
         var command = new AddProductAliasCommand(
             productId,
+            Guid.NewGuid(),
             "Альтернативное название");
 
         // Act
@@ -120,10 +123,11 @@ public sealed class AddProductAliasCommandHandlerTests
 
         repository.AddExisting(product);
 
-        var handler = new AddProductAliasCommandHandler(repository);
+        var handler = new AddProductAliasCommandHandler(repository, new FakeProductAuditRecorder());
 
         var command = new AddProductAliasCommand(
             product.Id,
+            Guid.NewGuid(),
             "  Автомат Ёлка  ");
 
         // Act
@@ -158,10 +162,11 @@ public sealed class AddProductAliasCommandHandlerTests
 
         repository.AddExisting(product);
 
-        var handler = new AddProductAliasCommandHandler(repository);
+        var handler = new AddProductAliasCommandHandler(repository, new FakeProductAuditRecorder());
 
         var command = new AddProductAliasCommand(
             product.Id,
+            Guid.NewGuid(),
             "  автомат елка  ");
 
         // Act
@@ -189,10 +194,11 @@ public sealed class AddProductAliasCommandHandlerTests
 
         repository.AddExisting(product);
 
-        var handler = new AddProductAliasCommandHandler(repository);
+        var handler = new AddProductAliasCommandHandler(repository, new FakeProductAuditRecorder());
 
         var command = new AddProductAliasCommand(
             product.Id,
+            Guid.NewGuid(),
             new string('A', 501));
 
         // Act
@@ -218,11 +224,12 @@ public sealed class AddProductAliasCommandHandlerTests
 
         repository.AddExisting(product);
 
-        var handler = new AddProductAliasCommandHandler(repository);
+        var handler = new AddProductAliasCommandHandler(repository, new FakeProductAuditRecorder());
         var cancellationToken = TestContext.Current.CancellationToken;
 
         var command = new AddProductAliasCommand(
             product.Id,
+            Guid.NewGuid(),
             "Новый алиас");
 
         // Act

@@ -133,6 +133,75 @@ public sealed class CatalogImportPipelineTests
     }
 
     [Fact]
+    public void WorkbookWithOnlyArticleAndNameDoesNotRequireCharacteristicColumns()
+    {
+        var manufacturerId = Guid.NewGuid();
+        var manufacturerIndex = new ManufacturerResolutionIndex(
+            [new ManufacturerResolutionEntry(
+                manufacturerId,
+                "CHINT",
+                "CHINT",
+                ManufacturerResolutionSource.ExactName,
+                null)],
+            []);
+
+        var productType = TestDataFactory.CreateProductType();
+        var definition = TestDataFactory.CreateCharacteristicDefinition();
+        TestDataFactory.AddCharacteristic(productType, definition, isRequired: true);
+
+        var analysisResult = new CatalogImportWorkbookAnalyzer().Analyze(
+            Guid.NewGuid(),
+            CreateWorkbook("NB1-63", "Автомат CHINT без распознанного тока"),
+            productType,
+            [definition],
+            manufacturerIndex,
+            [],
+            TestContext.Current.CancellationToken);
+
+        Assert.True(analysisResult.IsSuccess);
+        Assert.False(analysisResult.Value.MappingRequired);
+
+        var row = Assert.Single(analysisResult.Value.Rows);
+        Assert.Equal(CatalogImportRowStatus.Valid, row.Status);
+        Assert.DoesNotContain(
+            DeserializeIssues(row.IssuesJson),
+            issue => string.Equals(
+                issue.Code,
+                "characteristic.required",
+                StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void MissingRequiredCharacteristicIsAQualityWarningInsteadOfImportError()
+    {
+        var productType = TestDataFactory.CreateProductType();
+        var definition = TestDataFactory.CreateCharacteristicDefinition();
+        TestDataFactory.AddCharacteristic(productType, definition, isRequired: true);
+
+        var validationResult = new CatalogImportRowValidator().Validate(
+            new CatalogImportNormalizedRowData(
+                "Автомат CHINT",
+                "NB1-63",
+                "CHINT",
+                null,
+                null,
+                new Dictionary<string, string>(StringComparer.Ordinal),
+                Guid.NewGuid(),
+                ProductTypeId: productType.Id),
+            productType,
+            [definition]);
+
+        Assert.Equal(CatalogImportRowStatus.Valid, validationResult.Status);
+        Assert.Empty(validationResult.Issues);
+        Assert.Contains(
+            validationResult.Warnings,
+            warning => string.Equals(
+                warning.Code,
+                "characteristic.required",
+                StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task EnrichmentMarksConflictBetweenExcelAndProductNameValues()
     {
         var productType = TestDataFactory.CreateProductType();

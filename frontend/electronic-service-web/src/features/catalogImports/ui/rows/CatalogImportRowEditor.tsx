@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
+import { useCurrentUserAccess } from "@/features/auth/model/CurrentUserAccessContext";
 import { getCatalogManufacturers } from "@/features/catalogMetadata/api/getCatalogManufacturers";
 import { getCatalogProductTypeCharacteristics } from "@/features/catalogMetadata/api/getCatalogProductTypeCharacteristics";
 import { getCatalogProductTypes } from "@/features/catalogMetadata/api/getCatalogProductTypes";
@@ -15,6 +16,7 @@ import { AppButton } from "@/shared/ui/AppButton";
 import { AppInput } from "@/shared/ui/AppInput";
 import { CatalogImportProductTypePicker } from "../productTypes/CatalogImportProductTypePicker";
 import { updateCatalogImportRow } from "../../api/updateCatalogImportRow";
+import { confirmCatalogImportTrainingExample } from "../../api/confirmCatalogImportTrainingExample";
 import { catalogImportConfirmedSpansQueryKey } from "../../api/getCatalogImportRowConfirmedSpans";
 import { CatalogImportConfirmedSpanEditor } from "./CatalogImportConfirmedSpanEditor";
 import type { CatalogImportConfirmedSpan } from "../../model/types";
@@ -36,6 +38,22 @@ interface CatalogImportRowEditorProps {
 interface ParsedNumberResult {
   value: number | null;
   error?: string;
+}
+
+interface SaveRowVariables {
+  request: UpdateCatalogImportRowRequest;
+  confirmTrainingExamples: boolean;
+}
+
+interface TrainingConfirmationFailure {
+  confirmedCount: number;
+  error: unknown;
+}
+
+interface SaveRowResult {
+  row: UpdateCatalogImportRowResponse;
+  confirmedExamplesCount: number;
+  trainingFailure: TrainingConfirmationFailure | null;
 }
 
 const textareaClassName = [
@@ -133,6 +151,7 @@ export function CatalogImportRowEditor({
   onSaved,
 }: CatalogImportRowEditorProps) {
   const queryClient = useQueryClient();
+  const access = useCurrentUserAccess();
 
   const [name, setName] = useState(row.data.name ?? "");
 
@@ -159,6 +178,8 @@ export function CatalogImportRowEditor({
   });
 
   const [formErrors, setFormErrors] = useState<string[]>([]);
+  const [trainingConfirmationFailure, setTrainingConfirmationFailure] =
+    useState<TrainingConfirmationFailure | null>(null);
   const [confirmedSpans, setConfirmedSpans] = useState<
     Record<string, CatalogImportConfirmedSpan>
   >({});
@@ -200,11 +221,90 @@ export function CatalogImportRowEditor({
 
   const saveMutation = useMutation({
     mutationKey: catalogImportQueryKeys.saveRows(batchId),
-    mutationFn: (request: UpdateCatalogImportRowRequest) =>
-      updateCatalogImportRow(batchId, row.rowId, request),
+    mutationFn: async ({
+      request,
+      confirmTrainingExamples,
+    }: SaveRowVariables): Promise<SaveRowResult> => {
+      const savedRow = await updateCatalogImportRow(
+        batchId,
+        row.rowId,
+        request,
+      );
+
+      if (!confirmTrainingExamples || !request.confirmedSpans) {
+        return {
+          row: savedRow,
+          confirmedExamplesCount: 0,
+          trainingFailure: null,
+        };
+      }
+
+      let confirmedExamplesCount = 0;
+
+      try {
+        for (const [characteristicId, span] of Object.entries(
+          request.confirmedSpans,
+        )) {
+          const normalizedValue =
+            savedRow.data.characteristics[characteristicId]?.trim();
+          const savedName = savedRow.data.name?.trim();
+          const savedManufacturerId = savedRow.data.manufacturerId;
+          const savedProductTypeId = savedRow.data.productTypeId;
+          const rawValue = span.productName.slice(
+            span.start,
+            span.start + span.length,
+          );
+
+          if (
+            !normalizedValue ||
+            !savedName ||
+            !savedManufacturerId ||
+            !savedProductTypeId ||
+            !rawValue
+          ) {
+            throw new Error(
+              "Сохранённая строка не содержит всех данных учебного примера.",
+            );
+          }
+
+          await confirmCatalogImportTrainingExample(
+            batchId,
+            row.rowId,
+            characteristicId,
+            {
+              productName: savedName,
+              manufacturerId: savedManufacturerId,
+              productTypeId: savedProductTypeId,
+              normalizedValue,
+              rawValue,
+              spanStart: span.start,
+              spanLength: span.length,
+            },
+          );
+
+          confirmedExamplesCount++;
+        }
+      } catch (error) {
+        return {
+          row: savedRow,
+          confirmedExamplesCount,
+          trainingFailure: {
+            confirmedCount: confirmedExamplesCount,
+            error,
+          },
+        };
+      }
+
+      return {
+        row: savedRow,
+        confirmedExamplesCount,
+        trainingFailure: null,
+      };
+    },
 
     onSuccess: async (result) => {
       setConfirmedSpans({});
+      setTrainingConfirmationFailure(result.trainingFailure);
 
       await Promise.all([
         queryClient.invalidateQueries({
@@ -226,9 +326,14 @@ export function CatalogImportRowEditor({
         queryClient.invalidateQueries({
           queryKey: catalogImportQueryKeys.myRoot,
         }),
+        queryClient.invalidateQueries({
+          queryKey: ["training-examples"],
+        }),
       ]);
 
-      onSaved(result);
+      if (!result.trainingFailure) {
+        onSaved(result.row);
+      }
     },
   });
 
@@ -255,12 +360,11 @@ export function CatalogImportRowEditor({
     });
 
     setFormErrors([]);
+    setTrainingConfirmationFailure(null);
     saveMutation.reset();
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>): void {
-    event.preventDefault();
-
+  function saveRow(confirmTrainingExamples: boolean): void {
     const errors: string[] = [];
 
     const parsedPrice = parseNullableDecimal(price, "Цена");
@@ -318,8 +422,20 @@ export function CatalogImportRowEditor({
     };
 
     setFormErrors([]);
-    saveMutation.mutate(request);
+    setTrainingConfirmationFailure(null);
+    saveMutation.mutate({ request, confirmTrainingExamples });
   }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>): void {
+    event.preventDefault();
+    saveRow(false);
+  }
+
+  const trainingExamplesCount = Object.keys(confirmedSpans).length;
+  const canConfirmTrainingExamples =
+    !access.isLoading &&
+    !access.isError &&
+    access.hasPermission("DictionariesManage");
 
   return (
     <form
@@ -377,6 +493,7 @@ export function CatalogImportRowEditor({
               setName(event.target.value);
               setConfirmedSpans({});
               setFormErrors([]);
+              setTrainingConfirmationFailure(null);
               saveMutation.reset();
             }}
             className={textareaClassName}
@@ -415,6 +532,7 @@ export function CatalogImportRowEditor({
               setManufacturerId(value);
               setConfirmedSpans({});
               setFormErrors([]);
+              setTrainingConfirmationFailure(null);
               saveMutation.reset();
             }}
             options={[
@@ -452,6 +570,7 @@ export function CatalogImportRowEditor({
               setCharacteristicValues({});
               setConfirmedSpans({});
               setFormErrors([]);
+              setTrainingConfirmationFailure(null);
               saveMutation.reset();
             }}
           />
@@ -569,6 +688,26 @@ export function CatalogImportRowEditor({
         </div>
       )}
 
+      {trainingConfirmationFailure && (
+        <div className="rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-5 text-sm text-[var(--app-danger)]">
+          <p className="font-semibold">
+            Строка сохранена, но не все учебные примеры подтверждены
+          </p>
+          <p className="mt-2">
+            Успешно подтверждено: {trainingConfirmationFailure.confirmedCount}.
+            {" "}
+            {getApiErrorMessage(
+              trainingConfirmationFailure.error,
+              "Проверьте сохранённую разметку и повторите подтверждение.",
+            )}
+          </p>
+          <p className="mt-2 text-[var(--app-muted)]">
+            Сохранённые данные строки не потеряны. Ниже можно проверить разметку
+            и повторить подтверждение отдельно.
+          </p>
+        </div>
+      )}
+
       <div className="flex flex-col-reverse gap-3 border-t border-[var(--app-border)] pt-4 sm:flex-row sm:justify-end">
         <AppButton
           type="button"
@@ -581,13 +720,30 @@ export function CatalogImportRowEditor({
 
         <AppButton
           type="submit"
-          variant="primary"
+          variant="secondary"
           loading={saveMutation.isPending}
           disabled={isBusy || Boolean(metadataError)}
         >
           {saveMutation.isPending
             ? "Сохраняем и проверяем..."
             : "Сохранить строку"}
+        </AppButton>
+
+        <AppButton
+          type="button"
+          variant="primary"
+          loading={saveMutation.isPending}
+          disabled={
+            isBusy ||
+            Boolean(metadataError) ||
+            trainingExamplesCount === 0 ||
+            !canConfirmTrainingExamples
+          }
+          onClick={() => saveRow(true)}
+        >
+          {saveMutation.isPending
+            ? "Сохраняем и подтверждаем..."
+            : `Сохранить и подтвердить для обучения (${trainingExamplesCount})`}
         </AppButton>
       </div>
     </form>

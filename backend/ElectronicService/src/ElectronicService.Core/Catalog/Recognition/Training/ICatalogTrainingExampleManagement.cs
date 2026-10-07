@@ -15,11 +15,29 @@ public sealed record TrainingExampleItem(Guid Id, Guid SourceFeedbackId, Guid Ma
 
 public sealed record TrainingExamplePage(IReadOnlyList<TrainingExampleItem> Items, int Page, bool HasMore);
 
+public sealed record CatalogImportTrainingSummaryGroup(
+    Guid ManufacturerId,
+    string ManufacturerName,
+    Guid ProductTypeId,
+    string ProductTypeName,
+    Guid CharacteristicDefinitionId,
+    string CharacteristicName,
+    int ActiveExamplesCount,
+    int DistinctValuesCount);
+
+public sealed record CatalogImportTrainingSummary(
+    Guid BatchId,
+    int ActiveExamplesCount,
+    int EvaluationExamplesCount,
+    int RevokedExamplesCount,
+    IReadOnlyList<CatalogImportTrainingSummaryGroup> Groups);
+
 public sealed record ConfirmedExampleExportMetadata(DateTime SelectionAsOfUtc, long Count);
 
 public interface ICatalogTrainingExampleManagement
 {
     Task<Result<TrainingExamplePage, DomainError>> ListAsync(TrainingExampleFilter filter, CancellationToken cancellationToken);
+    Task<Result<CatalogImportTrainingSummary, DomainError>> GetImportSummaryAsync(Guid batchId, CancellationToken cancellationToken);
     Task<Result<TrainingExampleItem, DomainError>> GetAsync(Guid id, CancellationToken cancellationToken);
     Task<UnitResult<DomainError>> SetPurposeAsync(Guid id, bool evaluationOnly, CancellationToken cancellationToken);
     Task<UnitResult<DomainError>> RevokeAsync(Guid id, string reason, CancellationToken cancellationToken);

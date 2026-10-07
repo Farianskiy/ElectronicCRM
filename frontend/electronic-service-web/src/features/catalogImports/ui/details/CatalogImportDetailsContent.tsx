@@ -176,6 +176,7 @@ export function CatalogImportDetailsContent({
           productTypeId={batch.productTypeId}
           expectedVersion={batch.version}
           canEditRows={canEditRows}
+          onAnalysisChange={handleAnalysisChange}
         />
       ),
     },

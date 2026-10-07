@@ -37,3 +37,10 @@ Thumbs.db
 data/
 uploads/
 import-files/
+backups/
+*.dump
+
+# Local package and Python caches
+.pnpm-store/
+**/__pycache__/
+*.py[cod]

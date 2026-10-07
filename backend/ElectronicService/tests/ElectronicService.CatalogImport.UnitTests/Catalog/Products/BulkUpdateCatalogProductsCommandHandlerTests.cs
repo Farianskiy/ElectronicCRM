@@ -165,6 +165,19 @@ public sealed class BulkUpdateCatalogProductsCommandHandlerTests
 
         public int SaveCallsCount { get; private set; }
 
+        public void Add(Product product) => _products[product.Id] = product;
+
+        public Task<bool> ExistsByArticleAndManufacturerAsync(
+            string article,
+            Guid manufacturerId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(_products.Values.Any(product =>
+                product.ManufacturerId == manufacturerId
+                && string.Equals(
+                    product.Article.Value,
+                    article.Trim(),
+                    StringComparison.OrdinalIgnoreCase)));
+
         public Task<Product?> GetByIdAsync(Guid productId, CancellationToken cancellationToken = default) =>
             Task.FromResult(_products.GetValueOrDefault(productId));
 

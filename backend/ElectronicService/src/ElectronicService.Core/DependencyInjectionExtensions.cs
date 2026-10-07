@@ -65,6 +65,7 @@ using ElectronicService.Core.Catalog.PriceCalculations.UpdateCatalogPriceCalcula
 using ElectronicService.Core.Catalog.PriceLists.ActivateCatalogPriceList;
 using ElectronicService.Core.Catalog.PriceLists.ApplyCatalogPriceListIssueGroup;
 using ElectronicService.Core.Catalog.PriceLists.BulkUpdateCatalogPriceListRows;
+using ElectronicService.Core.Catalog.PriceLists.ExcludeCatalogPriceListUnmatchedRows;
 using ElectronicService.Core.Catalog.PriceLists.GetCatalogPriceList;
 using ElectronicService.Core.Catalog.PriceLists.GetCatalogPriceListIssueGroups;
 using ElectronicService.Core.Catalog.PriceLists.GetCatalogPriceListRows;
@@ -89,6 +90,7 @@ using ElectronicService.Core.Catalog.Products.SearchProducts;
 using ElectronicService.Core.Catalog.Products.SearchReplacements;
 using ElectronicService.Core.Catalog.Products.SetCharacteristic;
 using ElectronicService.Core.Catalog.Products.UpdateGeneralInformation;
+using ElectronicService.Core.Catalog.Products.CreateProduct;
 using ElectronicService.Core.Catalog.Products.UpdatePrice;
 using ElectronicService.Core.Catalog.Products.UpdateStock;
 using ElectronicService.Core.Catalog.ProductTypes.AddOptionalCharacteristic;
@@ -183,6 +185,7 @@ public static class DependencyInjectionExtensions
         services.AddScoped<RejectCatalogAssistantDictionarySuggestionCommandHandler>();
         services.AddScoped<LoginCommandHandler>();
         services.AddScoped<UpdateProductGeneralInformationCommandHandler>();
+        services.AddScoped<CreateProductCommandHandler>();
         services.AddScoped<RemoveProductCharacteristicCommandHandler>();
         services.AddScoped<RemoveProductAliasCommandHandler>();
         services.AddScoped<GetCatalogProductTypeCharacteristicSchemaQueryHandler>();
@@ -198,6 +201,7 @@ public static class DependencyInjectionExtensions
         services.AddScoped<ProductTypeMigrationPlanner>();
         services.AddScoped<ApplyProductTypeMigrationCommandHandler>();
         services.AddScoped<ProductAuditRecorder>();
+        services.AddScoped<IProductAuditRecorder, ProductAuditRecorder>();
         services.AddScoped<GetProductAuditHistoryQueryHandler>();
         services.AddScoped<ProductAuditSnapshotBuilder>();
         services.AddScoped<CreateManagerUserCommandHandler>();
@@ -230,6 +234,7 @@ public static class DependencyInjectionExtensions
         services.AddScoped<UpdateCatalogPriceListRowCommandHandler>();
         services.AddScoped<BulkUpdateCatalogPriceListRowsCommandHandler>();
         services.AddScoped<ApplyCatalogPriceListIssueGroupCommandHandler>();
+        services.AddScoped<ExcludeCatalogPriceListUnmatchedRowsCommandHandler>();
         services.AddScoped<AnalyzeCatalogImportBatchCommandHandler>();
         services.AddScoped<GetCatalogImportBatchQueryHandler>();
         services.AddScoped<GetCatalogImportRowsQueryHandler>();

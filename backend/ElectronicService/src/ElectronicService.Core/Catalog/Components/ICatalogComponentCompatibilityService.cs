@@ -106,6 +106,12 @@ public interface ICatalogComponentCompatibilityService
         Guid selectionId,
         CancellationToken cancellationToken = default);
 
+    Task<UnitResult<DomainError>> ValidateManualSelectionAsync(
+        Guid mainProductId,
+        Guid needDefinitionId,
+        Guid componentProductId,
+        CancellationToken cancellationToken = default);
+
     Task<Result<ProductComponentCompatibilityResult, DomainError>>
         GetCompatibilityAsync(
             Guid productId,

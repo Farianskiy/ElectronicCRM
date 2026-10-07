@@ -67,7 +67,10 @@ public sealed class DownloadCatalogImportFileQueryHandler
             && currentUser.CanViewOwnCatalogImports();
 
         var canDownloadAssignedReviewFile =
-            currentUser.CanReviewCatalogImports()
+            await _userRepository.HasPermissionAsync(
+                currentUser,
+                ElectronicService.Domain.Users.Enums.UserPermissionCode.CatalogImportsReview,
+                cancellationToken).ConfigureAwait(false)
             && batch.ReviewedByUserId == currentUser.Id;
 
         if (!canDownloadOwnFile && !canDownloadAssignedReviewFile)

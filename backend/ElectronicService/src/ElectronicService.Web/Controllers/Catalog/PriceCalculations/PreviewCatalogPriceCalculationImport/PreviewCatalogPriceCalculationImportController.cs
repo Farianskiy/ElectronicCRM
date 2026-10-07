@@ -136,6 +136,7 @@ public sealed class PreviewCatalogPriceCalculationImportController
             var preview =
                 await previewer
                     .PreviewAsync(
+                        calculationId,
                         stream,
                         file.FileName,
                         cancellationToken)
@@ -151,6 +152,8 @@ public sealed class PreviewCatalogPriceCalculationImportController
                                 row.SourceName,
                                 row.SourceManufacturer,
                                 row.Quantity,
+                                row.ExistingLineId,
+                                row.CurrentQuantity,
                                 row.Status.ToString(),
                                 row.Message,
                                 row.ProductId,
@@ -166,12 +169,56 @@ public sealed class PreviewCatalogPriceCalculationImportController
                                 row.MrcPriceAmount))
                     .ToArray();
 
+            var componentRows = preview.ComponentRows
+                .Select(row =>
+                    new CatalogPriceCalculationComponentImportPreviewRowResponse(
+                        row.RowNumber,
+                        row.MainProductArticle,
+                        row.NeedName,
+                        row.ComponentArticle,
+                        row.QuantityPerUnit,
+                        row.MainLineId,
+                        row.ExistingComponentLineId,
+                        row.NeedDefinitionId,
+                        row.ComponentProductId,
+                        row.CurrentQuantityPerUnit,
+                        row.Status.ToString(),
+                        row.Message))
+                .ToArray();
+
+            var characteristicRows = preview.CharacteristicRows
+                .Select(row =>
+                    new CatalogPriceCalculationCharacteristicImportPreviewRowResponse(
+                        row.RowNumber,
+                        row.ProductId,
+                        row.Article,
+                        row.ProductName,
+                        row.ProductTypeName,
+                        row.CharacteristicCode,
+                        row.CharacteristicName,
+                        row.DataType,
+                        row.Unit,
+                        row.IsRequired,
+                        row.CurrentValue,
+                        row.NewValue,
+                        row.Status.ToString(),
+                        row.Message))
+                .ToArray();
+
             return Ok(
                 new PreviewCatalogPriceCalculationImportResponse(
                     preview.ReadRowsCount,
                     preview.MatchedRowsCount,
                     preview.SkippedRowsCount,
-                    rows));
+                    preview.AddedRowsCount,
+                    preview.UpdatedRowsCount,
+                    preview.RemovedRowsCount,
+                    preview.UnchangedRowsCount,
+                    preview.IsProjectWorkbook,
+                    preview.Warning,
+                    rows,
+                    componentRows,
+                    characteristicRows));
         }
         catch (InvalidDataException exception)
         {

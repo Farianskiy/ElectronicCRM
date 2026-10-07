@@ -131,10 +131,27 @@ public sealed class AddCatalogPriceCalculationLineComponentCommandHandler
                 ComponentCompatibilityErrors.NeedDoesNotBelongToProductType());
         }
 
-        var isCompatible = need.CompatibleComponents.Any(
-            component => component.ProductId == command.ComponentProductId);
+        var selectionSource = command.ManualSelection
+            ? CatalogPriceCalculationLineComponentSelectionSource.Manual
+            : CatalogPriceCalculationLineComponentSelectionSource.Recommended;
 
-        if (!isCompatible)
+        if (command.ManualSelection)
+        {
+            var manualValidationResult = await _componentCompatibilityService
+                .ValidateManualSelectionAsync(
+                    line.ProductId,
+                    command.NeedDefinitionId,
+                    command.ComponentProductId,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            if (manualValidationResult.IsFailure)
+            {
+                return Failure(manualValidationResult.Error);
+            }
+        }
+        else if (!need.CompatibleComponents.Any(
+                     component => component.ProductId == command.ComponentProductId))
         {
             return Failure(ComponentCompatibilityErrors.CompatibleOfferNotFound());
         }
@@ -149,14 +166,7 @@ public sealed class AddCatalogPriceCalculationLineComponentCommandHandler
         if (priceSources.Count == 0)
         {
             return Failure(
-                CatalogPriceCalculationErrors.ActiveProductPriceNotFound(
-                    command.ComponentProductId));
-        }
-
-        if (priceSources.Count > 1)
-        {
-            return Failure(
-                CatalogPriceCalculationErrors.ActiveProductPriceIsAmbiguous(
+                CatalogPriceCalculationErrors.CatalogProductNotFound(
                     command.ComponentProductId));
         }
 
@@ -171,6 +181,7 @@ public sealed class AddCatalogPriceCalculationLineComponentCommandHandler
             priceSource.Article,
             priceSource.Name,
             priceSource.ManufacturerName,
+            selectionSource,
             command.QuantityPerUnit,
             priceSource.BasePriceAmount);
 
@@ -197,6 +208,7 @@ public sealed class AddCatalogPriceCalculationLineComponentCommandHandler
             componentLine.ManufacturerName,
             componentLine.Article,
             componentLine.Name,
+            componentLine.SelectionSource,
             componentLine.QuantityPerUnit,
             componentLine.BasePriceAmount,
             componentLine.DiscountPercent,

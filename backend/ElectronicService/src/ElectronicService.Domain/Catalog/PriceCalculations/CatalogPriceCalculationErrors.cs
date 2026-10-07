@@ -96,6 +96,20 @@ public static class CatalogPriceCalculationErrors
             $"Строка прайс-листа '{priceListRowId}' уже добавлена в расчёт.");
     }
 
+    public static DomainError CatalogProductNotFound(Guid productId)
+    {
+        return new DomainError(
+            "catalog.price_calculation.product_not_found",
+            $"Товар '{productId}' не найден в каталоге.");
+    }
+
+    public static DomainError DuplicateProduct(Guid productId)
+    {
+        return new DomainError(
+            "catalog.price_calculation.line.duplicate_product",
+            $"Товар '{productId}' уже добавлен в расчёт.");
+    }
+
     public static DomainError QuantityMustBePositive()
     {
         return new DomainError(

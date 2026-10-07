@@ -6,7 +6,7 @@ using ElectronicService.Domain.Common;
 
 namespace ElectronicService.Core.Catalog.Products.Audit;
 
-public sealed class ProductAuditRecorder
+public sealed class ProductAuditRecorder : IProductAuditRecorder
 {
     private readonly IProductAuditRepository
         _auditRepository;

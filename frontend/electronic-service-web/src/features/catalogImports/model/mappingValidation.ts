@@ -225,13 +225,6 @@ export function validateCatalogImportMapping(
 
     if (mappedColumns.length === 1) {
       requiredCharacteristicsMapped++;
-      continue;
-    }
-
-    if (mappedColumns.length === 0) {
-      errors.push(
-        `Не сопоставлена обязательная характеристика «${characteristic.name}».`,
-      );
     }
   }
 

@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type FormEvent,
   type ReactNode,
 } from "react";
 import { useAuthSession } from "@/features/auth/model/useAuthSession";
@@ -281,7 +282,7 @@ export function AppShell({ children }: AppShellProps) {
   const router = useRouter();
   const pathname = usePathname();
   const session = useAuthSession();
-  const { allowedPermissions } = useCurrentUserAccess();
+  const { allowedPermissions, hasPermission } = useCurrentUserAccess();
   const canUseQualityWorkspace = qualityWorkspacePermissions.some(
     (permission) => allowedPermissions.has(permission),
   );
@@ -299,6 +300,7 @@ export function AppShell({ children }: AppShellProps) {
 
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const [openHeaderMenu, setOpenHeaderMenu] = useState<HeaderMenu | null>(null);
+  const [globalSearch, setGlobalSearch] = useState("");
 
   const headerMenusRef = useRef<HTMLDivElement>(null);
   const appShellRef = useRef<HTMLDivElement>(null);
@@ -438,6 +440,24 @@ export function AppShell({ children }: AppShellProps) {
     setThemeMode(themeMode === "dark" ? "light" : "dark");
   }
 
+  function handleGlobalSearch(event: FormEvent<HTMLFormElement>): void {
+    event.preventDefault();
+
+    const normalizedSearch = globalSearch.trim();
+
+    if (normalizedSearch.length === 0) {
+      return;
+    }
+
+    window.dispatchEvent(
+      new CustomEvent("electronic-crm-global-product-search", {
+        detail: normalizedSearch,
+      }),
+    );
+
+    router.push(`/catalog/products?search=${encodeURIComponent(normalizedSearch)}`);
+  }
+
   return (
     <div
       ref={appShellRef}
@@ -519,7 +539,7 @@ export function AppShell({ children }: AppShellProps) {
             ref={headerMenusRef}
             className="relative flex min-h-16 items-center justify-between gap-2 px-3 sm:gap-3 sm:px-6 lg:px-8"
           >
-            <div className="flex min-w-0 flex-1 items-center gap-2">
+            <div className="flex min-w-0 items-center gap-2">
               <button
                 type="button"
                 aria-label="Открыть навигацию"
@@ -616,6 +636,43 @@ export function AppShell({ children }: AppShellProps) {
                 </div>
               )}
             </div>
+
+            {hasPermission("ProductsView") && (
+              <form
+                role="search"
+                onSubmit={handleGlobalSearch}
+                className="mx-auto hidden min-w-0 max-w-2xl flex-1 px-4 md:block"
+              >
+                <label className="relative block">
+                  <span className="sr-only">Поиск по каталогу</span>
+
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 24 24"
+                    className="pointer-events-none absolute left-3.5 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-[var(--app-subtle)]"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                  >
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="M20 20l-4-4" />
+                  </svg>
+
+                  <input
+                    type="search"
+                    value={globalSearch}
+                    onChange={(event) => setGlobalSearch(event.target.value)}
+                    placeholder="Поиск товаров, артикулов, производителей..."
+                    className="h-10 w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] pl-10 pr-20 text-sm text-[var(--app-text)] outline-none transition placeholder:text-[var(--app-subtle)] hover:border-[var(--app-border-strong)] focus:border-[var(--app-accent-border)] focus:ring-2 focus:ring-[var(--app-accent-soft)]"
+                  />
+
+                  <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md border border-[var(--app-border)] bg-[var(--app-panel)] px-2 py-0.5 text-[10px] font-medium text-[var(--app-subtle)]">
+                    Enter
+                  </span>
+                </label>
+              </form>
+            )}
 
             <div className="flex shrink-0 items-center gap-2">
               <button
@@ -775,7 +832,7 @@ export function AppShell({ children }: AppShellProps) {
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-[1680px] px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
+        <main className="w-full px-4 py-4 sm:px-5 sm:py-5 lg:px-6">
           {children}
         </main>
       </div>
@@ -836,25 +893,6 @@ function NavigationPanel({
           </div>
         </Link>
 
-        {showCollapseToggle && onCollapsedChange && (
-          <button
-            type="button"
-            aria-label={
-              collapsed ? "Развернуть навигацию" : "Свернуть навигацию"
-            }
-            title={collapsed ? "Развернуть навигацию" : "Свернуть навигацию"}
-            onClick={() => onCollapsedChange(!collapsed)}
-            className={
-              collapsed
-                ? "mt-3 flex w-full items-center justify-center rounded-xl border border-transparent py-2.5 text-[var(--app-muted)] transition hover:border-[var(--app-border)] hover:bg-[var(--app-surface-hover)] hover:text-[var(--app-text)]"
-                : "mt-3 flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-sm font-medium text-[var(--app-muted)] transition hover:border-[var(--app-border)] hover:bg-[var(--app-surface-hover)] hover:text-[var(--app-text)]"
-            }
-          >
-            <SidebarCollapseIcon collapsed={collapsed} />
-
-            {!collapsed && <span>Свернуть</span>}
-          </button>
-        )}
       </div>
 
       <nav
@@ -928,6 +966,28 @@ function NavigationPanel({
           ))}
         </div>
       </nav>
+
+      {showCollapseToggle && onCollapsedChange && (
+        <div className="shrink-0 border-t border-[var(--app-border)] p-3">
+          <button
+            type="button"
+            aria-label={
+              collapsed ? "Развернуть навигацию" : "Свернуть навигацию"
+            }
+            title={collapsed ? "Развернуть навигацию" : "Свернуть навигацию"}
+            onClick={() => onCollapsedChange(!collapsed)}
+            className={
+              collapsed
+                ? "flex w-full items-center justify-center rounded-xl border border-transparent py-2.5 text-[var(--app-muted)] transition hover:border-[var(--app-border)] hover:bg-[var(--app-surface-hover)] hover:text-[var(--app-text)]"
+                : "flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-sm font-medium text-[var(--app-muted)] transition hover:border-[var(--app-border)] hover:bg-[var(--app-surface-hover)] hover:text-[var(--app-text)]"
+            }
+          >
+            <SidebarCollapseIcon collapsed={collapsed} />
+
+            {!collapsed && <span>Свернуть</span>}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

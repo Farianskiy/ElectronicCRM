@@ -462,15 +462,6 @@ public sealed class CatalogImportBatchApplier : ICatalogImportBatchApplier
                 }
             }
 
-            var requiredValidationResult = product
-                .ValidateRequiredCharacteristics(productType);
-
-            if (requiredValidationResult.IsFailure)
-            {
-                return Result.Failure<CatalogImportApplyExecutionResult, DomainError>(
-                    requiredValidationResult.Error);
-            }
-
             if (!isExistingProduct)
             {
                 _dbContext.Products.Add(product);

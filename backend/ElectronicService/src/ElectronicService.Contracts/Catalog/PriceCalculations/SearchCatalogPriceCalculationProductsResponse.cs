@@ -10,13 +10,16 @@ public sealed record SearchCatalogPriceCalculationProductsResponse(
 
 public sealed record CatalogPriceCalculationProductSearchItemResponse(
     Guid ProductId,
+    string ProductTypeCode,
+    string ProductTypeName,
     Guid ManufacturerId,
     string ManufacturerName,
-    Guid PriceListId,
-    Guid PriceListRowId,
+    string PriceStatus,
+    Guid? PriceListId,
+    Guid? PriceListRowId,
     DateOnly? PriceListEffectiveDate,
     string Article,
     string Name,
     string? Unit,
-    decimal BasePriceAmount,
+    decimal? BasePriceAmount,
     decimal? MrcPriceAmount);

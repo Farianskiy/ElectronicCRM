@@ -69,7 +69,8 @@ public sealed class CatalogImportRowValidator : ICatalogImportRowValidator
             productType,
             characteristicDefinitions,
             normalizedManufacturer,
-            issues);
+            issues,
+            warnings);
 
         var normalizedCharacteristicOrigins = NormalizeCharacteristicOrigins(
             normalizedCharacteristics,
@@ -201,7 +202,8 @@ public sealed class CatalogImportRowValidator : ICatalogImportRowValidator
         ProductType productType,
         IReadOnlyCollection<CharacteristicDefinition> characteristicDefinitions,
         string? manufacturerName,
-        List<CatalogImportRowIssue> issues)
+        List<CatalogImportRowIssue> issues,
+        List<CatalogImportRowIssue> warnings)
     {
         var definitionsById = characteristicDefinitions.ToDictionary(
             definition => definition.Id);
@@ -289,10 +291,10 @@ public sealed class CatalogImportRowValidator : ICatalogImportRowValidator
                 ? definition.Name
                 : definitionKey;
 
-            issues.Add(
+            warnings.Add(
                 CreateIssue(
                     "characteristic.required",
-                    $"Не заполнена обязательная характеристика '{displayName}'.",
+                    $"Характеристика '{displayName}' пока не определена. Товар можно импортировать и дополнить значением после обучения распознавания.",
                     definitionKey));
         }
 

@@ -74,7 +74,10 @@ public sealed class GetCatalogImportRowExplanationsQueryHandler(
 
         // Те же права чтения, что у списка строк.
         if (batch.CreatedByUserId != user.Id &&
-            !user.CanReviewCatalogImports())
+            !await users.HasPermissionAsync(
+                user,
+                ElectronicService.Domain.Users.Enums.UserPermissionCode.CatalogImportsReview,
+                cancellationToken).ConfigureAwait(false))
         {
             return CatalogImportErrors.UserCannotAccessBatch();
         }

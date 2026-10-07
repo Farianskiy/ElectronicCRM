@@ -13,7 +13,7 @@ public sealed class UpdateProductPriceCommandHandlerTests
     {
         // Arrange
         var repository = new FakeProductRepository();
-        var handler = new UpdateProductPriceCommandHandler(repository);
+        var handler = new UpdateProductPriceCommandHandler(repository, new FakeProductAuditRecorder());
         var cancellationToken = TestContext.Current.CancellationToken;
 
         // Act
@@ -22,7 +22,7 @@ public sealed class UpdateProductPriceCommandHandlerTests
 
         // Assert
         Assert.Equal("command", exception.ParamName);
-        Assert.Equal(0, repository.GetByIdCallsCount);
+        Assert.Equal(0, repository.GetByIdWithDetailsCallsCount);
         Assert.Equal(0, repository.SaveChangesCallsCount);
     }
 
@@ -33,10 +33,11 @@ public sealed class UpdateProductPriceCommandHandlerTests
     {
         // Arrange
         var repository = new FakeProductRepository();
-        var handler = new UpdateProductPriceCommandHandler(repository);
+        var handler = new UpdateProductPriceCommandHandler(repository, new FakeProductAuditRecorder());
 
         var command = new UpdateProductPriceCommand(
             Guid.Empty,
+            Guid.NewGuid(),
             1_000m,
             "RUB");
 
@@ -48,7 +49,7 @@ public sealed class UpdateProductPriceCommandHandlerTests
         // Assert
         Assert.True(result.IsFailure);
         Assert.Equal("general.value_is_invalid", result.Error.Code);
-        Assert.Equal(0, repository.GetByIdCallsCount);
+        Assert.Equal(0, repository.GetByIdWithDetailsCallsCount);
         Assert.Equal(0, repository.SaveChangesCallsCount);
     }
 
@@ -59,11 +60,12 @@ public sealed class UpdateProductPriceCommandHandlerTests
     {
         // Arrange
         var repository = new FakeProductRepository();
-        var handler = new UpdateProductPriceCommandHandler(repository);
+        var handler = new UpdateProductPriceCommandHandler(repository, new FakeProductAuditRecorder());
         var productId = Guid.NewGuid();
 
         var command = new UpdateProductPriceCommand(
             productId,
+            Guid.NewGuid(),
             1_000m,
             "RUB");
 
@@ -75,8 +77,8 @@ public sealed class UpdateProductPriceCommandHandlerTests
         // Assert
         Assert.True(result.IsFailure);
         Assert.Equal("catalog.product.not_found", result.Error.Code);
-        Assert.Equal(1, repository.GetByIdCallsCount);
-        Assert.Equal(productId, repository.LastGetByIdProductId);
+        Assert.Equal(1, repository.GetByIdWithDetailsCallsCount);
+        Assert.Equal(productId, repository.LastGetByIdWithDetailsProductId);
         Assert.Equal(0, repository.SaveChangesCallsCount);
     }
 
@@ -91,10 +93,11 @@ public sealed class UpdateProductPriceCommandHandlerTests
 
         repository.AddExisting(product);
 
-        var handler = new UpdateProductPriceCommandHandler(repository);
+        var handler = new UpdateProductPriceCommandHandler(repository, new FakeProductAuditRecorder());
 
         var command = new UpdateProductPriceCommand(
             product.Id,
+            Guid.NewGuid(),
             -0.01m,
             "RUB");
 
@@ -122,10 +125,11 @@ public sealed class UpdateProductPriceCommandHandlerTests
 
         repository.AddExisting(product);
 
-        var handler = new UpdateProductPriceCommandHandler(repository);
+        var handler = new UpdateProductPriceCommandHandler(repository, new FakeProductAuditRecorder());
 
         var command = new UpdateProductPriceCommand(
             product.Id,
+            Guid.NewGuid(),
             800m,
             " ");
 
@@ -152,10 +156,11 @@ public sealed class UpdateProductPriceCommandHandlerTests
 
         repository.AddExisting(product);
 
-        var handler = new UpdateProductPriceCommandHandler(repository);
+        var handler = new UpdateProductPriceCommandHandler(repository, new FakeProductAuditRecorder());
 
         var command = new UpdateProductPriceCommand(
             product.Id,
+            Guid.NewGuid(),
             950m,
             "RUBL");
 
@@ -183,10 +188,11 @@ public sealed class UpdateProductPriceCommandHandlerTests
 
         repository.AddExisting(product);
 
-        var handler = new UpdateProductPriceCommandHandler(repository);
+        var handler = new UpdateProductPriceCommandHandler(repository, new FakeProductAuditRecorder());
 
         var command = new UpdateProductPriceCommand(
             product.Id,
+            Guid.NewGuid(),
             1_250.50m,
             " usd ");
 
@@ -200,7 +206,7 @@ public sealed class UpdateProductPriceCommandHandlerTests
         Assert.Equal(1_250.50m, product.Price.Amount);
         Assert.Equal("USD", product.Price.Currency);
         Assert.NotNull(product.UpdatedAtUtc);
-        Assert.Equal(1, repository.GetByIdCallsCount);
+        Assert.Equal(1, repository.GetByIdWithDetailsCallsCount);
         Assert.Equal(1, repository.SaveChangesCallsCount);
     }
 
@@ -215,10 +221,11 @@ public sealed class UpdateProductPriceCommandHandlerTests
 
         repository.AddExisting(product);
 
-        var handler = new UpdateProductPriceCommandHandler(repository);
+        var handler = new UpdateProductPriceCommandHandler(repository, new FakeProductAuditRecorder());
 
         var command = new UpdateProductPriceCommand(
             product.Id,
+            Guid.NewGuid(),
             0m,
             "RUB");
 
@@ -245,11 +252,12 @@ public sealed class UpdateProductPriceCommandHandlerTests
 
         repository.AddExisting(product);
 
-        var handler = new UpdateProductPriceCommandHandler(repository);
+        var handler = new UpdateProductPriceCommandHandler(repository, new FakeProductAuditRecorder());
         var cancellationToken = TestContext.Current.CancellationToken;
 
         var command = new UpdateProductPriceCommand(
             product.Id,
+            Guid.NewGuid(),
             2_000m,
             "RUB");
 
@@ -262,7 +270,7 @@ public sealed class UpdateProductPriceCommandHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Equal(
             cancellationToken,
-            repository.LastGetByIdCancellationToken);
+            repository.LastGetByIdWithDetailsCancellationToken);
         Assert.Equal(
             cancellationToken,
             repository.LastSaveChangesCancellationToken);

@@ -2,7 +2,7 @@
 
 import { getEvaluationReport } from "@/features/catalogRecognition/api/evaluationReports";
 import { EvaluationReportPanel } from "@/features/catalogRecognition/ui/EvaluationReportPanel";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppButton } from "@/shared/ui/AppButton";
 import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
@@ -25,6 +25,7 @@ interface Props {
   productTypeId: string;
   versionId: string;
   disabled: boolean;
+  onActiveChange?: (isActive: boolean) => void;
 }
 
 function rowStatus(status: string): string {
@@ -77,6 +78,7 @@ export function CatalogRecognitionRuleSetActivation({
   productTypeId,
   versionId,
   disabled,
+  onActiveChange,
 }: Props) {
   const client = useQueryClient();
   const requestLock = useRef(false);
@@ -163,6 +165,12 @@ export function CatalogRecognitionRuleSetActivation({
     stateQuery.isSuccess && !stateQuery.isFetching && !mustRefresh;
   const locked = disabled || busy;
 
+  useEffect(() => {
+    if (stateQuery.isSuccess && !stateQuery.isFetching) {
+      onActiveChange?.(isActive);
+    }
+  }, [isActive, onActiveChange, stateQuery.isFetching, stateQuery.isSuccess]);
+
   const reportReady =
     report !== null &&
     report.ruleSetVersionId === versionId &&
@@ -179,6 +187,15 @@ export function CatalogRecognitionRuleSetActivation({
     stateReady &&
     acceptedSequence !== null &&
     acceptedSequence === currentState?.sequenceNumber;
+  const activationBlockers = [
+    !stateReady ? "Нужно обновить текущее состояние правил." : null,
+    !isActive && !reportReady
+      ? "Нужен актуальный сравнительный отчёт со статусом «Готово к включению»."
+      : null,
+    !isActive && !trainingReady
+      ? "Нужно успешно проверить учебные примеры версии."
+      : null,
+  ].filter((value): value is string => value !== null);
 
   async function refreshState(): Promise<void> {
     if (locked || requestLock.current) return;
@@ -273,6 +290,8 @@ export function CatalogRecognitionRuleSetActivation({
           ? "Версия отключена. Уже сохранённые данные не изменены."
           : "Версия активирована для следующих запусков анализа.",
       );
+
+      onActiveChange?.(!isActive);
 
       setReason("");
       void client.invalidateQueries({ queryKey: ["recognition-evaluation"] });
@@ -426,7 +445,14 @@ export function CatalogRecognitionRuleSetActivation({
           ))}
       </div>
 
-      {report && <EvaluationReportPanel key={report.id} reportId={report.id} />}
+      {report && (
+        <EvaluationReportPanel
+          key={report.id}
+          reportId={report.id}
+          onCreateFreshReport={createReport}
+          creatingFreshReport={busy}
+        />
+      )}
       {report && (
         <div className="grid gap-2">
           <p className="break-all">Отчёт: {report.id}</p>
@@ -635,6 +661,30 @@ export function CatalogRecognitionRuleSetActivation({
           onChange={(event) => setReason(event.target.value)}
         />
       </label>
+
+      {activationBlockers.length > 0 && (
+        <div
+          role="status"
+          className="grid gap-2 rounded-lg border border-[var(--app-border)] p-3"
+        >
+          <p className="font-medium">Почему подтверждение пока недоступно</p>
+          <ul className="list-disc pl-5">
+            {activationBlockers.map((blocker) => (
+              <li key={blocker}>{blocker}</li>
+            ))}
+          </ul>
+          {!stateReady && (
+            <AppButton
+              type="button"
+              variant="secondary"
+              disabled={locked || stateQuery.isFetching}
+              onClick={() => void refreshState()}
+            >
+              Обновить состояние и продолжить
+            </AppButton>
+          )}
+        </div>
+      )}
 
       <label className="flex items-start gap-2">
         <input

@@ -1,6 +1,4 @@
-using System.Globalization;
 using CSharpFunctionalExtensions;
-using ElectronicService.Core.Catalog.Characteristics.Normalization;
 using ElectronicService.Core.Catalog.Products.Abstractions;
 using ElectronicService.Core.Catalog.Products.Audit;
 using ElectronicService.Domain.Catalog.Audit;
@@ -19,13 +17,13 @@ public sealed class SetProductCharacteristicCommandHandler
     private readonly ICatalogProductMetadataRepository
         _metadataRepository;
 
-    private readonly ProductAuditRecorder
+    private readonly IProductAuditRecorder
         _auditRecorder;
 
     public SetProductCharacteristicCommandHandler(
         IProductRepository productRepository,
         ICatalogProductMetadataRepository metadataRepository,
-        ProductAuditRecorder auditRecorder)
+        IProductAuditRecorder auditRecorder)
     {
         _productRepository = productRepository;
         _metadataRepository = metadataRepository;
@@ -120,7 +118,7 @@ public sealed class SetProductCharacteristicCommandHandler
          * не изменяется.
          */
         var characteristicValueResult =
-            CreateCharacteristicValue(
+            ProductCharacteristicValueFactory.Create(
                 definition.Code,
                 definition.DataType,
                 command.Value);
@@ -214,148 +212,4 @@ public sealed class SetProductCharacteristicCommandHandler
         return UnitResult.Success<DomainError>();
     }
 
-    private static Result<
-        CharacteristicValue,
-        DomainError> CreateCharacteristicValue(
-            string characteristicCode,
-            CharacteristicDataType dataType,
-            string value)
-    {
-        return dataType switch
-        {
-            CharacteristicDataType.Text =>
-                CreateTextCharacteristicValue(
-                    characteristicCode,
-                    value),
-
-            CharacteristicDataType.Number =>
-                CreateNumberCharacteristicValue(
-                    value),
-
-            CharacteristicDataType.Boolean =>
-                CreateBooleanCharacteristicValue(
-                    value),
-
-            _ => GeneralErrors.ValueIsInvalid(
-                nameof(dataType))
-        };
-    }
-
-    private static Result<CharacteristicValue, DomainError> CreateTextCharacteristicValue(string characteristicCode, string value)
-    {
-        if (string.Equals(characteristicCode, CatalogPoleConfigurationNormalizer.CharacteristicCode, StringComparison.Ordinal))
-        {
-            return CatalogPoleConfigurationNormalizer.TryNormalize(value, out var normalizedValue)
-                ? CharacteristicValue.CreateText(normalizedValue)
-                : GeneralErrors.ValueIsInvalid(nameof(value));
-        }
-
-        return CharacteristicValue.CreateText(value);
-    }
-
-    private static Result<
-        CharacteristicValue,
-        DomainError> CreateNumberCharacteristicValue(
-            string value)
-    {
-        var normalizedValue = value
-            .Trim()
-            .Replace(
-                " ",
-                string.Empty,
-                StringComparison.Ordinal)
-            .Replace(
-                ",",
-                ".",
-                StringComparison.Ordinal);
-
-        var parsed = decimal.TryParse(
-            normalizedValue,
-            NumberStyles.Number,
-            CultureInfo.InvariantCulture,
-            out var numberValue);
-
-        if (!parsed)
-        {
-            return GeneralErrors.ValueIsInvalid(
-                nameof(value));
-        }
-
-        return CharacteristicValue.CreateNumber(
-            numberValue);
-    }
-
-    private static Result<
-        CharacteristicValue,
-        DomainError> CreateBooleanCharacteristicValue(
-            string value)
-    {
-        var normalizedValue =
-            NormalizeText(value);
-
-        if (string.Equals(
-                normalizedValue,
-                "TRUE",
-                StringComparison.Ordinal)
-            || string.Equals(
-                normalizedValue,
-                "ДА",
-                StringComparison.Ordinal)
-            || string.Equals(
-                normalizedValue,
-                "ЕСТЬ",
-                StringComparison.Ordinal)
-            || string.Equals(
-                normalizedValue,
-                "1",
-                StringComparison.Ordinal)
-            || string.Equals(
-                normalizedValue,
-                "+",
-                StringComparison.Ordinal))
-        {
-            return CharacteristicValue.CreateBoolean(
-                true);
-        }
-
-        if (string.Equals(
-                normalizedValue,
-                "FALSE",
-                StringComparison.Ordinal)
-            || string.Equals(
-                normalizedValue,
-                "НЕТ",
-                StringComparison.Ordinal)
-            || string.Equals(
-                normalizedValue,
-                "ОТСУТСТВУЕТ",
-                StringComparison.Ordinal)
-            || string.Equals(
-                normalizedValue,
-                "0",
-                StringComparison.Ordinal)
-            || string.Equals(
-                normalizedValue,
-                "-",
-                StringComparison.Ordinal))
-        {
-            return CharacteristicValue.CreateBoolean(
-                false);
-        }
-
-        return GeneralErrors.ValueIsInvalid(
-            nameof(value));
-    }
-
-    private static string NormalizeText(
-        string value)
-    {
-        return value
-            .Trim()
-            .ToUpperInvariant()
-            .Replace(
-                "Ё",
-                "Е",
-                StringComparison.Ordinal);
-    }
 }

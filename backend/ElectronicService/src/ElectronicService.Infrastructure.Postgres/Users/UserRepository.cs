@@ -1,4 +1,5 @@
 using ElectronicService.Core.Users;
+using ElectronicService.Core.Users.Access;
 using ElectronicService.Domain.Users;
 using ElectronicService.Domain.Users.Enums;
 using ElectronicService.Domain.Users.ValueObjects;
@@ -62,6 +63,28 @@ public sealed class UserRepository : IUserRepository
             .AnyAsync(
                 user => user.Email == email,
                 cancellationToken);
+    }
+
+    public async Task<bool> HasPermissionAsync(
+        User user,
+        UserPermissionCode permission,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+
+        var permissionOverride = await _dbContext.UserPermissionOverrides
+            .AsNoTracking()
+            .Where(value =>
+                value.UserId == user.Id
+                && value.PermissionCode == permission)
+            .Select(value => (bool?)value.IsAllowed)
+            .SingleOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return UserPermissionResolver.HasPermission(
+            user,
+            permission,
+            permissionOverride);
     }
 
     public async Task<(IReadOnlyCollection<User> Items, int TotalCount)> GetPageAsync(

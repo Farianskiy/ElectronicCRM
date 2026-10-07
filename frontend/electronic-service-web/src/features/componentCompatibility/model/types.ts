@@ -55,3 +55,42 @@ export interface ComponentOfferSummary {
   mainProductTypeCode: string;
   constraintsCount: number;
 }
+
+export type ComponentCompatibilityImportRowStatus =
+  | "Ready"
+  | "AlreadyExists"
+  | "Invalid"
+  | "ComponentNotFound"
+  | "MainProductTypeNotFound"
+  | "NeedNotFound"
+  | "CharacteristicNotFound"
+  | "Duplicate";
+
+export interface ComponentCompatibilityImportConstraint {
+  characteristicDefinitionId: string;
+  characteristicName: string;
+  value: string;
+}
+
+export interface ComponentCompatibilityImportPreviewRow {
+  rowNumber: number;
+  componentArticle: string;
+  mainProductType: string;
+  need: string;
+  componentProductId: string | null;
+  needDefinitionId: string | null;
+  status: ComponentCompatibilityImportRowStatus;
+  message: string | null;
+  constraints: ComponentCompatibilityImportConstraint[];
+}
+
+export interface PreviewComponentCompatibilityImportResponse {
+  readRowsCount: number;
+  readyRowsCount: number;
+  skippedRowsCount: number;
+  rows: ComponentCompatibilityImportPreviewRow[];
+}
+
+export interface ApplyComponentCompatibilityImportResponse {
+  createdRulesCount: number;
+}

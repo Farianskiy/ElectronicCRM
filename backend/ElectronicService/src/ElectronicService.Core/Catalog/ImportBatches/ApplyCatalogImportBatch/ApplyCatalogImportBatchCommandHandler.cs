@@ -3,6 +3,7 @@ using ElectronicService.Core.Catalog.ImportBatches.Abstractions;
 using ElectronicService.Core.Users;
 using ElectronicService.Domain.Catalog.ImportBatches;
 using ElectronicService.Domain.Common;
+using ElectronicService.Domain.Users.Enums;
 
 namespace ElectronicService.Core.Catalog.ImportBatches.ApplyCatalogImportBatch;
 
@@ -50,7 +51,14 @@ public sealed class ApplyCatalogImportBatchCommandHandler
                 CatalogImportErrors.CurrentUserNotFound());
         }
 
-        if (!currentUser.CanApplyCatalogImport())
+        var canReviewImports = await _userRepository
+            .HasPermissionAsync(
+                currentUser,
+                UserPermissionCode.CatalogImportsReview,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        if (!canReviewImports)
         {
             return Result.Failure<ApplyCatalogImportBatchResult, DomainError>(
                 CatalogImportErrors.UserCannotApplyCatalogImport());

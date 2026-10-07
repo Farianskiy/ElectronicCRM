@@ -73,13 +73,11 @@ public sealed class CatalogPriceCalculationLineConfiguration
 
         builder.Property(line =>
                 line.PriceListId)
-            .HasColumnName("price_list_id")
-            .IsRequired();
+            .HasColumnName("price_list_id");
 
         builder.Property(line =>
                 line.PriceListRowId)
-            .HasColumnName("price_list_row_id")
-            .IsRequired();
+            .HasColumnName("price_list_row_id");
 
         builder.Property(line =>
                 line.Article)

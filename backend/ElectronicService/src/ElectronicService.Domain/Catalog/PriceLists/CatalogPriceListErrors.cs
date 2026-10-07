@@ -248,6 +248,13 @@ public static class CatalogPriceListErrors
             "Не удалось сохранить изменения строки прайс-листа.");
     }
 
+    public static DomainError MatchedRowsRequiredForExclusion()
+    {
+        return new DomainError(
+            "catalog.price_list.exclude_unmatched.matched_rows_required",
+            "Нельзя исключить все строки прайс-листа: не найдено ни одной позиции каталога с корректной ценой.");
+    }
+
     public static DomainError BulkRowsRequired()
     {
         return new DomainError(

@@ -5,6 +5,7 @@ using ElectronicService.Core.Users;
 using ElectronicService.Domain.Catalog
     .ImportBatches;
 using ElectronicService.Domain.Common;
+using ElectronicService.Domain.Users.Enums;
 
 namespace ElectronicService.Core.Catalog
     .ImportBatches.GetCatalogImportBatch;
@@ -95,6 +96,13 @@ public sealed class
             batch.CreatedByUserId
             == currentUser.Id;
 
+        var canReviewImports = await _userRepository
+            .HasPermissionAsync(
+                currentUser,
+                UserPermissionCode.CatalogImportsReview,
+                cancellationToken)
+            .ConfigureAwait(false);
+
         /*
          * Владелец видит собственный пакет.
          *
@@ -103,8 +111,7 @@ public sealed class
          */
         var canRead =
             isOwner
-            || currentUser
-                .CanReviewCatalogImports();
+            || canReviewImports;
 
         if (!canRead)
         {
@@ -151,16 +158,16 @@ public sealed class
             && batch.ReviewedByUserId == currentUser.Id;
 
         var canApply =
-            currentUser.CanApplyCatalogImport()
+            canReviewImports
             && (canApplyOwnBatch || canApplyReviewedBatch);
 
         var canRequestChanges =
-            currentUser.CanReviewCatalogImports()
+            canReviewImports
             && batch.Status == CatalogImportBatchStatus.UnderReview
             && batch.ReviewedByUserId == currentUser.Id;
 
         var canReject =
-            currentUser.CanReviewCatalogImports()
+            canReviewImports
             && batch.Status == CatalogImportBatchStatus.UnderReview
             && batch.ReviewedByUserId == currentUser.Id;
 
@@ -170,7 +177,7 @@ public sealed class
             && currentUser.CanViewOwnCatalogImports()
         )
         || (
-            currentUser.CanReviewCatalogImports()
+            canReviewImports
             && batch.ReviewedByUserId == currentUser.Id
         );
 

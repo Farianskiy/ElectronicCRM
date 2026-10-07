@@ -77,7 +77,10 @@ public sealed class GetCatalogImportAppliedProductsQueryHandler
         }
 
         var isOwner = batch.CreatedByUserId == currentUser.Id;
-        var canReview = currentUser.CanReviewCatalogImports();
+        var canReview = await _userRepository.HasPermissionAsync(
+            currentUser,
+            ElectronicService.Domain.Users.Enums.UserPermissionCode.CatalogImportsReview,
+            cancellationToken).ConfigureAwait(false);
 
         if (!isOwner && !canReview)
         {

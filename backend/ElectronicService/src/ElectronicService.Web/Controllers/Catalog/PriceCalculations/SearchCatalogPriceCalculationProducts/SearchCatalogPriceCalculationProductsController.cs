@@ -1,6 +1,7 @@
 using ElectronicService.Contracts.Catalog.PriceCalculations;
 using ElectronicService.Core.Abstractions;
 using ElectronicService.Core.Catalog.PriceCalculations.SearchCatalogPriceCalculationProducts;
+using ElectronicService.Domain.Catalog.ProductTypes;
 using ElectronicService.Web.Controllers.Catalog.PriceCalculations.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -40,6 +41,10 @@ public sealed class SearchCatalogPriceCalculationProductsController
             int page,
             [FromQuery]
             int pageSize,
+            [FromQuery]
+            ProductTypeKind? productKind,
+            [FromQuery]
+            string? productTypeCode,
             [FromServices]
             ICurrentUserProvider currentUserProvider,
             [FromServices]
@@ -72,7 +77,9 @@ public sealed class SearchCatalogPriceCalculationProductsController
                 currentUserProvider.UserId.Value,
                 search,
                 actualPage,
-                actualPageSize);
+                actualPageSize,
+                productKind,
+                productTypeCode);
 
         var result =
             await handler
@@ -101,8 +108,11 @@ public sealed class SearchCatalogPriceCalculationProductsController
                     item =>
                         new CatalogPriceCalculationProductSearchItemResponse(
                             item.ProductId,
+                            item.ProductTypeCode,
+                            item.ProductTypeName,
                             item.ManufacturerId,
                             item.ManufacturerName,
+                            item.PriceStatus.ToString(),
                             item.PriceListId,
                             item.PriceListRowId,
                             item.PriceListEffectiveDate,

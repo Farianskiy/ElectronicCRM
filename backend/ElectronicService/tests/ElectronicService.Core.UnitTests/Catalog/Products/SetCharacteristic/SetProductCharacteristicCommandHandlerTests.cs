@@ -18,7 +18,8 @@ public sealed class SetProductCharacteristicCommandHandlerTests
 
         var handler = new SetProductCharacteristicCommandHandler(
             productRepository,
-            metadataRepository);
+            metadataRepository,
+            new FakeProductAuditRecorder());
 
         var cancellationToken = TestContext.Current.CancellationToken;
 
@@ -44,10 +45,12 @@ public sealed class SetProductCharacteristicCommandHandlerTests
 
         var handler = new SetProductCharacteristicCommandHandler(
             productRepository,
-            metadataRepository);
+            metadataRepository,
+            new FakeProductAuditRecorder());
 
         var command = new SetProductCharacteristicCommand(
             Guid.Empty,
+            Guid.NewGuid(),
             "RATED_CURRENT",
             "16");
 
@@ -79,9 +82,11 @@ public sealed class SetProductCharacteristicCommandHandlerTests
 
         var handler = new SetProductCharacteristicCommandHandler(
             productRepository,
-            metadataRepository);
+            metadataRepository,
+            new FakeProductAuditRecorder());
 
         var command = new SetProductCharacteristicCommand(
+            Guid.NewGuid(),
             Guid.NewGuid(),
             code,
             "16");
@@ -113,9 +118,11 @@ public sealed class SetProductCharacteristicCommandHandlerTests
 
         var handler = new SetProductCharacteristicCommandHandler(
             productRepository,
-            metadataRepository);
+            metadataRepository,
+            new FakeProductAuditRecorder());
 
         var command = new SetProductCharacteristicCommand(
+            Guid.NewGuid(),
             Guid.NewGuid(),
             "RATED_CURRENT",
             value);
@@ -143,12 +150,14 @@ public sealed class SetProductCharacteristicCommandHandlerTests
 
         var handler = new SetProductCharacteristicCommandHandler(
             productRepository,
-            metadataRepository);
+            metadataRepository,
+            new FakeProductAuditRecorder());
 
         var productId = Guid.NewGuid();
 
         var command = new SetProductCharacteristicCommand(
             productId,
+            Guid.NewGuid(),
             "RATED_CURRENT",
             "16");
 
@@ -179,10 +188,12 @@ public sealed class SetProductCharacteristicCommandHandlerTests
 
         var handler = new SetProductCharacteristicCommandHandler(
             productRepository,
-            metadataRepository);
+            metadataRepository,
+            new FakeProductAuditRecorder());
 
         var command = new SetProductCharacteristicCommand(
             product.Id,
+            Guid.NewGuid(),
             "RATED_CURRENT",
             "16");
 
@@ -222,10 +233,12 @@ public sealed class SetProductCharacteristicCommandHandlerTests
 
         var handler = new SetProductCharacteristicCommandHandler(
             productRepository,
-            metadataRepository);
+            metadataRepository,
+            new FakeProductAuditRecorder());
 
         var command = new SetProductCharacteristicCommand(
             product.Id,
+            Guid.NewGuid(),
             "UNKNOWN_CODE",
             "16");
 
@@ -275,10 +288,12 @@ public sealed class SetProductCharacteristicCommandHandlerTests
 
         var handler = new SetProductCharacteristicCommandHandler(
             productRepository,
-            metadataRepository);
+            metadataRepository,
+            new FakeProductAuditRecorder());
 
         var command = new SetProductCharacteristicCommand(
             product.Id,
+            Guid.NewGuid(),
             " series ",
             "  Proxima Ёлка  ");
 
@@ -325,10 +340,12 @@ public sealed class SetProductCharacteristicCommandHandlerTests
 
         var handler = new SetProductCharacteristicCommandHandler(
             productRepository,
-            metadataRepository);
+            metadataRepository,
+            new FakeProductAuditRecorder());
 
         var command = new SetProductCharacteristicCommand(
             product.Id,
+            Guid.NewGuid(),
             definition.Code,
             " 1 234,50 ");
 
@@ -374,10 +391,12 @@ public sealed class SetProductCharacteristicCommandHandlerTests
 
         var handler = new SetProductCharacteristicCommandHandler(
             productRepository,
-            metadataRepository);
+            metadataRepository,
+            new FakeProductAuditRecorder());
 
         var command = new SetProductCharacteristicCommand(
             product.Id,
+            Guid.NewGuid(),
             definition.Code,
             "шестнадцать");
 
@@ -433,10 +452,12 @@ public sealed class SetProductCharacteristicCommandHandlerTests
 
         var handler = new SetProductCharacteristicCommandHandler(
             productRepository,
-            metadataRepository);
+            metadataRepository,
+            new FakeProductAuditRecorder());
 
         var command = new SetProductCharacteristicCommand(
             product.Id,
+            Guid.NewGuid(),
             definition.Code,
             rawValue);
 
@@ -485,10 +506,12 @@ public sealed class SetProductCharacteristicCommandHandlerTests
 
         var handler = new SetProductCharacteristicCommandHandler(
             productRepository,
-            metadataRepository);
+            metadataRepository,
+            new FakeProductAuditRecorder());
 
         var command = new SetProductCharacteristicCommand(
             product.Id,
+            Guid.NewGuid(),
             definition.Code,
             "возможно");
 
@@ -525,10 +548,12 @@ public sealed class SetProductCharacteristicCommandHandlerTests
 
         var handler = new SetProductCharacteristicCommandHandler(
             productRepository,
-            metadataRepository);
+            metadataRepository,
+            new FakeProductAuditRecorder());
 
         var command = new SetProductCharacteristicCommand(
             product.Id,
+            Guid.NewGuid(),
             definition.Code,
             "16");
 
@@ -576,10 +601,12 @@ public sealed class SetProductCharacteristicCommandHandlerTests
 
         var handler = new SetProductCharacteristicCommandHandler(
             productRepository,
-            metadataRepository);
+            metadataRepository,
+            new FakeProductAuditRecorder());
 
         var command = new SetProductCharacteristicCommand(
             product.Id,
+            Guid.NewGuid(),
             definition.Code,
             "16");
 
@@ -625,10 +652,12 @@ public sealed class SetProductCharacteristicCommandHandlerTests
 
         var handler = new SetProductCharacteristicCommandHandler(
             productRepository,
-            metadataRepository);
+            metadataRepository,
+            new FakeProductAuditRecorder());
 
         var command = new SetProductCharacteristicCommand(
             product.Id,
+            Guid.NewGuid(),
             definition.Code,
             "25");
 
@@ -669,12 +698,14 @@ public sealed class SetProductCharacteristicCommandHandlerTests
 
         var handler = new SetProductCharacteristicCommandHandler(
             productRepository,
-            metadataRepository);
+            metadataRepository,
+            new FakeProductAuditRecorder());
 
         var cancellationToken = TestContext.Current.CancellationToken;
 
         var command = new SetProductCharacteristicCommand(
             product.Id,
+            Guid.NewGuid(),
             definition.Code,
             "16");
 

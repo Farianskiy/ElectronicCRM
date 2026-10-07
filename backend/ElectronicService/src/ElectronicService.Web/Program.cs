@@ -79,13 +79,18 @@ builder.Services
 
 builder.Services.AddAuthorization(options =>
 {
+    options.DefaultPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .RequireClaim(PermissionClaimTypes.ActiveUser, bool.TrueString)
+        .Build();
+
     foreach (var permission in Enum.GetValues<UserPermissionCode>().Where(permission => permission != UserPermissionCode.None))
     {
-        options.AddPolicy(PermissionPolicy.For(permission), policy => policy.RequireAuthenticatedUser().RequireClaim(PermissionClaimTypes.Permission, permission.ToString()));
+        options.AddPolicy(PermissionPolicy.For(permission), policy => policy.RequireAuthenticatedUser().RequireClaim(PermissionClaimTypes.ActiveUser, bool.TrueString).RequireClaim(PermissionClaimTypes.Permission, permission.ToString()));
     }
 
     var catalogImportAccessPermissions = new[] { UserPermissionCode.CatalogImportsCreate, UserPermissionCode.CatalogImportsReview };
-    options.AddPolicy(PermissionPolicy.ForAny(catalogImportAccessPermissions), policy => policy.RequireAuthenticatedUser().RequireAssertion(context => catalogImportAccessPermissions.Any(permission => context.User.HasClaim(PermissionClaimTypes.Permission, permission.ToString()))));
+    options.AddPolicy(PermissionPolicy.ForAny(catalogImportAccessPermissions), policy => policy.RequireAuthenticatedUser().RequireClaim(PermissionClaimTypes.ActiveUser, bool.TrueString).RequireAssertion(context => catalogImportAccessPermissions.Any(permission => context.User.HasClaim(PermissionClaimTypes.Permission, permission.ToString()))));
 
     var bulkProductEditPermissions = new[]
     {
@@ -93,7 +98,7 @@ builder.Services.AddAuthorization(options =>
         UserPermissionCode.PricesManage,
         UserPermissionCode.StockManage
     };
-    options.AddPolicy(PermissionPolicy.ForAny(bulkProductEditPermissions), policy => policy.RequireAuthenticatedUser().RequireAssertion(context => bulkProductEditPermissions.Any(permission => context.User.HasClaim(PermissionClaimTypes.Permission, permission.ToString()))));
+    options.AddPolicy(PermissionPolicy.ForAny(bulkProductEditPermissions), policy => policy.RequireAuthenticatedUser().RequireClaim(PermissionClaimTypes.ActiveUser, bool.TrueString).RequireAssertion(context => bulkProductEditPermissions.Any(permission => context.User.HasClaim(PermissionClaimTypes.Permission, permission.ToString()))));
 });
 
 var frontendOrigins = builder.Configuration

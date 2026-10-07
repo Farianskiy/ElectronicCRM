@@ -121,6 +121,9 @@ public static class DependencyInjectionExtensions
         services.AddScoped<
             ICatalogComponentCompatibilityService,
             CatalogComponentCompatibilityService>();
+        services.AddScoped<
+            ICatalogComponentCompatibilityWorkbookService,
+            CatalogComponentCompatibilityWorkbookService>();
         services.AddScoped<ICatalogStockWorkbookImporter, CatalogStockWorkbookImporter>();
         services.AddScoped<ICatalogProductMetadataRepository, CatalogProductMetadataRepository>();
         services.AddScoped<IManufacturerResolver, PostgresManufacturerResolver>();

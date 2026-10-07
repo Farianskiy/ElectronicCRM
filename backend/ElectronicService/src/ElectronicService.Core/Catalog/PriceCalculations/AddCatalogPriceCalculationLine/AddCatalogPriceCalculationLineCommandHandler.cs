@@ -150,17 +150,7 @@ public sealed class AddCatalogPriceCalculationLineCommandHandler
                 AddCatalogPriceCalculationLineResult,
                 DomainError>(
                     CatalogPriceCalculationErrors
-                        .ActiveProductPriceNotFound(
-                            command.ProductId));
-        }
-
-        if (priceSources.Count > 1)
-        {
-            return Result.Failure<
-                AddCatalogPriceCalculationLineResult,
-                DomainError>(
-                    CatalogPriceCalculationErrors
-                        .ActiveProductPriceIsAmbiguous(
+                        .CatalogProductNotFound(
                             command.ProductId));
         }
 

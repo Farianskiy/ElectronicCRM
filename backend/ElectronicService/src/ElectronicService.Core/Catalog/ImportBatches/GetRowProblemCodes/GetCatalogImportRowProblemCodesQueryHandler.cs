@@ -89,7 +89,10 @@ public sealed class
 
         var canRead =
             batch.CreatedByUserId == currentUser.Id
-            || currentUser.CanReviewCatalogImports();
+            || await _userRepository.HasPermissionAsync(
+                currentUser,
+                ElectronicService.Domain.Users.Enums.UserPermissionCode.CatalogImportsReview,
+                cancellationToken).ConfigureAwait(false);
 
         if (!canRead)
         {
