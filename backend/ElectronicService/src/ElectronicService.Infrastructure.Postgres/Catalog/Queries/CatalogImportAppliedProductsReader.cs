@@ -22,7 +22,9 @@ public sealed class CatalogImportAppliedProductsReader : ICatalogImportAppliedPr
     {
         var query =
             from auditEntry in _dbContext.ProductAuditEntries.AsNoTracking()
-            join product in _dbContext.Products.AsNoTracking()
+            join product in _dbContext.Products
+                .IgnoreQueryFilters()
+                .AsNoTracking()
                 on auditEntry.ProductId equals product.Id
             join productType in _dbContext.ProductTypes.AsNoTracking()
                 on product.ProductTypeId equals productType.Id

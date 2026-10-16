@@ -80,7 +80,9 @@ public sealed class CatalogPriceCalculationReader
 
         var storedLines = await (
                 from line in _dbContext.CatalogPriceCalculationLines.AsNoTracking()
-                join product in _dbContext.Products.AsNoTracking()
+                join product in _dbContext.Products
+                    .IgnoreQueryFilters()
+                    .AsNoTracking()
                     on line.ProductId equals product.Id
                 where line.CalculationId == calculationId
                 orderby line.CreatedAtUtc, line.Id
@@ -129,6 +131,7 @@ public sealed class CatalogPriceCalculationReader
                     component.Article,
                     component.Name,
                     component.SelectionSource,
+                    component.SupplyStatus,
                     component.QuantityPerUnit,
                     component.TotalQuantity,
                     component.BasePriceAmount,
@@ -148,7 +151,9 @@ public sealed class CatalogPriceCalculationReader
             .ToArray();
 
         var productTypeReferences = await (
-                from product in _dbContext.Products.AsNoTracking()
+                from product in _dbContext.Products
+                    .IgnoreQueryFilters()
+                    .AsNoTracking()
                 join productType in _dbContext.ProductTypes.AsNoTracking()
                     on product.ProductTypeId equals productType.Id
                 where projectProductIds.Contains(product.Id)

@@ -10,3 +10,14 @@ export async function getCatalogProductTypes(): Promise<
 
   return response.data;
 }
+
+export async function getCatalogProductTypesIncludingArchived(): Promise<
+  CatalogProductTypeMetadata[]
+> {
+  const response = await httpClient.get<CatalogProductTypeMetadata[]>(
+    "/api/catalog/metadata/product-types",
+    { params: { includeArchived: true } },
+  );
+
+  return response.data;
+}

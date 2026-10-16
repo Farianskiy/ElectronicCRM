@@ -7,4 +7,6 @@ public sealed record SearchProductsQuery(
     IReadOnlyCollection<SearchProductCharacteristicFilter> Characteristics,
     int Page,
     int PageSize,
-    bool? OnlyInStock = null);
+    bool? OnlyInStock = null,
+    bool IncludeArchived = false,
+    bool OnlyArchived = false);

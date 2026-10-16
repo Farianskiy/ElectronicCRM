@@ -153,6 +153,13 @@ const navigationGroups: NavigationGroup[] = [
         permission: "DictionariesManage",
       },
       {
+        href: "/catalog/component-compatibility",
+        label: "Комплектующие",
+        description: "Потребности и правила совместимости",
+        icon: "products",
+        permission: "DictionariesManage",
+      },
+      {
         href: "/catalog/characteristics",
         label: "Характеристики",
         description: "Определения и правила значений",

@@ -25,37 +25,121 @@ public sealed class CatalogComponentCompatibilityWorkbookService
         _dbContext = dbContext;
     }
 
-    public byte[] CreateTemplate()
+    public async Task<Result<byte[], DomainError>> CreateTemplateAsync(
+        string? mainProductTypeCode,
+        IReadOnlyCollection<string>? characteristicCodes = null,
+        IReadOnlyCollection<string>? rangeCharacteristicCodes = null,
+        CancellationToken cancellationToken = default)
     {
+        ProductTypeReference? selectedType = null;
+        IReadOnlyCollection<NeedReference> selectedNeeds = [];
+        IReadOnlyCollection<CharacteristicReference> selectedCharacteristics = [];
+
+        if (!string.IsNullOrWhiteSpace(mainProductTypeCode))
+        {
+            var normalizedType = mainProductTypeCode.Trim().ToUpperInvariant();
+            selectedType = await _dbContext.ProductTypes
+                .AsNoTracking()
+                .Where(item => item.Kind == ProductTypeKind.MainProduct
+                    && item.Code == normalizedType)
+                .Select(item => new ProductTypeReference(
+                    item.Id,
+                    item.Code,
+                    item.Name))
+                .FirstOrDefaultAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            if (selectedType is null)
+            {
+                return Failure<byte[]>(
+                    "Выбранный тип основного товара не найден.");
+            }
+
+            selectedNeeds = await _dbContext.ComponentNeedDefinitions
+                .AsNoTracking()
+                .Where(item => item.MainProductTypeId == selectedType.Id)
+                .OrderBy(item => item.Name)
+                .Select(item => new NeedReference(
+                    item.Id,
+                    item.MainProductTypeId,
+                    item.Code,
+                    item.Name))
+                .ToArrayAsync(cancellationToken)
+                .ConfigureAwait(false);
+            selectedCharacteristics = await (
+                    from relation in _dbContext.ProductTypeCharacteristics
+                        .AsNoTracking()
+                    join definition in _dbContext.CharacteristicDefinitions
+                        .AsNoTracking()
+                        on relation.CharacteristicDefinitionId equals definition.Id
+                    where relation.ProductTypeId == selectedType.Id
+                    orderby definition.Name
+                    select new CharacteristicReference(
+                        relation.ProductTypeId,
+                        definition.Id,
+                        definition.Code,
+                        definition.Name,
+                        definition.DataType))
+                .ToArrayAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            if (characteristicCodes is not null)
+            {
+                var selectedCodes = characteristicCodes
+                    .Select(Normalize)
+                    .ToHashSet(StringComparer.Ordinal);
+                selectedCharacteristics = selectedCharacteristics
+                    .Where(item => selectedCodes.Contains(Normalize(item.Code)))
+                    .ToArray();
+            }
+        }
+
         using var workbook = new XLWorkbook();
         var worksheet = workbook.Worksheets.Add("Правила совместимости");
-        var headers = new[]
+        var headers = new List<string>
         {
             "Артикул комплектующего",
             "Тип основного товара",
             "Потребность",
-            "Характеристика 1",
-            "Характеристика 2"
+            "Активно"
         };
+        var selectedExportCharacteristics = selectedCharacteristics
+            .Select(item => new CharacteristicExportReference(
+                item.DefinitionId,
+                item.Code,
+                item.Name,
+                item.DataType))
+            .ToArray();
+        var selectedRangeCodes = (rangeCharacteristicCodes ?? [])
+            .Select(Normalize)
+            .ToHashSet(StringComparer.Ordinal);
+        var selectedRangeDefinitionIds = selectedExportCharacteristics
+            .Where(item => item.DataType == CharacteristicDataType.Number
+                && selectedRangeCodes.Contains(Normalize(item.Code)))
+            .Select(item => item.Id)
+            .ToHashSet();
+        var characteristicColumns = CreateCharacteristicColumns(
+            selectedExportCharacteristics,
+            selectedRangeDefinitionIds);
+        headers.AddRange(characteristicColumns.Count > 0
+            ? characteristicColumns.Select(item => item.Header)
+            : ["Характеристика 1", "Характеристика 2"]);
 
-        for (var index = 0; index < headers.Length; index++)
+        for (var index = 0; index < headers.Count; index++)
         {
             worksheet.Cell(1, index + 1).Value = headers[index];
         }
 
         worksheet.Cell(2, 1).Value = "АРТИКУЛ-001";
-        worksheet.Cell(2, 2).Value = "КОНТАКТОР";
-        worksheet.Cell(2, 3).Value = "ДОПОЛНИТЕЛЬНЫЙ КОНТАКТ";
-        worksheet.Cell(2, 4).Value = "значение; другое значение";
-        worksheet.Cell(2, 5).Value = "значение";
-        worksheet.Range(1, 1, 1, headers.Length).Style.Font.Bold = true;
-        worksheet.Range(1, 1, 1, headers.Length).Style.Fill.BackgroundColor =
-            XLColor.FromHtml("#DDEBF7");
-        worksheet.SheetView.FreezeRows(1);
-        worksheet.Columns().AdjustToContents();
-        worksheet.Column(1).Width = Math.Max(worksheet.Column(1).Width, 28);
-        worksheet.Column(2).Width = Math.Max(worksheet.Column(2).Width, 28);
-        worksheet.Column(3).Width = Math.Max(worksheet.Column(3).Width, 28);
+        worksheet.Cell(2, 2).Value = selectedType?.Code ?? "КОНТАКТОР";
+        worksheet.Cell(2, 3).Value = selectedNeeds.FirstOrDefault()?.Name
+            ?? "ДОПОЛНИТЕЛЬНЫЙ КОНТАКТ";
+        worksheet.Cell(2, 4).Value = "Да";
+        if (headers.Count > 4)
+        {
+            worksheet.Cell(2, 5).Value = "значение; другое значение";
+        }
+        StyleRulesWorksheet(worksheet, headers.Count);
 
         var instructions = workbook.Worksheets.Add("Инструкция");
         instructions.Cell(1, 1).Value = "Как заполнить шаблон";
@@ -67,11 +151,182 @@ public sealed class CatalogComponentCompatibilityWorkbookService
         instructions.Cell(5, 1).Value =
             "3. Потребность можно указать кодом или названием для выбранного типа товара.";
         instructions.Cell(6, 1).Value =
-            "4. Переименуйте колонки «Характеристика 1/2» в реальные коды или названия характеристик.";
+            selectedType is null
+                ? "4. Переименуйте колонки «Характеристика 1/2» в реальные коды или названия характеристик."
+                : "4. Колонки характеристик уже взяты из схемы выбранного типа товара.";
         instructions.Cell(7, 1).Value =
             "5. Несколько допустимых значений одной характеристики разделяйте точкой с запятой.";
+        instructions.Cell(8, 1).Value =
+            "6. Повторите артикул, тип и потребность в новой строке, чтобы добавить альтернативный вариант совместимости.";
+        instructions.Cell(9, 1).Value =
+            "7. В одной строке разные характеристики работают одновременно (И); повторные строки работают как варианты (ИЛИ).";
+        instructions.Cell(10, 1).Value =
+            "8. В колонке «Активно» укажите «Да» или «Нет». Если колонка отсутствует, правило считается активным.";
+        instructions.Cell(11, 1).Value =
+            "9. Для числового диапазона заполните колонки «характеристика от» и «характеристика до». Границы включаются в диапазон.";
         instructions.Column(1).Width = 120;
         instructions.Column(1).Style.Alignment.WrapText = true;
+
+        if (selectedType is not null)
+        {
+            AddMetadataWorksheet(
+                workbook,
+                selectedType,
+                characteristicColumns);
+        }
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        return stream.ToArray();
+    }
+
+    public async Task<Result<byte[], DomainError>> ExportRulesAsync(
+        string mainProductTypeCode,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(mainProductTypeCode))
+        {
+            return Failure<byte[]>("Выберите тип основного товара.");
+        }
+
+        var normalizedTypeCode = mainProductTypeCode.Trim().ToUpperInvariant();
+        var selectedType = await _dbContext.ProductTypes
+            .AsNoTracking()
+            .Where(item => item.Kind == ProductTypeKind.MainProduct
+                && item.Code == normalizedTypeCode)
+            .Select(item => new ProductTypeReference(item.Id, item.Code, item.Name))
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (selectedType is null)
+        {
+            return Failure<byte[]>("Выбранный тип основного товара не найден.");
+        }
+
+        var needs = await _dbContext.ComponentNeedDefinitions
+            .AsNoTracking()
+            .Where(item => item.MainProductTypeId == selectedType.Id)
+            .ToDictionaryAsync(item => item.Id, cancellationToken)
+            .ConfigureAwait(false);
+        var needIds = needs.Keys.ToArray();
+        var offers = await _dbContext.ComponentOffers
+            .AsNoTracking()
+            .Include(item => item.ConditionGroups)
+            .ThenInclude(group => group.Constraints)
+            .Where(item => needIds.Contains(item.NeedDefinitionId))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        var componentIds = offers
+            .Select(item => item.ComponentProductId)
+            .Distinct()
+            .ToArray();
+        var components = await _dbContext.Products
+            .AsNoTracking()
+            .Where(item => componentIds.Contains(item.Id))
+            .ToDictionaryAsync(item => item.Id, cancellationToken)
+            .ConfigureAwait(false);
+        var characteristics = await (
+                from relation in _dbContext.ProductTypeCharacteristics.AsNoTracking()
+                join definition in _dbContext.CharacteristicDefinitions.AsNoTracking()
+                    on relation.CharacteristicDefinitionId equals definition.Id
+                where relation.ProductTypeId == selectedType.Id
+                orderby definition.Name
+                select new CharacteristicExportReference(
+                    definition.Id,
+                    definition.Code,
+                    definition.Name,
+                    definition.DataType))
+            .ToArrayAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        using var workbook = new XLWorkbook();
+        var worksheet = workbook.Worksheets.Add("Правила совместимости");
+        var headers = new List<string>
+        {
+            "Артикул комплектующего",
+            "Тип основного товара",
+            "Потребность",
+            "Активно"
+        };
+        var rangeDefinitionIds = offers
+            .SelectMany(item => item.ConditionGroups)
+            .SelectMany(item => item.Constraints)
+            .Where(item => item.ComparisonOperator !=
+                ComponentCompatibilityComparisonOperator.Equal)
+            .Select(item => item.CharacteristicDefinitionId)
+            .ToHashSet();
+        var characteristicColumns = CreateCharacteristicColumns(
+            characteristics,
+            rangeDefinitionIds);
+        headers.AddRange(characteristicColumns.Select(item => item.Header));
+
+        for (var column = 0; column < headers.Count; column++)
+        {
+            worksheet.Cell(1, column + 1).Value = headers[column];
+        }
+
+        var rowNumber = 2;
+        foreach (var offer in offers
+                     .Where(item => components.ContainsKey(item.ComponentProductId))
+                     .OrderBy(
+                         item => needs[item.NeedDefinitionId].Name,
+                         StringComparer.OrdinalIgnoreCase)
+                     .ThenBy(
+                         item => components[item.ComponentProductId].Article.Value,
+                         StringComparer.OrdinalIgnoreCase))
+        {
+            var groups = offer.ConditionGroups.OrderBy(item => item.Position).ToArray();
+            if (groups.Length == 0)
+            {
+                groups = [null!];
+            }
+
+            foreach (var group in groups)
+            {
+                worksheet.Cell(rowNumber, 1).Value =
+                    components[offer.ComponentProductId].Article.Value;
+                worksheet.Cell(rowNumber, 2).Value = selectedType.Code;
+                worksheet.Cell(rowNumber, 3).Value = needs[offer.NeedDefinitionId].Name;
+                worksheet.Cell(rowNumber, 4).Value = offer.IsActive ? "Да" : "Нет";
+
+                if (group is not null)
+                {
+                    var constraintsByDefinition = group.Constraints
+                        .GroupBy(item => item.CharacteristicDefinitionId)
+                        .ToDictionary(item => item.Key, item => item.ToArray());
+
+                    for (var index = 0; index < characteristicColumns.Count; index++)
+                    {
+                        var column = characteristicColumns[index];
+                        if (!constraintsByDefinition.TryGetValue(
+                                column.Characteristic.Id,
+                                out var constraints))
+                        {
+                            continue;
+                        }
+
+                        var matchingConstraints = constraints
+                            .Where(item => item.ComparisonOperator ==
+                                column.ComparisonOperator)
+                            .ToArray();
+                        if (matchingConstraints.Length == 0)
+                        {
+                            continue;
+                        }
+
+                        worksheet.Cell(rowNumber, index + 5).Value = string.Join(
+                            ";",
+                            matchingConstraints.Select(item => FormatExcelValue(
+                                item.ExpectedValue)));
+                    }
+                }
+
+                rowNumber++;
+            }
+        }
+
+        StyleRulesWorksheet(worksheet, headers.Count);
+        AddMetadataWorksheet(workbook, selectedType, characteristicColumns);
 
         using var stream = new MemoryStream();
         workbook.SaveAs(stream);
@@ -97,12 +352,14 @@ public sealed class CatalogComponentCompatibilityWorkbookService
             }
 
             var headers = ReadHeaders(worksheet);
+            var metadataByHeader = ReadMetadataCharacteristics(workbook);
             var articleColumn = FindColumn(
                 headers,
                 "АРТИКУЛ КОМПЛЕКТУЮЩЕГО",
                 "АРТИКУЛ");
             var mainTypeColumn = FindColumn(headers, "ТИП ОСНОВНОГО ТОВАРА");
             var needColumn = FindColumn(headers, "ПОТРЕБНОСТЬ");
+            var activeColumn = FindColumn(headers, "АКТИВНО", "СОСТОЯНИЕ");
 
             if (!articleColumn.HasValue
                 || !mainTypeColumn.HasValue
@@ -116,7 +373,7 @@ public sealed class CatalogComponentCompatibilityWorkbookService
             var referenceData = await LoadReferenceDataAsync(cancellationToken)
                 .ConfigureAwait(false);
             var rows = new List<ComponentCompatibilityImportPreviewRow>();
-            var representedKeys = new HashSet<(Guid ProductId, Guid NeedId)>();
+            var representedGroups = new HashSet<string>(StringComparer.Ordinal);
             var lastRow = worksheet.LastRowUsed()?.RowNumber() ?? 1;
 
             if (lastRow - 1 > MaximumRowsCount)
@@ -133,11 +390,27 @@ public sealed class CatalogComponentCompatibilityWorkbookService
                 var article = ReadCell(row, articleColumn.Value);
                 var mainTypeValue = ReadCell(row, mainTypeColumn.Value);
                 var needValue = ReadCell(row, needColumn.Value);
+                var activeResult = ParseActiveValue(
+                    activeColumn.HasValue
+                        ? ReadCell(row, activeColumn.Value)
+                        : string.Empty);
 
                 if (article.Length == 0
                     && mainTypeValue.Length == 0
                     && needValue.Length == 0)
                 {
+                    continue;
+                }
+
+                if (activeResult.IsFailure)
+                {
+                    rows.Add(ProblemRow(
+                        rowNumber,
+                        article,
+                        mainTypeValue,
+                        needValue,
+                        ComponentCompatibilityImportRowStatus.Invalid,
+                        activeResult.Error.Message));
                     continue;
                 }
 
@@ -215,35 +488,6 @@ public sealed class CatalogComponentCompatibilityWorkbookService
 
                 var component = componentCandidates[0];
                 var need = needCandidates[0];
-                var key = (component.Id, need.Id);
-
-                if (!representedKeys.Add(key))
-                {
-                    rows.Add(ProblemRow(
-                        rowNumber,
-                        article,
-                        mainTypeValue,
-                        needValue,
-                        ComponentCompatibilityImportRowStatus.Duplicate,
-                        "Такое правило уже встречалось выше в файле."));
-                    continue;
-                }
-
-                if (referenceData.ExistingOffers.Contains(key))
-                {
-                    rows.Add(new ComponentCompatibilityImportPreviewRow(
-                        rowNumber,
-                        article,
-                        mainType.Name,
-                        need.Name,
-                        component.Id,
-                        need.Id,
-                        ComponentCompatibilityImportRowStatus.AlreadyExists,
-                        "Правило уже существует и повторно создано не будет.",
-                        []));
-                    continue;
-                }
-
                 var constraintResult = CreateConstraints(
                     row,
                     headers,
@@ -252,7 +496,9 @@ public sealed class CatalogComponentCompatibilityWorkbookService
                     referenceData.Definitions,
                     articleColumn.Value,
                     mainTypeColumn.Value,
-                    needColumn.Value);
+                    needColumn.Value,
+                    activeColumn,
+                    metadataByHeader);
 
                 if (constraintResult.IsFailure)
                 {
@@ -267,6 +513,23 @@ public sealed class CatalogComponentCompatibilityWorkbookService
                     continue;
                 }
 
+                var groupSignature = CreateGroupSignature(
+                    component.Id,
+                    need.Id,
+                    constraintResult.Value);
+
+                if (!representedGroups.Add(groupSignature))
+                {
+                    rows.Add(ProblemRow(
+                        rowNumber,
+                        article,
+                        mainTypeValue,
+                        needValue,
+                        ComponentCompatibilityImportRowStatus.Duplicate,
+                        "Полностью одинаковый вариант уже встречался выше в файле."));
+                    continue;
+                }
+
                 rows.Add(new ComponentCompatibilityImportPreviewRow(
                     rowNumber,
                     article,
@@ -274,17 +537,24 @@ public sealed class CatalogComponentCompatibilityWorkbookService
                     need.Name,
                     component.Id,
                     need.Id,
+                    activeResult.Value,
                     ComponentCompatibilityImportRowStatus.Ready,
                     null,
                     constraintResult.Value));
             }
 
+            rows = ClassifyPreviewRows(rows, referenceData.ExistingRules);
+
             return new ComponentCompatibilityImportPreview(
                 rows.Count,
                 rows.Count(item =>
-                    item.Status == ComponentCompatibilityImportRowStatus.Ready),
+                    item.Status is ComponentCompatibilityImportRowStatus.WillCreate
+                        or ComponentCompatibilityImportRowStatus.WillUpdate),
                 rows.Count(item =>
-                    item.Status != ComponentCompatibilityImportRowStatus.Ready),
+                    item.Status is not (
+                        ComponentCompatibilityImportRowStatus.WillCreate
+                        or ComponentCompatibilityImportRowStatus.WillUpdate
+                        or ComponentCompatibilityImportRowStatus.Unchanged)),
                 rows);
         }
         catch (Exception exception) when (
@@ -308,12 +578,31 @@ public sealed class CatalogComponentCompatibilityWorkbookService
 
         if (rows.Any(row =>
                 row.ComponentProductId == Guid.Empty
-                || row.NeedDefinitionId == Guid.Empty)
-            || rows.GroupBy(row =>
-                    (row.ComponentProductId, row.NeedDefinitionId))
-                .Any(group => group.Count() > 1))
+                || row.NeedDefinitionId == Guid.Empty))
         {
-            return Failure<int>("В запросе есть некорректные или повторяющиеся правила.");
+            return Failure<int>("В запросе есть некорректные правила.");
+        }
+
+        var groupedRows = rows
+            .GroupBy(row => (row.ComponentProductId, row.NeedDefinitionId))
+            .ToArray();
+        var requestedKeys = groupedRows.Select(group => group.Key).ToHashSet();
+
+        if (groupedRows.Any(group =>
+                group.Count() > 1
+                && group.Any(row => row.Constraints.Count == 0)))
+        {
+            return Failure<int>(
+                "Вариант без условий уже подходит всем товарам типа и не может "
+                + "использоваться вместе с другими вариантами одного правила.");
+        }
+
+
+        if (groupedRows.Any(group =>
+                group.Select(row => row.IsActive).Distinct().Count() > 1))
+        {
+            return Failure<int>(
+                "Все строки одного правила должны иметь одинаковое значение «Активно». ");
         }
 
         var productIds = rows.Select(row => row.ComponentProductId).Distinct().ToArray();
@@ -356,71 +645,157 @@ public sealed class CatalogComponentCompatibilityWorkbookService
         var allowed = allowedPairs
             .Select(item => (item.ProductTypeId, item.CharacteristicDefinitionId))
             .ToHashSet();
-        var existing = await _dbContext.ComponentOffers
+        var existingOffers = await _dbContext.ComponentOffers
+            .Include(item => item.ConditionGroups)
+            .ThenInclude(group => group.Constraints)
             .Where(item => productIds.Contains(item.ComponentProductId)
                 && needIds.Contains(item.NeedDefinitionId))
-            .Select(item => new { item.ComponentProductId, item.NeedDefinitionId })
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
-        var existingKeys = existing
-            .Select(item => (item.ComponentProductId, item.NeedDefinitionId))
-            .ToHashSet();
+        var targetExistingOffers = existingOffers
+            .Where(item => requestedKeys.Contains(
+                (item.ComponentProductId, item.NeedDefinitionId)))
+            .ToList();
+        var existingByKey = targetExistingOffers.ToDictionary(
+            item => (item.ComponentProductId, item.NeedDefinitionId));
+        var preparedRules = new List<PreparedImportRule>();
 
-        foreach (var row in rows)
+        foreach (var ruleRows in groupedRows)
         {
-            if (!componentIds.Contains(row.ComponentProductId)
-                || !needs.TryGetValue(row.NeedDefinitionId, out var need)
-                || existingKeys.Contains(
-                    (row.ComponentProductId, row.NeedDefinitionId)))
+            if (!componentIds.Contains(ruleRows.Key.ComponentProductId)
+                || !needs.TryGetValue(ruleRows.Key.NeedDefinitionId, out var need))
             {
                 return Failure<int>(
                     "Состав каталога изменился. Выполните предпросмотр повторно.");
             }
 
-            var offerResult = ComponentOffer.Create(
-                row.ComponentProductId,
-                row.NeedDefinitionId);
+            var preparedGroups = new List<IReadOnlyCollection<(
+                Guid DefinitionId,
+                CharacteristicValue Value,
+                ComponentCompatibilityComparisonOperator ComparisonOperator)>>();
 
-            if (offerResult.IsFailure)
+            foreach (var rowConstraints in ruleRows.Select(row => row.Constraints))
             {
-                return Result.Failure<int, DomainError>(offerResult.Error);
+                var preparedConstraints = new List<(
+                    Guid DefinitionId,
+                    CharacteristicValue Value,
+                    ComponentCompatibilityComparisonOperator ComparisonOperator)>();
+
+                foreach (var constraint in rowConstraints)
+                {
+                    if (!definitions.TryGetValue(
+                            constraint.CharacteristicDefinitionId,
+                            out var definition)
+                        || !allowed.Contains(
+                            (need.MainProductTypeId, definition.Id)))
+                    {
+                        return Failure<int>(
+                            "Характеристика больше не разрешена для типа товара.");
+                    }
+
+                    var valueResult = ParseValue(definition, constraint.Value);
+
+                    if (valueResult.IsFailure)
+                    {
+                        return Result.Failure<int, DomainError>(valueResult.Error);
+                    }
+
+                    if (constraint.ComparisonOperator !=
+                            ComponentCompatibilityComparisonOperator.Equal
+                        && definition.DataType != CharacteristicDataType.Number)
+                    {
+                        return Failure<int>(
+                            "Границы «от/до» доступны только для числовых характеристик.");
+                    }
+
+                    preparedConstraints.Add((
+                        definition.Id,
+                        valueResult.Value,
+                        constraint.ComparisonOperator));
+                }
+
+                var rangeValidation = ValidateNumericRanges(rowConstraints);
+                if (rangeValidation.IsFailure)
+                {
+                    return Result.Failure<int, DomainError>(rangeValidation.Error);
+                }
+
+                preparedGroups.Add(preparedConstraints);
             }
 
-            var offer = offerResult.Value;
+            preparedRules.Add(new PreparedImportRule(
+                ruleRows.Key.ComponentProductId,
+                ruleRows.Key.NeedDefinitionId,
+                ruleRows.First().IsActive,
+                preparedGroups));
+        }
 
-            foreach (var constraint in row.Constraints)
+        await using var transaction = await _dbContext.Database
+            .BeginTransactionAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        _dbContext.ComponentCompatibilityConditionGroups.RemoveRange(
+            targetExistingOffers.SelectMany(offer => offer.ConditionGroups));
+        await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        foreach (var preparedRule in preparedRules)
+        {
+            ComponentOffer offer;
+            var key = (
+                preparedRule.ComponentProductId,
+                preparedRule.NeedDefinitionId);
+
+            if (existingByKey.TryGetValue(key, out var existingOffer))
             {
-                if (!definitions.TryGetValue(
-                        constraint.CharacteristicDefinitionId,
-                        out var definition)
-                    || !allowed.Contains(
-                        (need.MainProductTypeId, definition.Id)))
+                offer = existingOffer;
+                offer.ClearConditionGroups();
+            }
+            else
+            {
+                var offerResult = ComponentOffer.Create(
+                    preparedRule.ComponentProductId,
+                    preparedRule.NeedDefinitionId);
+
+                if (offerResult.IsFailure)
                 {
-                    return Failure<int>(
-                        "Характеристика больше не разрешена для типа товара.");
+                    return Result.Failure<int, DomainError>(offerResult.Error);
                 }
 
-                var valueResult = ParseValue(definition, constraint.Value);
+                offer = offerResult.Value;
+                offer.ClearConditionGroups();
+                _dbContext.ComponentOffers.Add(offer);
+            }
 
-                if (valueResult.IsFailure)
+            foreach (var preparedGroup in preparedRule.Groups)
+            {
+                var groupResult = offer.AddConditionGroup();
+
+                if (groupResult.IsFailure)
                 {
-                    return Result.Failure<int, DomainError>(valueResult.Error);
+                    return Result.Failure<int, DomainError>(groupResult.Error);
                 }
 
-                var addResult = offer.AddConstraint(definition.Id, valueResult.Value);
-
-                if (addResult.IsFailure)
+                foreach (var constraint in preparedGroup)
                 {
-                    return Result.Failure<int, DomainError>(addResult.Error);
+                    var addResult = groupResult.Value.AddConstraint(
+                        constraint.DefinitionId,
+                        constraint.Value,
+                        constraint.ComparisonOperator);
+
+                    if (addResult.IsFailure)
+                    {
+                        return Result.Failure<int, DomainError>(addResult.Error);
+                    }
                 }
             }
 
-            _dbContext.ComponentOffers.Add(offer);
+            offer.SetActive(preparedRule.IsActive);
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
 
-        return rows.Count;
+        return preparedRules.Count;
     }
 
     private async Task<ReferenceData> LoadReferenceDataAsync(
@@ -457,7 +832,8 @@ public sealed class CatalogComponentCompatibilityWorkbookService
                     relation.ProductTypeId,
                     definition.Id,
                     definition.Code,
-                    definition.Name))
+                    definition.Name,
+                    definition.DataType))
             .ToArrayAsync(cancellationToken)
             .ConfigureAwait(false);
         var definitions = await _dbContext.CharacteristicDefinitions
@@ -466,7 +842,8 @@ public sealed class CatalogComponentCompatibilityWorkbookService
             .ConfigureAwait(false);
         var existingOffers = await _dbContext.ComponentOffers
             .AsNoTracking()
-            .Select(item => new { item.ComponentProductId, item.NeedDefinitionId })
+            .Include(item => item.ConditionGroups)
+            .ThenInclude(group => group.Constraints)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
@@ -476,9 +853,22 @@ public sealed class CatalogComponentCompatibilityWorkbookService
             needs,
             characteristics,
             definitions,
-            existingOffers
-                .Select(item => (item.ComponentProductId, item.NeedDefinitionId))
-                .ToHashSet());
+            existingOffers.ToDictionary(
+                item => (item.ComponentProductId, item.NeedDefinitionId),
+                item => new ExistingRuleReference(
+                    item.IsActive,
+                    item.ConditionGroups
+                        .Select(group => CreateGroupSignature(
+                            item.ComponentProductId,
+                            item.NeedDefinitionId,
+                            group.Constraints.Select(constraint =>
+                                new ComponentCompatibilityImportConstraint(
+                                    constraint.CharacteristicDefinitionId,
+                                    string.Empty,
+                                    FormatExcelValue(constraint.ExpectedValue),
+                                    constraint.ComparisonOperator))
+                                .ToArray()))
+                        .ToHashSet(StringComparer.Ordinal))));
     }
 
     private static Result<
@@ -491,7 +881,9 @@ public sealed class CatalogComponentCompatibilityWorkbookService
             IReadOnlyDictionary<Guid, CharacteristicDefinition> definitions,
             int articleColumn,
             int mainTypeColumn,
-            int needColumn)
+            int needColumn,
+            int? activeColumn,
+            IReadOnlyDictionary<string, CharacteristicColumnMetadata> metadataByHeader)
     {
         var result = new List<ComponentCompatibilityImportConstraint>();
 
@@ -500,6 +892,7 @@ public sealed class CatalogComponentCompatibilityWorkbookService
             if (header.Key == articleColumn
                 || header.Key == mainTypeColumn
                 || header.Key == needColumn
+                || header.Key == activeColumn
                 || IsIgnoredStandardHeader(header.Value))
             {
                 continue;
@@ -512,16 +905,22 @@ public sealed class CatalogComponentCompatibilityWorkbookService
                 continue;
             }
 
+            var normalizedHeader = Normalize(header.Value);
+            metadataByHeader.TryGetValue(normalizedHeader, out var columnMetadata);
+            var comparisonOperator = columnMetadata?.ComparisonOperator
+                ?? GetComparisonOperatorFromHeader(header.Value);
+            var characteristicHeader = columnMetadata?.CharacteristicCode
+                ?? StripRangeSuffix(header.Value, comparisonOperator);
             var candidates = characteristics
                 .Where(item =>
                     item.ProductTypeId == mainProductTypeId
                     && (string.Equals(
                             Normalize(item.Code),
-                            Normalize(header.Value),
+                            Normalize(characteristicHeader),
                             StringComparison.Ordinal)
                         || string.Equals(
                             Normalize(item.Name),
-                            Normalize(header.Value),
+                            Normalize(characteristicHeader),
                             StringComparison.Ordinal)))
                 .ToArray();
 
@@ -532,9 +931,18 @@ public sealed class CatalogComponentCompatibilityWorkbookService
                     + "выбранного типа основного товара.");
             }
 
-            foreach (var value in rawValue
+            var rawValues = rawValue
                          .Split(';', StringSplitOptions.TrimEntries
-                             | StringSplitOptions.RemoveEmptyEntries))
+                             | StringSplitOptions.RemoveEmptyEntries);
+
+            if (comparisonOperator != ComponentCompatibilityComparisonOperator.Equal
+                && rawValues.Length != 1)
+            {
+                return Failure<IReadOnlyList<ComponentCompatibilityImportConstraint>>(
+                    $"В колонке диапазона «{header.Value}» укажите одно число.");
+            }
+
+            foreach (var value in rawValues)
             {
                 if (!definitions.TryGetValue(
                         candidates[0].DefinitionId,
@@ -542,6 +950,14 @@ public sealed class CatalogComponentCompatibilityWorkbookService
                 {
                     return Failure<IReadOnlyList<ComponentCompatibilityImportConstraint>>(
                         $"Характеристика «{candidates[0].Name}» не найдена.");
+                }
+
+                if (comparisonOperator !=
+                        ComponentCompatibilityComparisonOperator.Equal
+                    && definition.DataType != CharacteristicDataType.Number)
+                {
+                    return Failure<IReadOnlyList<ComponentCompatibilityImportConstraint>>(
+                        $"Границы «от/до» доступны только для числовых характеристик. Колонка: «{header.Value}».");
                 }
 
                 var valueResult = ParseValue(definition, value);
@@ -555,8 +971,16 @@ public sealed class CatalogComponentCompatibilityWorkbookService
                 result.Add(new ComponentCompatibilityImportConstraint(
                     candidates[0].DefinitionId,
                     candidates[0].Name,
-                    value));
+                    FormatExcelValue(valueResult.Value),
+                    comparisonOperator));
             }
+        }
+
+        var rangeValidation = ValidateNumericRanges(result);
+        if (rangeValidation.IsFailure)
+        {
+            return Failure<IReadOnlyList<ComponentCompatibilityImportConstraint>>(
+                rangeValidation.Error.Message);
         }
 
         return result;
@@ -597,6 +1021,23 @@ public sealed class CatalogComponentCompatibilityWorkbookService
                 validationResult.Error);
     }
 
+    private static Result<bool, DomainError> ParseActiveValue(string rawValue)
+    {
+        var normalized = Normalize(rawValue);
+        if (normalized.Length == 0 || normalized is "ДА" or "TRUE" or "1" or "АКТИВНО")
+        {
+            return true;
+        }
+
+        if (normalized is "НЕТ" or "FALSE" or "0" or "ОТКЛЮЧЕНО")
+        {
+            return false;
+        }
+
+        return Failure<bool>(
+            "В колонке «Активно» допустимы значения «Да» или «Нет».");
+    }
+
     private static Dictionary<int, string> ReadHeaders(
         IXLWorksheet worksheet)
     {
@@ -610,6 +1051,41 @@ public sealed class CatalogComponentCompatibilityWorkbookService
             if (header.Length > 0)
             {
                 result[column] = header;
+            }
+        }
+
+        return result;
+    }
+
+    private static Dictionary<string, CharacteristicColumnMetadata>
+        ReadMetadataCharacteristics(XLWorkbook workbook)
+    {
+        if (!workbook.TryGetWorksheet("_Метаданные", out var metadata))
+        {
+            return new Dictionary<string, CharacteristicColumnMetadata>(
+                StringComparer.Ordinal);
+        }
+
+        var result = new Dictionary<string, CharacteristicColumnMetadata>(
+            StringComparer.Ordinal);
+        var lastRow = metadata.LastRowUsed()?.RowNumber() ?? 3;
+        for (var row = 4; row <= lastRow; row++)
+        {
+            var code = metadata.Cell(row, 1).GetFormattedString().Trim();
+            var name = metadata.Cell(row, 2).GetFormattedString().Trim();
+            var operatorText = metadata.Cell(row, 4).GetFormattedString().Trim();
+            if (code.Length > 0 && name.Length > 0)
+            {
+                var comparisonOperator = Enum.TryParse<
+                        ComponentCompatibilityComparisonOperator>(
+                        operatorText,
+                        true,
+                        out var parsedOperator)
+                    ? parsedOperator
+                    : GetComparisonOperatorFromHeader(name);
+                result[Normalize(name)] = new CharacteristicColumnMetadata(
+                    code,
+                    comparisonOperator);
             }
         }
 
@@ -647,6 +1123,23 @@ public sealed class CatalogComponentCompatibilityWorkbookService
                 .Split(' ', StringSplitOptions.RemoveEmptyEntries));
     }
 
+    private static string CreateGroupSignature(
+        Guid componentProductId,
+        Guid needDefinitionId,
+        IReadOnlyCollection<ComponentCompatibilityImportConstraint> constraints)
+    {
+        var values = constraints
+            .OrderBy(item => item.CharacteristicDefinitionId)
+            .ThenBy(item => item.ComparisonOperator)
+            .ThenBy(item => item.Value, StringComparer.OrdinalIgnoreCase)
+            .Select(item =>
+                $"{item.CharacteristicDefinitionId:N}:"
+                + $"{item.ComparisonOperator}:"
+                + Normalize(item.Value));
+
+        return $"{componentProductId:N}|{needDefinitionId:N}|{string.Join('|', values)}";
+    }
+
     private static ComponentCompatibilityImportPreviewRow ProblemRow(
         int rowNumber,
         string article,
@@ -662,9 +1155,244 @@ public sealed class CatalogComponentCompatibilityWorkbookService
             need,
             null,
             null,
+            true,
             status,
             message,
             []);
+    }
+
+    private static List<ComponentCompatibilityImportPreviewRow> ClassifyPreviewRows(
+        IReadOnlyCollection<ComponentCompatibilityImportPreviewRow> rows,
+        IReadOnlyDictionary<(Guid ProductId, Guid NeedId), ExistingRuleReference>
+            existingRules)
+    {
+        var result = rows.ToList();
+        var validGroups = rows
+            .Select((row, index) => new { Row = row, Index = index })
+            .Where(item => item.Row.Status == ComponentCompatibilityImportRowStatus.Ready
+                && item.Row.ComponentProductId.HasValue
+                && item.Row.NeedDefinitionId.HasValue)
+            .GroupBy(item => (
+                ProductId: item.Row.ComponentProductId!.Value,
+                NeedId: item.Row.NeedDefinitionId!.Value));
+
+        foreach (var ruleRows in validGroups)
+        {
+            if (ruleRows.Select(item => item.Row.IsActive).Distinct().Count() > 1)
+            {
+                foreach (var item in ruleRows)
+                {
+                    result[item.Index] = item.Row with
+                    {
+                        Status = ComponentCompatibilityImportRowStatus.Invalid,
+                        Message = "Все варианты одного правила должны иметь одинаковое значение «Активно»."
+                    };
+                }
+
+                continue;
+            }
+
+            var groupSignatures = ruleRows
+                .Select(item => CreateGroupSignature(
+                    ruleRows.Key.ProductId,
+                    ruleRows.Key.NeedId,
+                    item.Row.Constraints))
+                .ToHashSet(StringComparer.Ordinal);
+            var isActive = ruleRows.First().Row.IsActive;
+            ComponentCompatibilityImportRowStatus status;
+            string message;
+
+            if (!existingRules.TryGetValue(ruleRows.Key, out var existingRule))
+            {
+                status = ComponentCompatibilityImportRowStatus.WillCreate;
+                message = "Будет создано новое правило.";
+            }
+            else if (existingRule.IsActive == isActive
+                     && existingRule.GroupSignatures.SetEquals(groupSignatures))
+            {
+                status = ComponentCompatibilityImportRowStatus.Unchanged;
+                message = "Условия и состояние уже совпадают с сохранённым правилом.";
+            }
+            else
+            {
+                status = ComponentCompatibilityImportRowStatus.WillUpdate;
+                message = "Существующее правило будет обновлено вариантами из файла.";
+            }
+
+            foreach (var item in ruleRows)
+            {
+                result[item.Index] = item.Row with { Status = status, Message = message };
+            }
+        }
+
+        return result;
+    }
+
+    private static void StyleRulesWorksheet(
+        IXLWorksheet worksheet,
+        int columnsCount)
+    {
+        worksheet.Range(1, 1, 1, columnsCount).Style.Font.Bold = true;
+        worksheet.Range(1, 1, 1, columnsCount).Style.Fill.BackgroundColor =
+            XLColor.FromHtml("#DDEBF7");
+        worksheet.SheetView.FreezeRows(1);
+        worksheet.Columns().AdjustToContents();
+        worksheet.Column(1).Width = Math.Max(worksheet.Column(1).Width, 28);
+        worksheet.Column(2).Width = Math.Max(worksheet.Column(2).Width, 28);
+        worksheet.Column(3).Width = Math.Max(worksheet.Column(3).Width, 28);
+        worksheet.Column(4).Width = Math.Max(worksheet.Column(4).Width, 14);
+        worksheet.Range(2, 4, Math.Max(2, worksheet.LastRowUsed()?.RowNumber() ?? 2), 4)
+            .CreateDataValidation()
+            .List("\"Да,Нет\"", true);
+    }
+
+    private static void AddMetadataWorksheet(
+        XLWorkbook workbook,
+        ProductTypeReference selectedType,
+        IReadOnlyCollection<CharacteristicColumnReference> columns)
+    {
+        var metadata = workbook.Worksheets.Add("_Метаданные");
+        metadata.Cell(1, 1).Value = "Тип основного товара";
+        metadata.Cell(1, 2).Value = selectedType.Code;
+        metadata.Cell(3, 1).Value = "Код характеристики";
+        metadata.Cell(3, 2).Value = "Название колонки";
+        metadata.Cell(3, 3).Value = "Тип значения";
+        metadata.Cell(3, 4).Value = "Оператор";
+
+        var row = 4;
+        foreach (var column in columns)
+        {
+            metadata.Cell(row, 1).Value = column.Characteristic.Code;
+            metadata.Cell(row, 2).Value = column.Header;
+            metadata.Cell(row, 3).Value = column.Characteristic.DataType.ToString();
+            metadata.Cell(row, 4).Value = column.ComparisonOperator.ToString();
+            row++;
+        }
+
+        metadata.Visibility = XLWorksheetVisibility.VeryHidden;
+    }
+
+    private static string FormatExcelValue(CharacteristicValue value)
+    {
+        return value.DataType switch
+        {
+            CharacteristicDataType.Boolean => value.BooleanValue == true ? "Да" : "Нет",
+            CharacteristicDataType.Number => value.NumberValue?.ToString(
+                "0.############################",
+                CultureInfo.InvariantCulture) ?? string.Empty,
+            _ => value.TextValue ?? string.Empty
+        };
+    }
+
+    private static List<CharacteristicColumnReference>
+        CreateCharacteristicColumns(
+            IReadOnlyCollection<CharacteristicExportReference> characteristics,
+            HashSet<Guid> rangeDefinitionIds)
+    {
+        var result = new List<CharacteristicColumnReference>();
+        foreach (var characteristic in characteristics)
+        {
+            result.Add(new CharacteristicColumnReference(
+                characteristic,
+                characteristic.Name,
+                ComponentCompatibilityComparisonOperator.Equal));
+
+            if (characteristic.DataType == CharacteristicDataType.Number
+                && rangeDefinitionIds.Contains(characteristic.Id))
+            {
+                result.Add(new CharacteristicColumnReference(
+                    characteristic,
+                    $"{characteristic.Name} от",
+                    ComponentCompatibilityComparisonOperator.GreaterThanOrEqual));
+                result.Add(new CharacteristicColumnReference(
+                    characteristic,
+                    $"{characteristic.Name} до",
+                    ComponentCompatibilityComparisonOperator.LessThanOrEqual));
+            }
+        }
+
+        return result;
+    }
+
+    private static ComponentCompatibilityComparisonOperator
+        GetComparisonOperatorFromHeader(string header)
+    {
+        var normalized = Normalize(header);
+        if (normalized.EndsWith(" ОТ", StringComparison.Ordinal))
+        {
+            return ComponentCompatibilityComparisonOperator.GreaterThanOrEqual;
+        }
+
+        if (normalized.EndsWith(" ДО", StringComparison.Ordinal))
+        {
+            return ComponentCompatibilityComparisonOperator.LessThanOrEqual;
+        }
+
+        return ComponentCompatibilityComparisonOperator.Equal;
+    }
+
+    private static string StripRangeSuffix(
+        string header,
+        ComponentCompatibilityComparisonOperator comparisonOperator)
+    {
+        var suffix = comparisonOperator switch
+        {
+            ComponentCompatibilityComparisonOperator.GreaterThanOrEqual => " ОТ",
+            ComponentCompatibilityComparisonOperator.LessThanOrEqual => " ДО",
+            _ => string.Empty
+        };
+
+        var normalized = Normalize(header);
+        return suffix.Length > 0
+            && normalized.EndsWith(suffix, StringComparison.Ordinal)
+                ? normalized[..^suffix.Length].TrimEnd()
+                : header;
+    }
+
+    private static UnitResult<DomainError> ValidateNumericRanges(
+        IReadOnlyCollection<ComponentCompatibilityImportConstraint> constraints)
+    {
+        foreach (var group in constraints.GroupBy(item => item.CharacteristicDefinitionId))
+        {
+            var equalValues = group.Where(item => item.ComparisonOperator ==
+                    ComponentCompatibilityComparisonOperator.Equal)
+                .ToArray();
+            var lowerBounds = group.Where(item => item.ComparisonOperator ==
+                    ComponentCompatibilityComparisonOperator.GreaterThanOrEqual)
+                .ToArray();
+            var upperBounds = group.Where(item => item.ComparisonOperator ==
+                    ComponentCompatibilityComparisonOperator.LessThanOrEqual)
+                .ToArray();
+
+            if (lowerBounds.Length > 1 || upperBounds.Length > 1)
+            {
+                return UnitResult.Failure(new DomainError(
+                    "catalog.component_import.invalid_range",
+                    "Для характеристики допускается только одна нижняя и одна верхняя граница."));
+            }
+
+            if (equalValues.Length > 0
+                && (lowerBounds.Length > 0 || upperBounds.Length > 0))
+            {
+                return UnitResult.Failure(new DomainError(
+                    "catalog.component_import.invalid_range",
+                    "Для одной характеристики используйте либо точные значения, либо диапазон «от/до»."));
+            }
+
+            if (lowerBounds.Length == 1 && upperBounds.Length == 1
+                && decimal.TryParse(lowerBounds[0].Value, NumberStyles.Number,
+                    CultureInfo.InvariantCulture, out var lowerValue)
+                && decimal.TryParse(upperBounds[0].Value, NumberStyles.Number,
+                    CultureInfo.InvariantCulture, out var upperValue)
+                && lowerValue > upperValue)
+            {
+                return UnitResult.Failure(new DomainError(
+                    "catalog.component_import.invalid_range",
+                    "Нижняя граница диапазона не может быть больше верхней."));
+            }
+        }
+
+        return UnitResult.Success<DomainError>();
     }
 
     private static Result<T, DomainError> Failure<T>(string message)
@@ -687,7 +1415,32 @@ public sealed class CatalogComponentCompatibilityWorkbookService
         Guid ProductTypeId,
         Guid DefinitionId,
         string Code,
-        string Name);
+        string Name,
+        CharacteristicDataType DataType);
+
+    private sealed record CharacteristicExportReference(
+        Guid Id,
+        string Code,
+        string Name,
+        CharacteristicDataType DataType);
+
+    private sealed record CharacteristicColumnReference(
+        CharacteristicExportReference Characteristic,
+        string Header,
+        ComponentCompatibilityComparisonOperator ComparisonOperator);
+
+    private sealed record CharacteristicColumnMetadata(
+        string CharacteristicCode,
+        ComponentCompatibilityComparisonOperator ComparisonOperator);
+
+    private sealed record PreparedImportRule(
+        Guid ComponentProductId,
+        Guid NeedDefinitionId,
+        bool IsActive,
+        IReadOnlyCollection<IReadOnlyCollection<(
+            Guid DefinitionId,
+            CharacteristicValue Value,
+            ComponentCompatibilityComparisonOperator ComparisonOperator)>> Groups);
 
     private sealed record ReferenceData(
         IReadOnlyCollection<ProductReference> ComponentProducts,
@@ -695,5 +1448,10 @@ public sealed class CatalogComponentCompatibilityWorkbookService
         IReadOnlyCollection<NeedReference> Needs,
         IReadOnlyCollection<CharacteristicReference> Characteristics,
         IReadOnlyDictionary<Guid, CharacteristicDefinition> Definitions,
-        IReadOnlySet<(Guid ProductId, Guid NeedId)> ExistingOffers);
+        IReadOnlyDictionary<(Guid ProductId, Guid NeedId), ExistingRuleReference>
+            ExistingRules);
+
+    private sealed record ExistingRuleReference(
+        bool IsActive,
+        IReadOnlySet<string> GroupSignatures);
 }

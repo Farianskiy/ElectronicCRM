@@ -12,6 +12,7 @@ public sealed record AddCatalogPriceCalculationLineComponentResponse(
     string Article,
     string Name,
     string SelectionSource,
+    string SupplyStatus,
     int QuantityPerUnit,
     decimal BasePriceAmount,
     decimal DiscountPercent,

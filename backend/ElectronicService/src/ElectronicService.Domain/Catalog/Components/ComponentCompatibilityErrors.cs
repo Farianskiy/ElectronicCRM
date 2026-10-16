@@ -26,6 +26,18 @@ public static class ComponentCompatibilityErrors
         "catalog.component_offer.already_exists",
         $"Комплектующее '{componentProductId}' уже привязано к потребности '{needId}'.");
 
+    public static DomainError OfferNotFound(Guid offerId) => new(
+        "catalog.component_offer.not_found",
+        $"Правило совместимости '{offerId}' не найдено.");
+
+    public static DomainError ConditionGroupsRequired() => new(
+        "catalog.component_offer.condition_groups_required",
+        "Добавьте хотя бы одну группу условий совместимости.");
+
+    public static DomainError UnconditionalGroupMustBeOnly() => new(
+        "catalog.component_offer.unconditional_group_must_be_only",
+        "Группа без условий уже означает совместимость со всеми товарами типа и не может использоваться вместе с другими группами.");
+
     public static DomainError NeedDoesNotBelongToProductType() => new(
         "catalog.component_need.product_type_mismatch",
         "Потребность не относится к типу выбранного основного товара.");

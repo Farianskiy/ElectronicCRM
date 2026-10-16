@@ -27,6 +27,14 @@ public sealed class ComponentNeedDefinitionConfiguration
             .HasColumnName("name")
             .HasMaxLength(200)
             .IsRequired();
+        builder.Property(need => need.RequirementMode)
+            .HasColumnName("requirement_mode")
+            .HasConversion<string>()
+            .HasMaxLength(32)
+            .IsRequired();
+        builder.Property(need => need.DefaultQuantityPerUnit)
+            .HasColumnName("default_quantity_per_unit")
+            .IsRequired();
         builder.Property(need => need.CreatedAtUtc)
             .HasColumnName("created_at_utc")
             .IsRequired();
@@ -38,5 +46,10 @@ public sealed class ComponentNeedDefinitionConfiguration
 
         builder.HasIndex(need => new { need.MainProductTypeId, need.Code })
             .IsUnique();
+
+        builder.ToTable("component_need_definitions", table =>
+            table.HasCheckConstraint(
+                "ck_component_need_default_quantity",
+                $"\"default_quantity_per_unit\" >= 1 AND \"default_quantity_per_unit\" <= {ComponentNeedDefinition.MaximumDefaultQuantityPerUnit}"));
     }
 }

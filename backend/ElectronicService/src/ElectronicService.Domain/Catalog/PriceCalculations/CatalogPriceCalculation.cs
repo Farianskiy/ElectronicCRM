@@ -477,7 +477,9 @@ public sealed class CatalogPriceCalculation : AggregateRoot
         string manufacturerName,
         CatalogPriceCalculationLineComponentSelectionSource selectionSource,
         int quantityPerUnit,
-        decimal basePriceAmount)
+        decimal basePriceAmount,
+        CatalogPriceCalculationLineComponentSupplyStatus supplyStatus =
+            CatalogPriceCalculationLineComponentSupplyStatus.ToPurchase)
     {
         var editableResult =
             EnsureEditable();
@@ -535,7 +537,8 @@ public sealed class CatalogPriceCalculation : AggregateRoot
                 selectionSource,
                 quantityPerUnit,
                 basePriceAmount,
-                discountPercent);
+                discountPercent,
+                supplyStatus);
 
         if (componentResult.IsFailure)
         {
@@ -615,6 +618,42 @@ public sealed class CatalogPriceCalculation : AggregateRoot
 
         RemoveUnusedManufacturerDiscount(
             manufacturerId);
+
+        RecalculateTotal();
+        Touch();
+
+        return UnitResult.Success<DomainError>();
+    }
+
+    public UnitResult<DomainError> ChangeLineComponentSupplyStatus(
+        Guid lineId,
+        Guid componentLineId,
+        CatalogPriceCalculationLineComponentSupplyStatus supplyStatus)
+    {
+        var editableResult = EnsureEditable();
+
+        if (editableResult.IsFailure)
+        {
+            return editableResult;
+        }
+
+        var line = _lines.SingleOrDefault(
+            existingLine => existingLine.Id == lineId);
+
+        if (line is null)
+        {
+            return UnitResult.Failure(
+                CatalogPriceCalculationErrors.LineNotFound(lineId));
+        }
+
+        var changeResult = line.ChangeComponentSupplyStatus(
+            componentLineId,
+            supplyStatus);
+
+        if (changeResult.IsFailure)
+        {
+            return changeResult;
+        }
 
         RecalculateTotal();
         Touch();

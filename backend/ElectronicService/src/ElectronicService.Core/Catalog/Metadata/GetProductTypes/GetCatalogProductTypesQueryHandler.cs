@@ -18,6 +18,8 @@ public sealed class GetCatalogProductTypesQueryHandler
     {
         ArgumentNullException.ThrowIfNull(query);
 
-        return _catalogMetadataReader.GetProductTypesAsync(cancellationToken);
+        return _catalogMetadataReader.GetProductTypesAsync(
+            query.IncludeArchived,
+            cancellationToken);
     }
 }

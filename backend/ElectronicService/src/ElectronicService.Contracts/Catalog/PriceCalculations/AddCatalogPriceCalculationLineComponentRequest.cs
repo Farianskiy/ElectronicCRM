@@ -4,4 +4,5 @@ public sealed record AddCatalogPriceCalculationLineComponentRequest(
     Guid NeedDefinitionId,
     Guid ComponentProductId,
     int QuantityPerUnit,
-    bool ManualSelection = false);
+    bool ManualSelection = false,
+    string SupplyStatus = "ToPurchase");

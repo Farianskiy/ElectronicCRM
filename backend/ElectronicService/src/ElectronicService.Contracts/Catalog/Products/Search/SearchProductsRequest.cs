@@ -16,4 +16,8 @@ public sealed class SearchProductsRequest
     public int PageSize { get; init; }
 
     public bool? OnlyInStock { get; init; }
+
+    public bool IncludeArchived { get; init; }
+
+    public bool OnlyArchived { get; init; }
 }

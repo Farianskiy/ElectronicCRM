@@ -555,6 +555,16 @@ public static class CatalogImportErrors
             $"Товары импорта недоступны для пакета в статусе '{status}'.");
     }
 
+    public static DomainError ProductArticleIsArchived(
+        string article,
+        int rowNumber)
+    {
+        return new DomainError(
+            "catalog.import.product.archived",
+            $"Строка {rowNumber}: товар с артикулом '{article}' удалён из программы. " +
+            "Восстановите его в каталоге, если позицию нужно импортировать снова.");
+    }
+
     public static DomainError ErrorReportUnavailable()
     {
         return new DomainError(

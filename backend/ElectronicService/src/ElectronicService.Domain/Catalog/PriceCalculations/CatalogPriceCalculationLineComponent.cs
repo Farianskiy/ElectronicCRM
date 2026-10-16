@@ -24,7 +24,8 @@ public sealed class CatalogPriceCalculationLineComponent
         int quantityPerUnit,
         decimal basePriceAmount,
         decimal discountPercent,
-        decimal parentQuantity)
+        decimal parentQuantity,
+        CatalogPriceCalculationLineComponentSupplyStatus supplyStatus)
         : base(id)
     {
         CalculationLineId = calculationLineId;
@@ -36,6 +37,7 @@ public sealed class CatalogPriceCalculationLineComponent
         Name = name;
         ManufacturerName = manufacturerName;
         SelectionSource = selectionSource;
+        SupplyStatus = supplyStatus;
         QuantityPerUnit = quantityPerUnit;
         BasePriceAmount = basePriceAmount;
         DiscountPercent = discountPercent;
@@ -97,6 +99,12 @@ public sealed class CatalogPriceCalculationLineComponent
     } = string.Empty;
 
     public CatalogPriceCalculationLineComponentSelectionSource SelectionSource
+    {
+        get;
+        private set;
+    }
+
+    public CatalogPriceCalculationLineComponentSupplyStatus SupplyStatus
     {
         get;
         private set;
@@ -165,7 +173,9 @@ public sealed class CatalogPriceCalculationLineComponent
             int quantityPerUnit,
             decimal basePriceAmount,
             decimal discountPercent,
-            decimal parentQuantity)
+            decimal parentQuantity,
+            CatalogPriceCalculationLineComponentSupplyStatus supplyStatus =
+                CatalogPriceCalculationLineComponentSupplyStatus.ToPurchase)
     {
         if (calculationLineId == Guid.Empty)
         {
@@ -269,6 +279,12 @@ public sealed class CatalogPriceCalculationLineComponent
                 .DiscountIsOutOfRange();
         }
 
+        if (!Enum.IsDefined(supplyStatus))
+        {
+            return GeneralErrors.ValueIsInvalid(
+                nameof(supplyStatus));
+        }
+
         return new CatalogPriceCalculationLineComponent(
             Guid.CreateVersion7(),
             calculationLineId,
@@ -289,7 +305,8 @@ public sealed class CatalogPriceCalculationLineComponent
                 discountPercent,
                 2,
                 MidpointRounding.AwayFromZero),
-            parentQuantity);
+            parentQuantity,
+            supplyStatus);
     }
 
     internal UnitResult<DomainError> ChangeQuantityPerUnit(
@@ -333,6 +350,24 @@ public sealed class CatalogPriceCalculationLineComponent
         return UnitResult.Success<DomainError>();
     }
 
+    internal UnitResult<DomainError> ChangeSupplyStatus(
+        CatalogPriceCalculationLineComponentSupplyStatus supplyStatus,
+        decimal parentQuantity)
+    {
+        if (!Enum.IsDefined(supplyStatus))
+        {
+            return UnitResult.Failure(
+                GeneralErrors.ValueIsInvalid(
+                    nameof(supplyStatus)));
+        }
+
+        SupplyStatus = supplyStatus;
+        Recalculate(parentQuantity);
+        UpdatedAtUtc = DateTime.UtcNow;
+
+        return UnitResult.Success<DomainError>();
+    }
+
     internal void RecalculateForParentQuantity(
         decimal parentQuantity)
     {
@@ -354,10 +389,14 @@ public sealed class CatalogPriceCalculationLineComponent
         TotalQuantity =
             parentQuantity * QuantityPerUnit;
 
-        TotalAmount = decimal.Round(
-            ProjectPriceAmount * TotalQuantity,
-            2,
-            MidpointRounding.AwayFromZero);
+        TotalAmount =
+            SupplyStatus
+                == CatalogPriceCalculationLineComponentSupplyStatus.ToPurchase
+            ? decimal.Round(
+                ProjectPriceAmount * TotalQuantity,
+                2,
+                MidpointRounding.AwayFromZero)
+            : 0m;
     }
 
     private static UnitResult<DomainError>

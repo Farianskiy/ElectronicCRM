@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState, type FormEvent } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { getCatalogProductTypeCharacteristicSchema } from "@/features/catalogProductTypes/api/getCatalogProductTypeCharacteristicSchema";
 import {
   applyComponentCompatibilityImport,
   downloadComponentCompatibilityTemplate,
@@ -16,7 +17,13 @@ import { AppButton } from "@/shared/ui/AppButton";
 function getStatusLabel(status: ComponentCompatibilityImportRowStatus): string {
   switch (status) {
     case "Ready":
+      return "Будет применено";
+    case "WillCreate":
       return "Будет создано";
+    case "WillUpdate":
+      return "Будет изменено";
+    case "Unchanged":
+      return "Без изменений";
     case "AlreadyExists":
       return "Уже существует";
     case "ComponentNotFound":
@@ -35,27 +42,44 @@ function getStatusLabel(status: ComponentCompatibilityImportRowStatus): string {
 }
 
 function getStatusClassName(status: ComponentCompatibilityImportRowStatus): string {
-  if (status === "Ready") {
+  if (status === "Ready" || status === "WillCreate" || status === "WillUpdate") {
     return "border-[var(--app-success-border)] bg-[var(--app-success-soft)] text-[var(--app-success)]";
   }
 
-  if (status === "AlreadyExists") {
+  if (status === "AlreadyExists" || status === "Unchanged") {
     return "border-[var(--app-border)] bg-[var(--app-surface)] text-[var(--app-muted)]";
   }
 
   return "border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] text-[var(--app-danger)]";
 }
 
-export function ComponentCompatibilityImportPanel() {
+export function ComponentCompatibilityImportPanel({
+  productTypeCode,
+}: {
+  productTypeCode?: string;
+}) {
   const queryClient = useQueryClient();
   const { hasPermission } = useCurrentUserAccess();
   const canEditProducts = hasPermission("ProductsEdit");
   const [file, setFile] = useState<File | null>(null);
+  const [showColumnSelection, setShowColumnSelection] = useState(false);
+  const [columnSearch, setColumnSearch] = useState("");
+  const [columnSelection, setColumnSelection] = useState<{
+    productTypeCode?: string;
+    codes: string[];
+    rangeCodes: string[];
+  } | null>(null);
   const [missingComponentArticle, setMissingComponentArticle] = useState<
     string | null
   >(null);
   const previewMutation = useMutation({
     mutationFn: previewComponentCompatibilityImport,
+  });
+  const schemaQuery = useQuery({
+    queryKey: ["catalog-product-type-characteristic-schema", productTypeCode],
+    queryFn: () =>
+      getCatalogProductTypeCharacteristicSchema(productTypeCode as string),
+    enabled: Boolean(productTypeCode),
   });
   const applyMutation = useMutation({
     mutationFn: applyComponentCompatibilityImport,
@@ -64,18 +88,62 @@ export function ComponentCompatibilityImportPanel() {
     },
   });
   const templateMutation = useMutation({
-    mutationFn: downloadComponentCompatibilityTemplate,
+    mutationFn: () =>
+      downloadComponentCompatibilityTemplate(
+        productTypeCode,
+        productTypeCode ? selectedCharacteristicCodes : undefined,
+        productTypeCode ? selectedRangeCharacteristicCodes : undefined,
+      ),
   });
+  const characteristics = useMemo(
+    () => schemaQuery.data?.characteristics ?? [],
+    [schemaQuery.data?.characteristics],
+  );
+  const selectedCharacteristicCodes =
+    columnSelection !== null &&
+    columnSelection.productTypeCode === productTypeCode
+      ? columnSelection.codes
+      : characteristics.map((characteristic) => characteristic.code);
+  const selectedRangeCharacteristicCodes =
+    columnSelection !== null &&
+    columnSelection.productTypeCode === productTypeCode
+      ? columnSelection.rangeCodes
+      : [];
+  const filteredCharacteristics = useMemo(() => {
+    const search = columnSearch.trim().toLocaleLowerCase("ru");
+    return search.length === 0
+      ? characteristics
+      : characteristics.filter(
+          (item) =>
+            item.name.toLocaleLowerCase("ru").includes(search) ||
+            item.code.toLocaleLowerCase("ru").includes(search),
+        );
+  }, [characteristics, columnSearch]);
+
   const readyRows = useMemo(
     () =>
       (previewMutation.data?.rows ?? []).filter(
         (row) =>
-          row.status === "Ready" &&
+          (row.status === "WillCreate" || row.status === "WillUpdate") &&
           row.componentProductId !== null &&
           row.needDefinitionId !== null,
       ),
     [previewMutation.data?.rows],
   );
+  const previewSummary = useMemo(() => {
+    const rows = previewMutation.data?.rows ?? [];
+    return {
+      willCreate: rows.filter((row) => row.status === "WillCreate").length,
+      willUpdate: rows.filter((row) => row.status === "WillUpdate").length,
+      unchanged: rows.filter((row) => row.status === "Unchanged").length,
+      errors: rows.filter(
+        (row) =>
+          row.status !== "WillCreate" &&
+          row.status !== "WillUpdate" &&
+          row.status !== "Unchanged",
+      ).length,
+    };
+  }, [previewMutation.data?.rows]);
 
   function handlePreview(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
@@ -97,6 +165,7 @@ export function ComponentCompatibilityImportPanel() {
       readyRows.map((row) => ({
         componentProductId: row.componentProductId as string,
         needDefinitionId: row.needDefinitionId as string,
+        isActive: row.isActive,
         constraints: row.constraints,
       })),
     );
@@ -124,19 +193,174 @@ export function ComponentCompatibilityImportPanel() {
           type="button"
           size="sm"
           variant="secondary"
-          loading={templateMutation.isPending}
-          onClick={() => templateMutation.mutate()}
+          onClick={() => setShowColumnSelection((current) => !current)}
         >
-          Скачать шаблон
+          {showColumnSelection ? "Закрыть настройку" : "Создать новый Excel"}
         </AppButton>
       </div>
       <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">
-        Одно правило действует сразу для всех подходящих основных товаров.
+        Одна или несколько строк с одинаковыми артикулом, типом и потребностью
+        образуют одно правило. Каждая повторная строка — альтернативный вариант.
+        В одной строке разные характеристики работают одновременно. {" "}
         Обязательные колонки: «Артикул комплектующего» (можно «Артикул»),
         «Тип основного товара» и «Потребность». Остальные заполненные колонки
         считаются характеристиками совместимости; варианты разделяются точкой с
         запятой.
       </p>
+
+      {showColumnSelection && (
+        <div className="mt-5 grid gap-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
+          <div>
+            <h3 className="font-semibold text-[var(--app-text)]">
+              Колонки условий
+            </h3>
+            <p className="mt-1 text-sm text-[var(--app-muted)]">
+              Артикул, тип товара, потребность и состояние добавляются всегда.
+              Отметьте только характеристики, которые нужны в новом файле.
+            </p>
+          </div>
+
+          <input
+            value={columnSearch}
+            onChange={(event) => setColumnSearch(event.target.value)}
+            placeholder="Найти характеристику по названию или коду"
+            className="min-h-11 rounded-xl border border-[var(--app-border)] bg-[var(--app-panel)] px-3 text-sm text-[var(--app-text)]"
+          />
+
+          <div className="flex flex-wrap gap-2">
+            <AppButton
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() =>
+                setColumnSelection({
+                  productTypeCode,
+                  codes: characteristics.map((item) => item.code),
+                  rangeCodes: [],
+                })
+              }
+            >
+              Выбрать все
+            </AppButton>
+            <AppButton
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() =>
+                setColumnSelection({
+                  productTypeCode,
+                  codes: [],
+                  rangeCodes: [],
+                })
+              }
+            >
+              Очистить
+            </AppButton>
+          </div>
+
+          {schemaQuery.isLoading ? (
+            <p className="text-sm text-[var(--app-muted)]">
+              Загружаем характеристики…
+            </p>
+          ) : (
+            <div className="grid max-h-72 gap-2 overflow-y-auto sm:grid-cols-2 xl:grid-cols-3">
+              {filteredCharacteristics.map((characteristic) => (
+                <div
+                  key={characteristic.definitionId}
+                  className="grid gap-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-panel)] p-3"
+                >
+                  <label className="flex cursor-pointer items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedCharacteristicCodes.includes(
+                        characteristic.code,
+                      )}
+                      onChange={(event) =>
+                        setColumnSelection({
+                          productTypeCode,
+                          codes: event.target.checked
+                            ? [
+                                ...selectedCharacteristicCodes,
+                                characteristic.code,
+                              ]
+                            : selectedCharacteristicCodes.filter(
+                                (code) => code !== characteristic.code,
+                              ),
+                          rangeCodes: event.target.checked
+                            ? selectedRangeCharacteristicCodes
+                            : selectedRangeCharacteristicCodes.filter(
+                                (code) => code !== characteristic.code,
+                              ),
+                        })
+                      }
+                      className="mt-1"
+                    />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium text-[var(--app-text)]">
+                        {characteristic.name}
+                      </span>
+                      <span className="block text-xs text-[var(--app-muted)]">
+                        {characteristic.code} · {characteristic.dataType}
+                      </span>
+                    </span>
+                  </label>
+                  {characteristic.dataType === "Number" &&
+                    selectedCharacteristicCodes.includes(characteristic.code) && (
+                      <label className="ml-7 flex cursor-pointer items-center gap-2 text-xs text-[var(--app-muted)]">
+                        <input
+                          type="checkbox"
+                          checked={selectedRangeCharacteristicCodes.includes(
+                            characteristic.code,
+                          )}
+                          onChange={(event) =>
+                            setColumnSelection({
+                              productTypeCode,
+                              codes: selectedCharacteristicCodes,
+                              rangeCodes: event.target.checked
+                                ? [
+                                    ...selectedRangeCharacteristicCodes,
+                                    characteristic.code,
+                                  ]
+                                : selectedRangeCharacteristicCodes.filter(
+                                    (code) => code !== characteristic.code,
+                                  ),
+                            })
+                          }
+                        />
+                        Добавить колонки «от/до»
+                      </label>
+                    )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-[var(--app-muted)]">
+              Выбрано характеристик: {selectedCharacteristicCodes.length}.
+              Диапазонов: {selectedRangeCharacteristicCodes.length}
+            </p>
+            <AppButton
+              type="button"
+              variant="primary"
+              loading={templateMutation.isPending}
+              disabled={!productTypeCode || schemaQuery.isLoading}
+              onClick={() => templateMutation.mutate()}
+            >
+              Скачать новый Excel
+            </AppButton>
+          </div>
+
+          {templateMutation.isError && (
+            <p className="text-sm text-[var(--app-danger)]">
+              {getApiErrorMessage(
+                templateMutation.error,
+                "Не удалось создать Excel-шаблон.",
+              )}
+            </p>
+          )}
+        </div>
+      )}
 
       <form
         onSubmit={handlePreview}
@@ -181,7 +405,7 @@ export function ComponentCompatibilityImportPanel() {
 
       {previewMutation.data && (
         <div className="mt-5 grid gap-4">
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
               <p className="text-sm text-[var(--app-muted)]">Прочитано</p>
               <p className="mt-1 text-2xl font-bold text-[var(--app-text)]">
@@ -189,23 +413,38 @@ export function ComponentCompatibilityImportPanel() {
               </p>
             </div>
             <div className="rounded-2xl border border-[var(--app-success-border)] bg-[var(--app-success-soft)] p-4">
-              <p className="text-sm text-[var(--app-success)]">Будет создано</p>
+              <p className="text-sm text-[var(--app-success)]">
+                Будет создано
+              </p>
               <p className="mt-1 text-2xl font-bold text-[var(--app-success)]">
-                {previewMutation.data.readyRowsCount}
+                {previewSummary.willCreate}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-[var(--app-success-border)] bg-[var(--app-success-soft)] p-4">
+              <p className="text-sm text-[var(--app-success)]">Будет изменено</p>
+              <p className="mt-1 text-2xl font-bold text-[var(--app-success)]">
+                {previewSummary.willUpdate}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
+              <p className="text-sm text-[var(--app-muted)]">Без изменений</p>
+              <p className="mt-1 text-2xl font-bold text-[var(--app-text)]">
+                {previewSummary.unchanged}
               </p>
             </div>
             <div className="rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-4">
-              <p className="text-sm text-[var(--app-danger)]">Пропущено</p>
+              <p className="text-sm text-[var(--app-danger)]">Ошибок</p>
               <p className="mt-1 text-2xl font-bold text-[var(--app-danger)]">
-                {previewMutation.data.skippedRowsCount}
+                {previewSummary.errors}
               </p>
             </div>
           </div>
 
           <div className="flex flex-col gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-[var(--app-muted)]">
-              Сначала проверьте строки ниже. Ошибочные и уже существующие
-              правила применяться не будут.
+              Сначала проверьте строки ниже. Повторные строки одного правила
+              станут альтернативными вариантами. Ошибочные строки применяться
+              не будут.
             </p>
             <AppButton
               type="button"
@@ -214,7 +453,7 @@ export function ComponentCompatibilityImportPanel() {
               disabled={readyRows.length === 0 || applyMutation.isSuccess}
               onClick={handleApply}
             >
-              Создать правила
+              Создать или обновить правила
             </AppButton>
           </div>
 
@@ -235,7 +474,7 @@ export function ComponentCompatibilityImportPanel() {
               role="status"
               className="rounded-2xl border border-[var(--app-success-border)] bg-[var(--app-success-soft)] p-4 text-sm text-[var(--app-success)]"
             >
-              Создано правил: {applyMutation.data.createdRulesCount}.
+              Применено правил: {applyMutation.data.createdRulesCount}.
             </div>
           )}
 
@@ -286,8 +525,15 @@ export function ComponentCompatibilityImportPanel() {
                         ? "Без ограничений"
                         : row.constraints
                             .map(
-                              (item) =>
-                                `${item.characteristicName}: ${item.value}`,
+                              (item) => {
+                                const operator =
+                                  item.comparisonOperator === "GreaterThanOrEqual"
+                                    ? "от "
+                                    : item.comparisonOperator === "LessThanOrEqual"
+                                      ? "до "
+                                      : "";
+                                return `${item.characteristicName}: ${operator}${item.value}`;
+                              },
                             )
                             .join("; ")}
                     </td>
@@ -297,6 +543,9 @@ export function ComponentCompatibilityImportPanel() {
                       >
                         {getStatusLabel(row.status)}
                       </span>
+                      <p className="mt-2 text-xs text-[var(--app-muted)]">
+                        После применения: {row.isActive ? "работает" : "отключено"}
+                      </p>
                       {row.message && (
                         <p className="mt-2 text-xs text-[var(--app-muted)]">
                           {row.message}

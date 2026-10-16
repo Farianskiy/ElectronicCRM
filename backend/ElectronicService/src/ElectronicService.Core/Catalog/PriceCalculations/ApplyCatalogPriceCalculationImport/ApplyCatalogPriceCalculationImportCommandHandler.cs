@@ -357,6 +357,16 @@ public sealed class ApplyCatalogPriceCalculationImportCommandHandler
                 return Failure(updateResult.Error);
             }
 
+            var supplyStatusResult = calculation.ChangeLineComponentSupplyStatus(
+                row.MainLineId,
+                row.ExistingComponentLineId!.Value,
+                row.SupplyStatus!.Value);
+
+            if (supplyStatusResult.IsFailure)
+            {
+                return Failure(supplyStatusResult.Error);
+            }
+
             updatedComponentsCount++;
         }
 
@@ -429,7 +439,8 @@ public sealed class ApplyCatalogPriceCalculationImportCommandHandler
                 componentPriceSource.ManufacturerName,
                 CatalogPriceCalculationLineComponentSelectionSource.Manual,
                 row.QuantityPerUnit!.Value,
-                componentPriceSource.BasePriceAmount);
+                componentPriceSource.BasePriceAmount,
+                row.SupplyStatus!.Value);
 
             if (addComponentResult.IsFailure)
             {
@@ -611,7 +622,8 @@ public sealed class ApplyCatalogPriceCalculationImportCommandHandler
                 row.Action is CatalogPriceCalculationImportAction.Add
                     or CatalogPriceCalculationImportAction.UpdateQuantity
                 && (!row.QuantityPerUnit.HasValue
-                    || row.QuantityPerUnit.Value <= 0)))
+                    || row.QuantityPerUnit.Value <= 0
+                    || !row.SupplyStatus.HasValue)))
         {
             return UnitResult.Failure(
                 CatalogPriceCalculationErrors.QuantityMustBePositive());

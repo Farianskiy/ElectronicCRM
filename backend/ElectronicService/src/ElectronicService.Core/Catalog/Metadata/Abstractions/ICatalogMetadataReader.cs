@@ -7,6 +7,7 @@ namespace ElectronicService.Core.Catalog.Metadata.Abstractions;
 public interface ICatalogMetadataReader
 {
     Task<IReadOnlyCollection<CatalogProductTypeResult>> GetProductTypesAsync(
+        bool includeArchived,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyCollection<CatalogProductTypeCharacteristicResult>> GetProductTypeCharacteristicsAsync(

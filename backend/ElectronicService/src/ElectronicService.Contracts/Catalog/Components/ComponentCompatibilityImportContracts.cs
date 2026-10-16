@@ -13,6 +13,7 @@ public sealed record ComponentCompatibilityImportPreviewRowResponse(
     string Need,
     Guid? ComponentProductId,
     Guid? NeedDefinitionId,
+    bool IsActive,
     string Status,
     string? Message,
     IReadOnlyList<ComponentCompatibilityImportConstraintResponse> Constraints);
@@ -20,7 +21,8 @@ public sealed record ComponentCompatibilityImportPreviewRowResponse(
 public sealed record ComponentCompatibilityImportConstraintResponse(
     Guid CharacteristicDefinitionId,
     string CharacteristicName,
-    string Value);
+    string Value,
+    string ComparisonOperator);
 
 public sealed record ApplyComponentCompatibilityImportRequest(
     IReadOnlyList<ApplyComponentCompatibilityImportRowRequest>? Rows);
@@ -28,12 +30,14 @@ public sealed record ApplyComponentCompatibilityImportRequest(
 public sealed record ApplyComponentCompatibilityImportRowRequest(
     Guid ComponentProductId,
     Guid NeedDefinitionId,
+    bool IsActive,
     IReadOnlyList<ComponentCompatibilityImportConstraintRequest>? Constraints);
 
 public sealed record ComponentCompatibilityImportConstraintRequest(
     Guid CharacteristicDefinitionId,
     string CharacteristicName,
-    string Value);
+    string Value,
+    string ComparisonOperator = "Equal");
 
 public sealed record ApplyComponentCompatibilityImportResponse(
     int CreatedRulesCount);

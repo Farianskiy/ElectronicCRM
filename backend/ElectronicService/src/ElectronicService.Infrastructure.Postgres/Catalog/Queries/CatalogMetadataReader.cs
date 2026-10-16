@@ -18,16 +18,21 @@ public sealed class CatalogMetadataReader : ICatalogMetadataReader
     }
 
     public async Task<IReadOnlyCollection<CatalogProductTypeResult>> GetProductTypesAsync(
+        bool includeArchived,
         CancellationToken cancellationToken = default)
     {
-        return await _dbContext.ProductTypes
+        var query = _dbContext.ProductTypes
             .AsNoTracking()
+            .Where(productType => includeArchived || !productType.IsArchived);
+
+        return await query
             .OrderBy(productType => productType.Name)
             .Select(productType => new CatalogProductTypeResult(
                 productType.Id,
                 productType.Code,
                 productType.Name,
-                productType.Kind.ToString()))
+                productType.Kind.ToString(),
+                productType.IsArchived))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
     }

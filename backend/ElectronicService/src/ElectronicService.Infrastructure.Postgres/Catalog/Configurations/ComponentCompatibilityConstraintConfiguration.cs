@@ -46,11 +46,17 @@ public sealed class ComponentCompatibilityConstraintConfiguration
         builder.Property(constraint => constraint.Id)
             .HasColumnName("id")
             .ValueGeneratedNever();
-        builder.Property(constraint => constraint.ComponentOfferId)
-            .HasColumnName("component_offer_id")
+        builder.Property(constraint => constraint.ConditionGroupId)
+            .HasColumnName("condition_group_id")
             .IsRequired();
         builder.Property(constraint => constraint.CharacteristicDefinitionId)
             .HasColumnName("characteristic_definition_id")
+            .IsRequired();
+        builder.Property(constraint => constraint.ComparisonOperator)
+            .HasColumnName("comparison_operator")
+            .HasConversion<string>()
+            .HasMaxLength(32)
+            .HasDefaultValue(ComponentCompatibilityComparisonOperator.Equal)
             .IsRequired();
 
         builder.OwnsOne(constraint => constraint.ExpectedValue, valueBuilder =>
@@ -75,7 +81,7 @@ public sealed class ComponentCompatibilityConstraintConfiguration
             .WithMany()
             .HasForeignKey(constraint => constraint.CharacteristicDefinitionId)
             .OnDelete(DeleteBehavior.Restrict);
-        builder.HasIndex(constraint => constraint.ComponentOfferId);
+        builder.HasIndex(constraint => constraint.ConditionGroupId);
         builder.HasIndex(constraint => constraint.CharacteristicDefinitionId);
     }
 }

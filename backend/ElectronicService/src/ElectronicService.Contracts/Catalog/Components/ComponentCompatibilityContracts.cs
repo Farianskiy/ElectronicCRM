@@ -1,6 +1,14 @@
 namespace ElectronicService.Contracts.Catalog.Components;
 
-public sealed record CreateComponentNeedRequest(string Code, string Name);
+public sealed record CreateComponentNeedRequest(
+    string? Code,
+    string Name,
+    string RequirementMode = "Optional",
+    int DefaultQuantityPerUnit = 1);
+
+public sealed record UpdateComponentNeedRequest(
+    string RequirementMode,
+    int DefaultQuantityPerUnit);
 
 public sealed record ComponentNeedResponse(
     Guid Id,
@@ -8,15 +16,25 @@ public sealed record ComponentNeedResponse(
     string MainProductTypeCode,
     string MainProductTypeName,
     string Code,
-    string Name);
+    string Name,
+    string RequirementMode,
+    int DefaultQuantityPerUnit);
 
 public sealed record ComponentCompatibilityConstraintRequest(
     Guid CharacteristicDefinitionId,
-    string Value);
+    string Value,
+    string ComparisonOperator = "Equal");
+
+public sealed record ComponentCompatibilityConditionGroupRequest(
+    IReadOnlyCollection<ComponentCompatibilityConstraintRequest>? Constraints);
 
 public sealed record CreateComponentOfferRequest(
     Guid NeedDefinitionId,
     IReadOnlyCollection<ComponentCompatibilityConstraintRequest> Constraints);
+
+public sealed record UpdateComponentOfferRequest(
+    bool IsActive,
+    IReadOnlyCollection<ComponentCompatibilityConditionGroupRequest> ConditionGroups);
 
 public sealed record ComponentOfferResponse(
     Guid Id,
@@ -31,6 +49,30 @@ public sealed record ComponentOfferSummaryResponse(
     string NeedName,
     string MainProductTypeCode,
     int ConstraintsCount);
+
+public sealed record ComponentCompatibilityRuleConstraintResponse(
+    Guid CharacteristicDefinitionId,
+    string CharacteristicName,
+    string Value,
+    string ComparisonOperator);
+
+public sealed record ComponentCompatibilityRuleGroupResponse(
+    Guid Id,
+    int Position,
+    IReadOnlyCollection<ComponentCompatibilityRuleConstraintResponse> Constraints);
+
+public sealed record ComponentCompatibilityRuleResponse(
+    Guid Id,
+    Guid ComponentProductId,
+    string ComponentArticle,
+    string ComponentName,
+    Guid NeedDefinitionId,
+    string NeedCode,
+    string NeedName,
+    string MainProductTypeCode,
+    string MainProductTypeName,
+    bool IsActive,
+    IReadOnlyCollection<ComponentCompatibilityRuleGroupResponse> ConditionGroups);
 
 public sealed record SetProductNeedStatusRequest(string Status);
 
@@ -57,12 +99,20 @@ public sealed record CompatibleComponentResponse(
     string Article,
     string Name,
     decimal PriceAmount,
-    string PriceCurrency);
+    string PriceCurrency,
+    IReadOnlyCollection<ComponentCompatibilityConditionResponse> MatchConditions);
+
+public sealed record ComponentCompatibilityConditionResponse(
+    string CharacteristicName,
+    string ActualValue,
+    IReadOnlyCollection<string> ExpectedValues);
 
 public sealed record ProductNeedCompatibilityResponse(
     Guid NeedDefinitionId,
     string Code,
     string Name,
+    string RequirementMode,
+    int DefaultQuantityPerUnit,
     string Status,
     IReadOnlyCollection<CompatibleComponentResponse> CompatibleComponents,
     IReadOnlyCollection<SelectedComponentResponse> SelectedComponents);

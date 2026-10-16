@@ -24,10 +24,20 @@ public sealed class CatalogComponentCompatibilityController : ControllerBase
         [FromBody] CreateComponentNeedRequest request,
         CancellationToken cancellationToken = default)
     {
+        if (!Enum.TryParse<ComponentNeedRequirementMode>(
+                request.RequirementMode,
+                true,
+                out var requirementMode))
+        {
+            return BadRequest("Некорректная обязательность группы комплектующих.");
+        }
+
         var result = await _service.CreateNeedAsync(
             mainProductTypeCode,
             request.Code,
             request.Name,
+            requirementMode,
+            request.DefaultQuantityPerUnit,
             cancellationToken).ConfigureAwait(false);
 
         if (result.IsFailure)
@@ -43,7 +53,9 @@ public sealed class CatalogComponentCompatibilityController : ControllerBase
                 result.Value.MainProductTypeCode,
                 result.Value.MainProductTypeName,
                 result.Value.Code,
-                result.Value.Name));
+                result.Value.Name,
+                result.Value.RequirementMode.ToString(),
+                result.Value.DefaultQuantityPerUnit));
     }
 
     [HttpGet("needs")]
@@ -63,7 +75,46 @@ public sealed class CatalogComponentCompatibilityController : ControllerBase
             need.MainProductTypeCode,
             need.MainProductTypeName,
             need.Code,
-            need.Name)).ToList());
+            need.Name,
+            need.RequirementMode.ToString(),
+            need.DefaultQuantityPerUnit)).ToList());
+    }
+
+    [HttpPut("needs/{needDefinitionId:guid}")]
+    [PermissionAuthorize(UserPermissionCode.DictionariesManage)]
+    public async Task<ActionResult<ComponentNeedResponse>> UpdateNeed(
+        Guid needDefinitionId,
+        [FromBody] UpdateComponentNeedRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!Enum.TryParse<ComponentNeedRequirementMode>(
+                request.RequirementMode,
+                true,
+                out var requirementMode))
+        {
+            return BadRequest("Некорректная обязательность группы комплектующих.");
+        }
+
+        var result = await _service.UpdateNeedAsync(
+            needDefinitionId,
+            requirementMode,
+            request.DefaultQuantityPerUnit,
+            cancellationToken).ConfigureAwait(false);
+
+        if (result.IsFailure)
+        {
+            return BadRequest(result.Error.Message);
+        }
+
+        return Ok(new ComponentNeedResponse(
+            result.Value.Id,
+            result.Value.MainProductTypeId,
+            result.Value.MainProductTypeCode,
+            result.Value.MainProductTypeName,
+            result.Value.Code,
+            result.Value.Name,
+            result.Value.RequirementMode.ToString(),
+            result.Value.DefaultQuantityPerUnit));
     }
 
     [HttpPost("products/{componentProductId:guid}/offers")]
@@ -73,13 +124,15 @@ public sealed class CatalogComponentCompatibilityController : ControllerBase
         [FromBody] CreateComponentOfferRequest request,
         CancellationToken cancellationToken = default)
     {
+        if (!TryParseConstraints(request.Constraints, out var constraints))
+        {
+            return BadRequest("Некорректный оператор условия совместимости.");
+        }
+
         var result = await _service.CreateOfferAsync(
             componentProductId,
             request.NeedDefinitionId,
-            request.Constraints.Select(constraint =>
-                new ComponentCompatibilityConstraintInput(
-                    constraint.CharacteristicDefinitionId,
-                    constraint.Value)).ToList(),
+            constraints,
             cancellationToken).ConfigureAwait(false);
 
         if (result.IsFailure)
@@ -115,6 +168,66 @@ public sealed class CatalogComponentCompatibilityController : ControllerBase
             offer.NeedName,
             offer.MainProductTypeCode,
             offer.ConstraintsCount)).ToList());
+    }
+
+    [HttpGet("rules")]
+    [PermissionAuthorize(UserPermissionCode.ProductsView)]
+    public async Task<
+        ActionResult<IReadOnlyCollection<ComponentCompatibilityRuleResponse>>>
+        GetRules(
+            [FromQuery] string? mainProductTypeCode,
+            CancellationToken cancellationToken = default)
+    {
+        var result = await _service.GetRulesAsync(
+            mainProductTypeCode,
+            cancellationToken).ConfigureAwait(false);
+
+        return Ok(result.Select(MapRule).ToList());
+    }
+
+    [HttpPut("offers/{offerId:guid}")]
+    [PermissionAuthorize(UserPermissionCode.DictionariesManage)]
+    public async Task<ActionResult<ComponentCompatibilityRuleResponse>>
+        UpdateOffer(
+            Guid offerId,
+            [FromBody] UpdateComponentOfferRequest request,
+            CancellationToken cancellationToken = default)
+    {
+        var parsedGroups = new List<ComponentCompatibilityConditionGroupInput>();
+        foreach (var group in request.ConditionGroups)
+        {
+            if (!TryParseConstraints(group.Constraints ?? [], out var constraints))
+            {
+                return BadRequest("Некорректный оператор условия совместимости.");
+            }
+
+            parsedGroups.Add(new ComponentCompatibilityConditionGroupInput(constraints));
+        }
+
+        var result = await _service.UpdateOfferAsync(
+            offerId,
+            request.IsActive,
+            parsedGroups,
+            cancellationToken).ConfigureAwait(false);
+
+        return result.IsSuccess
+            ? Ok(MapRule(result.Value))
+            : BadRequest(result.Error.Message);
+    }
+
+    [HttpDelete("offers/{offerId:guid}")]
+    [PermissionAuthorize(UserPermissionCode.DictionariesManage)]
+    public async Task<IActionResult> DeleteOffer(
+        Guid offerId,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _service.DeleteOfferAsync(
+            offerId,
+            cancellationToken).ConfigureAwait(false);
+
+        return result.IsSuccess
+            ? NoContent()
+            : NotFound(result.Error.Message);
     }
 
     [HttpPut("products/{productId:guid}/needs/{needDefinitionId:guid}")]
@@ -228,6 +341,8 @@ public sealed class CatalogComponentCompatibilityController : ControllerBase
                     need.NeedDefinitionId,
                     need.Code,
                     need.Name,
+                    need.RequirementMode.ToString(),
+                    need.DefaultQuantityPerUnit,
                     need.Status.ToString(),
                     need.CompatibleComponents.Select(component =>
                         new CompatibleComponentResponse(
@@ -235,7 +350,12 @@ public sealed class CatalogComponentCompatibilityController : ControllerBase
                             component.Article,
                             component.Name,
                             component.PriceAmount,
-                            component.PriceCurrency)).ToList(),
+                            component.PriceCurrency,
+                            component.MatchConditions.Select(condition =>
+                                new ComponentCompatibilityConditionResponse(
+                                    condition.CharacteristicName,
+                                    condition.ActualValue,
+                                    condition.ExpectedValues)).ToList())).ToList(),
                     need.SelectedComponents.Select(MapSelectedComponent)
                         .ToList())).ToList()));
     }
@@ -253,5 +373,58 @@ public sealed class CatalogComponentCompatibilityController : ControllerBase
             selection.PriceAmount,
             selection.PriceCurrency,
             selection.LineTotalAmount);
+    }
+
+    private static ComponentCompatibilityRuleResponse MapRule(
+        ComponentCompatibilityRuleResult rule)
+    {
+        return new ComponentCompatibilityRuleResponse(
+            rule.Id,
+            rule.ComponentProductId,
+            rule.ComponentArticle,
+            rule.ComponentName,
+            rule.NeedDefinitionId,
+            rule.NeedCode,
+            rule.NeedName,
+            rule.MainProductTypeCode,
+            rule.MainProductTypeName,
+            rule.IsActive,
+            rule.ConditionGroups.Select(group =>
+                new ComponentCompatibilityRuleGroupResponse(
+                    group.Id,
+                    group.Position,
+                    group.Constraints.Select(constraint =>
+                        new ComponentCompatibilityRuleConstraintResponse(
+                            constraint.CharacteristicDefinitionId,
+                            constraint.CharacteristicName,
+                            constraint.Value,
+                            constraint.ComparisonOperator.ToString())).ToList())).ToList());
+    }
+
+    private static bool TryParseConstraints(
+        IEnumerable<ComponentCompatibilityConstraintRequest> requests,
+        out IReadOnlyCollection<ComponentCompatibilityConstraintInput> constraints)
+    {
+        var result = new List<ComponentCompatibilityConstraintInput>();
+        foreach (var request in requests)
+        {
+            if (!Enum.TryParse<ComponentCompatibilityComparisonOperator>(
+                    request.ComparisonOperator,
+                    true,
+                    out var comparisonOperator)
+                || !Enum.IsDefined(comparisonOperator))
+            {
+                constraints = [];
+                return false;
+            }
+
+            result.Add(new ComponentCompatibilityConstraintInput(
+                request.CharacteristicDefinitionId,
+                request.Value,
+                comparisonOperator));
+        }
+
+        constraints = result;
+        return true;
     }
 }

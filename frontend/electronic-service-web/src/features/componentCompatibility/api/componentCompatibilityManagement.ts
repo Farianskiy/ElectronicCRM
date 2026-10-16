@@ -1,7 +1,11 @@
 import { httpClient } from "@/shared/api/httpClient";
 import type {
+  ComponentCompatibilityComparisonOperator,
+  ComponentNeedRequirementMode,
   ComponentNeed,
   ComponentOfferSummary,
+  ComponentCompatibilityRule,
+  ComponentCompatibilityRuleGroupInput,
 } from "../model/types";
 
 export async function getComponentNeeds(
@@ -19,12 +23,26 @@ export async function getComponentNeeds(
 
 export async function createComponentNeed(
   mainProductTypeCode: string,
-  code: string,
   name: string,
+  requirementMode: ComponentNeedRequirementMode,
+  defaultQuantityPerUnit: number,
 ): Promise<ComponentNeed> {
   const response = await httpClient.post<ComponentNeed>(
     `/api/catalog/component-compatibility/product-types/${encodeURIComponent(mainProductTypeCode)}/needs`,
-    { code, name },
+    { name, requirementMode, defaultQuantityPerUnit },
+  );
+
+  return response.data;
+}
+
+export async function updateComponentNeed(
+  needDefinitionId: string,
+  requirementMode: ComponentNeedRequirementMode,
+  defaultQuantityPerUnit: number,
+): Promise<ComponentNeed> {
+  const response = await httpClient.put<ComponentNeed>(
+    `/api/catalog/component-compatibility/needs/${encodeURIComponent(needDefinitionId)}`,
+    { requirementMode, defaultQuantityPerUnit },
   );
 
   return response.data;
@@ -46,10 +64,45 @@ export async function createComponentOffer(
   constraints: Array<{
     characteristicDefinitionId: string;
     value: string;
+    comparisonOperator?: ComponentCompatibilityComparisonOperator;
   }>,
 ): Promise<void> {
   await httpClient.post(
     `/api/catalog/component-compatibility/products/${encodeURIComponent(componentProductId)}/offers`,
     { needDefinitionId, constraints },
+  );
+}
+
+export async function getComponentCompatibilityRules(
+  mainProductTypeCode?: string,
+): Promise<ComponentCompatibilityRule[]> {
+  const response = await httpClient.get<ComponentCompatibilityRule[]>(
+    "/api/catalog/component-compatibility/rules",
+    {
+      params: mainProductTypeCode ? { mainProductTypeCode } : undefined,
+    },
+  );
+
+  return response.data;
+}
+
+export async function updateComponentCompatibilityRule(
+  offerId: string,
+  isActive: boolean,
+  conditionGroups: ComponentCompatibilityRuleGroupInput[],
+): Promise<ComponentCompatibilityRule> {
+  const response = await httpClient.put<ComponentCompatibilityRule>(
+    `/api/catalog/component-compatibility/offers/${encodeURIComponent(offerId)}`,
+    { isActive, conditionGroups },
+  );
+
+  return response.data;
+}
+
+export async function deleteComponentCompatibilityRule(
+  offerId: string,
+): Promise<void> {
+  await httpClient.delete(
+    `/api/catalog/component-compatibility/offers/${encodeURIComponent(offerId)}`,
   );
 }

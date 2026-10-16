@@ -19,6 +19,13 @@ public interface IProductRepository
         Guid productId,
         CancellationToken cancellationToken = default);
 
+    Task<Product?> GetByIdIncludingArchivedAsync(
+        Guid productId,
+        CancellationToken cancellationToken = default)
+    {
+        return GetByIdWithDetailsAsync(productId, cancellationToken);
+    }
+
     Task<IReadOnlyCollection<Product>> GetByIdsWithDetailsAsync(
         IReadOnlyCollection<Guid> productIds,
         CancellationToken cancellationToken = default);

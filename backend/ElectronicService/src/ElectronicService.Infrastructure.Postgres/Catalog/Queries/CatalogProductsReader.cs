@@ -101,7 +101,8 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
                 item.Manufacturer.Name,
                 item.Product.Price.Amount,
                 item.Product.Price.Currency,
-                item.Product.StockQuantity.Value))
+                item.Product.StockQuantity.Value,
+                item.Product.IsArchived))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
@@ -134,7 +135,8 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
                         ?? item.PriceCurrency,
                     item.PriceAmount,
                     item.PriceCurrency,
-                    item.StockQuantity);
+                    item.StockQuantity,
+                    item.IsArchived);
             })
             .ToList();
 
@@ -150,7 +152,9 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
         CancellationToken cancellationToken = default)
     {
         var product = await (
-            from productEntity in _dbContext.Products.AsNoTracking()
+            from productEntity in _dbContext.Products
+                .IgnoreQueryFilters()
+                .AsNoTracking()
             join productType in _dbContext.ProductTypes.AsNoTracking()
                 on productEntity.ProductTypeId equals productType.Id
             join manufacturer in _dbContext.Manufacturers.AsNoTracking()
@@ -171,7 +175,10 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
 
                 PriceAmount = productEntity.Price.Amount,
                 PriceCurrency = productEntity.Price.Currency,
-                StockQuantity = productEntity.StockQuantity.Value
+                StockQuantity = productEntity.StockQuantity.Value,
+                productEntity.IsArchived,
+                productEntity.ArchivedAtUtc,
+                productEntity.ArchiveReason
             })
             .FirstOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -251,7 +258,10 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
                 ?? product.PriceCurrency,
             product.StockQuantity,
             characteristics,
-            aliases);
+            aliases,
+            product.IsArchived,
+            product.ArchivedAtUtc,
+            product.ArchiveReason);
     }
 
     public async Task<CatalogProductsPageResult> SearchProductsAsync(
@@ -267,7 +277,9 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
             : Math.Clamp(query.PageSize, 1, MaxPageSize);
 
         var productsQuery =
-            from product in _dbContext.Products.AsNoTracking()
+            from product in _dbContext.Products
+                .IgnoreQueryFilters()
+                .AsNoTracking()
             join productType in _dbContext.ProductTypes.AsNoTracking()
                 on product.ProductTypeId equals productType.Id
             join productManufacturer in _dbContext.Manufacturers.AsNoTracking()
@@ -278,6 +290,15 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
                 ProductType = productType,
                 Manufacturer = productManufacturer
             };
+
+        if (query.OnlyArchived)
+        {
+            productsQuery = productsQuery.Where(item => item.Product.IsArchived);
+        }
+        else if (!query.IncludeArchived)
+        {
+            productsQuery = productsQuery.Where(item => !item.Product.IsArchived);
+        }
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
@@ -473,7 +494,8 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
                 item.Manufacturer.Name,
                 item.Product.Price.Amount,
                 item.Product.Price.Currency,
-                item.Product.StockQuantity.Value))
+                item.Product.StockQuantity.Value,
+                item.Product.IsArchived))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
@@ -506,7 +528,8 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
                         ?? item.PriceCurrency,
                     item.PriceAmount,
                     item.PriceCurrency,
-                    item.StockQuantity);
+                    item.StockQuantity,
+                    item.IsArchived);
             })
             .ToList();
 
@@ -679,5 +702,6 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
         string ManufacturerName,
         decimal PriceAmount,
         string PriceCurrency,
-        decimal StockQuantity);
+        decimal StockQuantity,
+        bool IsArchived);
 }

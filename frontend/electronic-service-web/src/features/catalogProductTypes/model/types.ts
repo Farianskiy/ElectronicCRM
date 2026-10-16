@@ -36,3 +36,40 @@ export interface AvailableCharacteristicDefinition {
   dataType: string;
   unit?: string | null;
 }
+
+export type ProductTypeKind = "MainProduct" | "Component";
+
+export interface ProductTypeKindChangeBlocker {
+  code: string;
+  message: string;
+  count: number;
+}
+
+export interface ProductTypeKindChangePreview {
+  productTypeId: string;
+  productTypeCode: string;
+  productTypeName: string;
+  currentKind: ProductTypeKind;
+  targetKind: ProductTypeKind;
+  productsCount: number;
+  characteristicsCount: number;
+  canChange: boolean;
+  blockers: ProductTypeKindChangeBlocker[];
+}
+
+export interface ProductTypeArchiveBlocker {
+  code: string;
+  message: string;
+  count: number;
+}
+
+export interface ProductTypeArchivePreview {
+  productTypeId: string;
+  productTypeCode: string;
+  productTypeName: string;
+  isArchived: boolean;
+  productsCount: number;
+  characteristicsCount: number;
+  canArchive: boolean;
+  blockers: ProductTypeArchiveBlocker[];
+}

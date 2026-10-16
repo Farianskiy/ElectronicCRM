@@ -182,6 +182,8 @@ public sealed class PreviewCatalogPriceCalculationImportController
                         row.NeedDefinitionId,
                         row.ComponentProductId,
                         row.CurrentQuantityPerUnit,
+                        row.SupplyStatus?.ToString(),
+                        row.CurrentSupplyStatus?.ToString(),
                         row.Status.ToString(),
                         row.Message))
                 .ToArray();

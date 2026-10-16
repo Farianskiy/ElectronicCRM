@@ -105,15 +105,16 @@ export function ComponentOfferManager({
       </h2>
 
       <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">
-        Выберите потребность, которую закрывает комплектующее. Несколько
-        допустимых значений одной характеристики разделяйте точкой с запятой:
-        например, 1800; 2000.
+        Выберите группу, к которой относится комплектующее. Оставьте все
+        характеристики пустыми, если оно подходит всем товарам выбранного
+        типа. Несколько допустимых значений одной характеристики разделяйте
+        точкой с запятой: например, 115; 125.
       </p>
 
       <form onSubmit={handleSubmit} className="mt-5 grid gap-4">
         <label className="grid gap-2">
           <span className="text-sm font-medium text-[var(--app-text)]">
-            Потребность основного товара
+            Группа комплектующих
           </span>
 
           <select
@@ -124,7 +125,7 @@ export function ComponentOfferManager({
             }}
             className="min-h-11 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] px-3 text-sm text-[var(--app-text)]"
           >
-            <option value="">Выберите потребность</option>
+            <option value="">Выберите группу комплектующих</option>
             {(needsQuery.data ?? []).map((need) => (
               <option key={need.id} value={need.id}>
                 {need.mainProductTypeName} · {need.name}
@@ -187,7 +188,10 @@ export function ComponentOfferManager({
               key={offer.id}
               className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-3 text-sm text-[var(--app-text)]"
             >
-              {offer.needName} · условий: {offer.constraintsCount}
+              {offer.needName} ·{" "}
+              {offer.constraintsCount === 0
+                ? "подходит всем товарам типа"
+                : `условий: ${offer.constraintsCount}`}
             </li>
           ))}
         </ul>

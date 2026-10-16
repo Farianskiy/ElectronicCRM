@@ -37,6 +37,14 @@ public sealed class ProductTypeConfiguration : IEntityTypeConfiguration<ProductT
             .HasDefaultValue(ProductTypeKind.MainProduct)
             .IsRequired();
 
+        builder.Property(productType => productType.IsArchived)
+            .HasColumnName("is_archived")
+            .HasDefaultValue(false)
+            .IsRequired();
+
+        builder.Property(productType => productType.ArchivedAtUtc)
+            .HasColumnName("archived_at_utc");
+
         builder.HasMany(productType => productType.Characteristics)
             .WithOne()
             .HasForeignKey(productTypeCharacteristic => productTypeCharacteristic.ProductTypeId)
@@ -49,5 +57,7 @@ public sealed class ProductTypeConfiguration : IEntityTypeConfiguration<ProductT
             .IsUnique();
 
         builder.HasIndex(productType => productType.Name);
+
+        builder.HasIndex(productType => productType.IsArchived);
     }
 }

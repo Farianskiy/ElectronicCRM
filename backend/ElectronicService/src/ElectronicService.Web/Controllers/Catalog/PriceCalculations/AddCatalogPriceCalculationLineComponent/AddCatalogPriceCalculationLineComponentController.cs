@@ -1,6 +1,7 @@
 using ElectronicService.Contracts.Catalog.PriceCalculations;
 using ElectronicService.Core.Abstractions;
 using ElectronicService.Core.Catalog.PriceCalculations.AddCatalogPriceCalculationLineComponent;
+using ElectronicService.Domain.Catalog.PriceCalculations;
 using ElectronicService.Web.Controllers.Catalog.PriceCalculations.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -38,6 +39,16 @@ public sealed class AddCatalogPriceCalculationLineComponentController : Controll
             return this.ToCurrentUserProblem();
         }
 
+        if (!Enum.TryParse<CatalogPriceCalculationLineComponentSupplyStatus>(
+                request.SupplyStatus,
+                true,
+                out var supplyStatus)
+            || !Enum.IsDefined(supplyStatus))
+        {
+            return BadRequest(
+                "Способ обеспечения должен быть ToPurchase, AlreadyAvailable или IncludedInSupply.");
+        }
+
         var command = new AddCatalogPriceCalculationLineComponentCommand(
             calculationId,
             lineId,
@@ -45,6 +56,7 @@ public sealed class AddCatalogPriceCalculationLineComponentController : Controll
             request.ComponentProductId,
             request.QuantityPerUnit,
             request.ManualSelection,
+            supplyStatus,
             currentUserProvider.UserId.Value);
 
         var result = await handler
@@ -69,6 +81,7 @@ public sealed class AddCatalogPriceCalculationLineComponentController : Controll
             value.Article,
             value.Name,
             value.SelectionSource.ToString(),
+            value.SupplyStatus.ToString(),
             value.QuantityPerUnit,
             value.BasePriceAmount,
             value.DiscountPercent,

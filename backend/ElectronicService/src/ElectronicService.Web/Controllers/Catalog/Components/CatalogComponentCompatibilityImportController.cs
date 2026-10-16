@@ -1,5 +1,6 @@
 using ElectronicService.Contracts.Catalog.Components;
 using ElectronicService.Core.Catalog.Components;
+using ElectronicService.Domain.Catalog.Components;
 using ElectronicService.Domain.Users.Enums;
 using ElectronicService.Web.Auth;
 using Microsoft.AspNetCore.Mvc;
@@ -22,12 +23,51 @@ public sealed class CatalogComponentCompatibilityImportController
     }
 
     [HttpGet("template")]
-    public IActionResult DownloadTemplate()
+    public async Task<IActionResult> DownloadTemplate(
+        [FromQuery] string? mainProductTypeCode,
+        [FromQuery] string[]? characteristicCodes,
+        [FromQuery] string[]? rangeCharacteristicCodes,
+        CancellationToken cancellationToken = default)
     {
+        var result = await _service.CreateTemplateAsync(
+            mainProductTypeCode,
+            characteristicCodes,
+            rangeCharacteristicCodes,
+            cancellationToken).ConfigureAwait(false);
+
+        if (result.IsFailure)
+        {
+            return BadRequest(result.Error.Message);
+        }
+
         return File(
-            _service.CreateTemplate(),
+            result.Value,
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             "component-compatibility-template.xlsx");
+    }
+
+    [HttpGet("export")]
+    public async Task<IActionResult> ExportRules(
+        [FromQuery] string mainProductTypeCode,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _service.ExportRulesAsync(
+            mainProductTypeCode,
+            cancellationToken).ConfigureAwait(false);
+
+        if (result.IsFailure)
+        {
+            return BadRequest(result.Error.Message);
+        }
+
+        var safeCode = string.Concat(mainProductTypeCode
+            .Where(character => char.IsLetterOrDigit(character)
+                || character is '-' or '_'));
+
+        return File(
+            result.Value,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            $"component-compatibility-{safeCode}.xlsx");
     }
 
     [HttpPost("preview")]
@@ -72,13 +112,15 @@ public sealed class CatalogComponentCompatibilityImportController
                     row.Need,
                     row.ComponentProductId,
                     row.NeedDefinitionId,
+                    row.IsActive,
                     row.Status.ToString(),
                     row.Message,
                     row.Constraints.Select(constraint =>
                         new ComponentCompatibilityImportConstraintResponse(
                             constraint.CharacteristicDefinitionId,
                             constraint.CharacteristicName,
-                            constraint.Value)).ToArray())).ToArray()));
+                            constraint.Value,
+                            constraint.ComparisonOperator.ToString())).ToArray())).ToArray()));
     }
 
     [HttpPost("apply")]
@@ -88,16 +130,34 @@ public sealed class CatalogComponentCompatibilityImportController
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        var hasInvalidOperator = (request.Rows ?? [])
+            .SelectMany(row => row.Constraints ?? [])
+            .Any(constraint =>
+                !Enum.TryParse<ComponentCompatibilityComparisonOperator>(
+                    constraint.ComparisonOperator,
+                    true,
+                    out var comparisonOperator)
+                || !Enum.IsDefined(comparisonOperator));
+
+        if (hasInvalidOperator)
+        {
+            return BadRequest("Некорректный оператор условия совместимости.");
+        }
+
         var rows = (request.Rows ?? [])
             .Select(row => new ApplyComponentCompatibilityImportRow(
                 row.ComponentProductId,
                 row.NeedDefinitionId,
+                row.IsActive,
                 (row.Constraints ?? [])
                     .Select(constraint =>
                         new ComponentCompatibilityImportConstraint(
                             constraint.CharacteristicDefinitionId,
                             constraint.CharacteristicName,
-                            constraint.Value))
+                            constraint.Value,
+                            Enum.Parse<ComponentCompatibilityComparisonOperator>(
+                                constraint.ComparisonOperator,
+                                true)))
                     .ToArray()))
             .ToArray();
         var result = await _service

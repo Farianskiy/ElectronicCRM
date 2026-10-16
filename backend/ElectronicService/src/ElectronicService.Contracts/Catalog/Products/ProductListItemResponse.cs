@@ -12,4 +12,5 @@ public sealed record ProductListItemResponse(
     decimal StockQuantity,
     Guid ManufacturerId = default,
     decimal BasePriceAmount = 0,
-    string BasePriceCurrency = "");
+    string BasePriceCurrency = "",
+    bool IsArchived = false);

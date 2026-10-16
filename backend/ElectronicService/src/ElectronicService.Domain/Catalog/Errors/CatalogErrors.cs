@@ -93,6 +93,34 @@ public static class CatalogErrors
             $"Тип товара '{productTypeId}' не найден.");
     }
 
+    public static DomainError ProductTypeKindIsAlreadySet(string kind)
+    {
+        return new DomainError(
+            "catalog.product_type.kind_is_already_set",
+            $"Тип товара уже имеет назначение '{kind}'.");
+    }
+
+    public static DomainError ProductTypeKindChangeIsBlocked()
+    {
+        return new DomainError(
+            "catalog.product_type.kind_change_is_blocked",
+            "Назначение типа товара нельзя изменить, пока существуют блокирующие зависимости.");
+    }
+
+    public static DomainError ProductTypeIsArchived()
+    {
+        return new DomainError(
+            "catalog.product_type.is_archived",
+            "Архивный тип товара нельзя изменять.");
+    }
+
+    public static DomainError ProductTypeArchiveIsBlocked()
+    {
+        return new DomainError(
+            "catalog.product_type.archive_is_blocked",
+            "Тип товара нельзя архивировать, пока существуют блокирующие зависимости.");
+    }
+
     public static DomainError CharacteristicDefinitionNotFound(string code)
     {
         return new DomainError(

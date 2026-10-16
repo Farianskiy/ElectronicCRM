@@ -5,10 +5,11 @@ export interface CatalogProductTypeMetadata {
   code: string;
   name: string;
   kind: CatalogProductTypeKind;
+  isArchived: boolean;
 }
 
 export interface CreateCatalogProductTypeRequest {
-  code: string;
+  code?: string;
   name: string;
   kind: CatalogProductTypeKind;
 }

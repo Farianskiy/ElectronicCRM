@@ -1,6 +1,11 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMemo, useState, type FormEvent } from "react";
@@ -9,6 +14,7 @@ import {
   addCatalogPriceCalculationLineComponent,
   applyCatalogPriceCalculationImport,
   changeCatalogPriceCalculationLineComponentQuantity,
+  changeCatalogPriceCalculationLineComponentSupplyStatus,
   changeCatalogPriceCalculationLineQuantity,
   completeCatalogPriceCalculation,
   getCatalogPriceCalculation,
@@ -34,6 +40,7 @@ import type {
   CatalogPriceCalculationImportRowStatus,
   CatalogPriceCalculationLine,
   CatalogPriceCalculationLineComponent,
+  CatalogPriceCalculationLineComponentSupplyStatus,
   CatalogPriceCalculationManufacturerDiscount,
   CatalogPriceCalculationProductSearchItem,
   CatalogPriceCalculationStatus,
@@ -74,6 +81,19 @@ function formatQuantity(value: number): string {
   }).format(value);
 }
 
+function getComponentSupplyStatusLabel(
+  status: CatalogPriceCalculationLineComponentSupplyStatus,
+): string {
+  switch (status) {
+    case "ToPurchase":
+      return "Добавить в расчёт";
+    case "AlreadyAvailable":
+      return "Уже имеется";
+    case "IncludedInSupply":
+      return "Входит в поставку";
+  }
+}
+
 function getImportStatusLabel(
   status: CatalogPriceCalculationImportRowStatus,
 ): string {
@@ -81,7 +101,7 @@ function getImportStatusLabel(
     case "New":
       return "Будет добавлена";
     case "QuantityChanged":
-      return "Изменится количество";
+      return "Изменятся параметры";
     case "Removed":
       return "Будет удалена";
     case "Unchanged":
@@ -322,6 +342,7 @@ function CalculationComponentRow({
   isChanging,
   isRemoving,
   onChangeQuantity,
+  onChangeSupplyStatus,
   onRemove,
 }: {
   component: CatalogPriceCalculationLineComponent;
@@ -330,6 +351,10 @@ function CalculationComponentRow({
   isChanging: boolean;
   isRemoving: boolean;
   onChangeQuantity: (componentLineId: string, quantityPerUnit: number) => void;
+  onChangeSupplyStatus: (
+    componentLineId: string,
+    supplyStatus: CatalogPriceCalculationLineComponentSupplyStatus,
+  ) => void;
   onRemove: (component: CatalogPriceCalculationLineComponent) => void;
 }) {
   const [quantityPerUnit, setQuantityPerUnit] = useState(
@@ -361,6 +386,29 @@ function CalculationComponentRow({
         <p className="mt-1 text-xs text-[var(--app-muted)]">
           {component.article} · Закрывает: {component.needName}
         </p>
+        {editable ? (
+          <select
+            value={component.supplyStatus}
+            disabled={isChanging || isRemoving}
+            onChange={(event) =>
+              onChangeSupplyStatus(
+                component.componentLineId,
+                event.target
+                  .value as CatalogPriceCalculationLineComponentSupplyStatus,
+              )
+            }
+            aria-label={`Способ обеспечения ${component.name}`}
+            className="mt-3 min-h-9 rounded-xl border border-[var(--app-border)] bg-[var(--app-panel)] px-3 text-xs text-[var(--app-text)]"
+          >
+            <option value="ToPurchase">Добавить в расчёт</option>
+            <option value="AlreadyAvailable">Уже имеется</option>
+            <option value="IncludedInSupply">Входит в поставку</option>
+          </select>
+        ) : (
+          <p className="mt-2 text-xs font-medium text-[var(--app-accent)]">
+            {getComponentSupplyStatusLabel(component.supplyStatus)}
+          </p>
+        )}
       </td>
 
       <td className="px-4 py-4 text-[var(--app-muted)]">
@@ -420,7 +468,9 @@ function CalculationComponentRow({
         {formatPrice(component.projectPriceAmount, currency)}
       </td>
       <td className="whitespace-nowrap px-4 py-4 font-semibold tabular-nums text-[var(--app-text)]">
-        {formatPrice(component.totalAmount, currency)}
+        {component.supplyStatus === "ToPurchase"
+          ? formatPrice(component.totalAmount, currency)
+          : "Не включено в стоимость"}
       </td>
 
       {editable && (
@@ -462,12 +512,16 @@ function ComponentPickerRow({
     componentProductId: string,
     quantityPerUnit: number,
     manualSelection: boolean,
+    supplyStatus: CatalogPriceCalculationLineComponentSupplyStatus,
   ) => void;
   canCreateProducts: boolean;
   onCreateComponent: (article: string) => void;
   onClose: () => void;
 }) {
   const [quantities, setQuantities] = useState<Record<string, string>>({});
+  const [supplyStatuses, setSupplyStatuses] = useState<
+    Record<string, CatalogPriceCalculationLineComponentSupplyStatus>
+  >({});
   const [mode, setMode] = useState<"recommended" | "catalog">("recommended");
   const [manualNeedId, setManualNeedId] = useState("");
   const [manualSearchInput, setManualSearchInput] = useState("");
@@ -573,6 +627,10 @@ function ComponentPickerRow({
           {effectiveMode === "recommended" && (
             <div className="mt-4 grid gap-4">
             {needs.map((need) => {
+              const selectedForNeed = line.components.filter(
+                (component) =>
+                  component.needDefinitionId === need.needDefinitionId,
+              );
               const availableComponents = need.compatibleComponents.filter(
                 (candidate) =>
                   !line.components.some(
@@ -587,9 +645,42 @@ function ComponentPickerRow({
                   key={need.needDefinitionId}
                   className="rounded-xl border border-[var(--app-border)] bg-[var(--app-panel)] p-4"
                 >
-                  <h4 className="font-semibold text-[var(--app-text)]">
-                    {need.name}
-                  </h4>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h4 className="font-semibold text-[var(--app-text)]">
+                      {need.name}
+                    </h4>
+                    {selectedForNeed.length > 0 ? (
+                      <span className="rounded-full border border-[var(--app-success-border)] bg-[var(--app-success-soft)] px-2 py-1 text-[11px] font-semibold text-[var(--app-success)]">
+                        Решение принято
+                      </span>
+                    ) : need.requirementMode === "RequiredForAssembly" ? (
+                      <span className="rounded-full border border-[var(--app-warning-border)] bg-[var(--app-warning-soft)] px-2 py-1 text-[11px] font-semibold text-[var(--app-warning)]">
+                        Решение не принято
+                      </span>
+                    ) : (
+                      <span className="rounded-full border border-[var(--app-border)] bg-[var(--app-surface)] px-2 py-1 text-[11px] font-semibold text-[var(--app-muted)]">
+                        По выбору
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-xs text-[var(--app-muted)]">
+                    {need.requirementMode === "RequiredForAssembly"
+                      ? "Требуется для монтажа"
+                      : "Необязательное комплектующее"}
+                    {` · обычно ${need.defaultQuantityPerUnit} шт. на единицу товара`}
+                  </p>
+
+                  {selectedForNeed.length > 0 && (
+                    <p className="mt-2 text-xs text-[var(--app-success)]">
+                      Выбрано:{" "}
+                      {selectedForNeed
+                        .map(
+                          (component) =>
+                            `${component.name} — ${getComponentSupplyStatusLabel(component.supplyStatus)}`,
+                        )
+                        .join("; ")}
+                    </p>
+                  )}
 
                   {availableComponents.length === 0 ? (
                     <p className="mt-2 text-sm text-[var(--app-muted)]">
@@ -599,8 +690,12 @@ function ComponentPickerRow({
                     <div className="mt-3 grid gap-2">
                       {availableComponents.map((candidate) => {
                         const candidateKey = `${need.needDefinitionId}:${candidate.productId}`;
-                        const quantityValue = quantities[candidateKey] ?? "1";
+                        const quantityValue =
+                          quantities[candidateKey] ??
+                          String(need.defaultQuantityPerUnit);
                         const quantity = Number(quantityValue);
+                        const supplyStatus =
+                          supplyStatuses[candidateKey] ?? "ToPurchase";
 
                         return (
                           <div
@@ -617,9 +712,41 @@ function ComponentPickerRow({
                                   candidate.priceCurrency || currency,
                                 )}
                               </p>
+                              <p className="mt-1 text-xs leading-5 text-[var(--app-muted)]">
+                                {candidate.matchConditions.length === 0
+                                  ? "Подходит ко всем товарам этого типа."
+                                  : `Почему подходит: ${candidate.matchConditions
+                                      .map(
+                                        (condition) =>
+                                          `${condition.characteristicName} — ${condition.actualValue}`,
+                                      )
+                                      .join("; ")}.`}
+                              </p>
                             </div>
 
                             <div className="flex items-center gap-2">
+                              <select
+                                value={supplyStatus}
+                                onChange={(event) =>
+                                  setSupplyStatuses((current) => ({
+                                    ...current,
+                                    [candidateKey]: event.target
+                                      .value as CatalogPriceCalculationLineComponentSupplyStatus,
+                                  }))
+                                }
+                                aria-label={`Способ обеспечения ${candidate.name}`}
+                                className="min-h-10 rounded-xl border border-[var(--app-border)] bg-[var(--app-panel)] px-3 text-xs text-[var(--app-text)]"
+                              >
+                                <option value="ToPurchase">
+                                  Добавить в расчёт
+                                </option>
+                                <option value="AlreadyAvailable">
+                                  Уже имеется
+                                </option>
+                                <option value="IncludedInSupply">
+                                  Входит в поставку
+                                </option>
+                              </select>
                               <AppInput
                                 type="number"
                                 min="1"
@@ -647,6 +774,7 @@ function ComponentPickerRow({
                                     candidate.productId,
                                     quantity,
                                     false,
+                                    supplyStatus,
                                   )
                                 }
                               >
@@ -799,6 +927,8 @@ function ComponentPickerRow({
                       const candidateKey = `manual:${effectiveManualNeedId}:${candidate.productId}`;
                       const quantityValue = quantities[candidateKey] ?? "1";
                       const quantity = Number(quantityValue);
+                      const supplyStatus =
+                        supplyStatuses[candidateKey] ?? "ToPurchase";
                       const isAlreadyAdded = line.components.some(
                         (component) =>
                           component.needDefinitionId === effectiveManualNeedId &&
@@ -823,6 +953,28 @@ function ComponentPickerRow({
                           </div>
 
                           <div className="flex items-center gap-2">
+                            <select
+                              value={supplyStatus}
+                              onChange={(event) =>
+                                setSupplyStatuses((current) => ({
+                                  ...current,
+                                  [candidateKey]: event.target
+                                    .value as CatalogPriceCalculationLineComponentSupplyStatus,
+                                }))
+                              }
+                              aria-label={`Способ обеспечения ${candidate.name}`}
+                              className="min-h-10 rounded-xl border border-[var(--app-border)] bg-[var(--app-panel)] px-3 text-xs text-[var(--app-text)]"
+                            >
+                              <option value="ToPurchase">
+                                Добавить в расчёт
+                              </option>
+                              <option value="AlreadyAvailable">
+                                Уже имеется
+                              </option>
+                              <option value="IncludedInSupply">
+                                Входит в поставку
+                              </option>
+                            </select>
                             <AppInput
                               type="number"
                               min="1"
@@ -844,7 +996,15 @@ function ComponentPickerRow({
                               size="sm"
                               loading={addingKey === candidateKey}
                               disabled={isAlreadyAdded || !hasActivePrice || !Number.isInteger(quantity) || quantity < 1}
-                              onClick={() => onAdd(effectiveManualNeedId, candidate.productId, quantity, true)}
+                              onClick={() =>
+                                onAdd(
+                                  effectiveManualNeedId,
+                                  candidate.productId,
+                                  quantity,
+                                  true,
+                                  supplyStatus,
+                                )
+                              }
                             >
                               {isAlreadyAdded
                                 ? "Добавлено"
@@ -909,6 +1069,7 @@ function CalculationLineRow({
   canCreateProducts,
   onCreateComponent,
   onChangeComponentQuantity,
+  onChangeComponentSupplyStatus,
   onRemoveComponent,
 }: {
   calculationId: string;
@@ -928,6 +1089,7 @@ function CalculationLineRow({
     componentProductId: string,
     quantityPerUnit: number,
     manualSelection: boolean,
+    supplyStatus: CatalogPriceCalculationLineComponentSupplyStatus,
   ) => void;
   canCreateProducts: boolean;
   onCreateComponent: (article: string) => void;
@@ -936,6 +1098,11 @@ function CalculationLineRow({
     componentLineId: string,
     quantityPerUnit: number,
   ) => void;
+  onChangeComponentSupplyStatus: (
+    lineId: string,
+    componentLineId: string,
+    supplyStatus: CatalogPriceCalculationLineComponentSupplyStatus,
+  ) => void;
   onRemoveComponent: (
     lineId: string,
     component: CatalogPriceCalculationLineComponent,
@@ -943,6 +1110,21 @@ function CalculationLineRow({
 }) {
   const [quantity, setQuantity] = useState(line.quantity.toString());
   const [showComponentPicker, setShowComponentPicker] = useState(false);
+  const compatibilitySummaryQuery = useQuery({
+    queryKey: ["product-component-compatibility", line.productId],
+    queryFn: () => getProductComponentCompatibility(line.productId),
+  });
+  const requiredNeeds =
+    compatibilitySummaryQuery.data?.needs.filter(
+      (need) => need.requirementMode === "RequiredForAssembly",
+    ) ?? [];
+  const unresolvedRequiredNeeds = requiredNeeds.filter(
+    (need) =>
+      !line.components.some(
+        (component) =>
+          component.needDefinitionId === need.needDefinitionId,
+      ),
+  );
 
   function handleSave(): void {
     const parsedQuantity = Number(quantity.replace(",", "."));
@@ -963,6 +1145,17 @@ function CalculationLineRow({
           </span>
           <p className="mt-2 font-medium text-[var(--app-text)]">{line.name}</p>
           <p className="mt-1 text-xs text-[var(--app-muted)]">{line.article}</p>
+
+          {unresolvedRequiredNeeds.length > 0 ? (
+            <p className="mt-2 text-xs font-medium text-[var(--app-warning)]">
+              Не принято решений по обязательным группам:{" "}
+              {unresolvedRequiredNeeds.length}
+            </p>
+          ) : requiredNeeds.length > 0 ? (
+            <p className="mt-2 text-xs font-medium text-[var(--app-success)]">
+              По обязательным комплектующим решения приняты
+            </p>
+          ) : null}
 
           {editable && (
             <AppButton
@@ -1084,6 +1277,13 @@ function CalculationLineRow({
               quantityPerUnit,
             )
           }
+          onChangeSupplyStatus={(componentLineId, supplyStatus) =>
+            onChangeComponentSupplyStatus(
+              line.lineId,
+              componentLineId,
+              supplyStatus,
+            )
+          }
           onRemove={(selectedComponent) =>
             onRemoveComponent(line.lineId, selectedComponent)
           }
@@ -1097,13 +1297,20 @@ function CalculationLineRow({
           currency={currency}
           editable={editable}
           addingKey={addingComponentKey}
-          onAdd={(needDefinitionId, componentProductId, quantityPerUnit, manualSelection) =>
+          onAdd={(
+            needDefinitionId,
+            componentProductId,
+            quantityPerUnit,
+            manualSelection,
+            supplyStatus,
+          ) =>
             onAddComponent(
               line.lineId,
               needDefinitionId,
               componentProductId,
               quantityPerUnit,
               manualSelection,
+              supplyStatus,
             )
           }
           canCreateProducts={canCreateProducts}
@@ -1426,6 +1633,44 @@ export default function CatalogPriceCalculationPage() {
   const calculation = calculationQuery.data;
   const editable = calculation?.status === "Draft";
 
+  const compatibilityReadinessQueries = useQueries({
+    queries: (calculation?.lines ?? []).map((line) => ({
+      queryKey: ["product-component-compatibility", line.productId],
+      queryFn: () => getProductComponentCompatibility(line.productId),
+      enabled: editable,
+    })),
+  });
+  const compatibilityReadinessLoading = compatibilityReadinessQueries.some(
+    (query) => query.isLoading,
+  );
+  const compatibilityReadinessFailed = compatibilityReadinessQueries.some(
+    (query) => query.isError,
+  );
+  const unresolvedRequiredComponentDecisions =
+    (calculation?.lines ?? []).flatMap((line, index) => {
+      const needs = compatibilityReadinessQueries[index]?.data?.needs ?? [];
+
+      return needs
+        .filter(
+          (need) =>
+            need.requirementMode === "RequiredForAssembly" &&
+            !line.components.some(
+              (component) =>
+                component.needDefinitionId === need.needDefinitionId,
+            ),
+        )
+        .map((need) => ({
+          lineId: line.lineId,
+          article: line.article,
+          productName: line.name,
+          needName: need.name,
+        }));
+    });
+  const completionBlocked =
+    compatibilityReadinessLoading ||
+    compatibilityReadinessFailed ||
+    unresolvedRequiredComponentDecisions.length > 0;
+
   const productsQuery = useQuery({
     queryKey: catalogPriceCalculationQueryKeys.products(
       calculationId,
@@ -1477,6 +1722,11 @@ export default function CatalogPriceCalculationPage() {
 
   const componentQuantityMutation = useMutation({
     mutationFn: changeCatalogPriceCalculationLineComponentQuantity,
+    onSuccess: refreshCalculation,
+  });
+
+  const componentSupplyStatusMutation = useMutation({
+    mutationFn: changeCatalogPriceCalculationLineComponentSupplyStatus,
     onSuccess: refreshCalculation,
   });
 
@@ -1656,6 +1906,7 @@ export default function CatalogPriceCalculationPage() {
     removeLineMutation.error ??
     addComponentMutation.error ??
     componentQuantityMutation.error ??
+    componentSupplyStatusMutation.error ??
     removeComponentMutation.error ??
     setDiscountMutation.error ??
     removeDiscountMutation.error ??
@@ -1711,6 +1962,7 @@ export default function CatalogPriceCalculationPage() {
       needDefinitionId: row.needDefinitionId as string,
       componentProductId: row.componentProductId as string,
       quantityPerUnit: row.status === "Removed" ? null : row.quantityPerUnit,
+      supplyStatus: row.status === "Removed" ? null : row.supplyStatus,
     }));
 
     const characteristicRows = actionableCharacteristicImportRows.map(
@@ -1827,6 +2079,7 @@ export default function CatalogPriceCalculationPage() {
     componentProductId: string,
     quantityPerUnit: number,
     manualSelection: boolean,
+    supplyStatus: CatalogPriceCalculationLineComponentSupplyStatus,
   ): void {
     addComponentMutation.mutate({
       calculationId,
@@ -1835,6 +2088,7 @@ export default function CatalogPriceCalculationPage() {
       componentProductId,
       quantityPerUnit,
       manualSelection,
+      supplyStatus,
     });
   }
 
@@ -1848,6 +2102,19 @@ export default function CatalogPriceCalculationPage() {
       lineId,
       componentLineId,
       quantityPerUnit,
+    });
+  }
+
+  function handleChangeComponentSupplyStatus(
+    lineId: string,
+    componentLineId: string,
+    supplyStatus: CatalogPriceCalculationLineComponentSupplyStatus,
+  ): void {
+    componentSupplyStatusMutation.mutate({
+      calculationId,
+      lineId,
+      componentLineId,
+      supplyStatus,
     });
   }
 
@@ -1889,12 +2156,16 @@ export default function CatalogPriceCalculationPage() {
   }
 
   function handleComplete(): void {
-    if (!calculation || calculation.lines.length === 0) {
+    if (
+      !calculation ||
+      calculation.lines.length === 0 ||
+      completionBlocked
+    ) {
       return;
     }
 
     const confirmed = window.confirm(
-      "Завершить расчёт? После завершения изменять товары, количество и скидки будет нельзя.",
+      "Завершить расчёт? После завершения изменять товары, комплектующие, количество и скидки будет нельзя.",
     );
 
     if (!confirmed) {
@@ -1968,7 +2239,9 @@ export default function CatalogPriceCalculationPage() {
               type="button"
               variant="primary"
               loading={completeMutation.isPending}
-              disabled={calculation.lines.length === 0}
+              disabled={
+                calculation.lines.length === 0 || completionBlocked
+              }
               onClick={handleComplete}
             >
               Завершить расчёт
@@ -1986,6 +2259,44 @@ export default function CatalogPriceCalculationPage() {
             mutationError,
             "Не удалось выполнить действие с расчётом.",
           )}
+        </section>
+      )}
+
+      {editable && compatibilityReadinessLoading && (
+        <section
+          role="status"
+          className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-panel)] p-4 text-sm text-[var(--app-muted)]"
+        >
+          Проверяем обязательные комплектующие перед завершением расчёта...
+        </section>
+      )}
+
+      {editable && compatibilityReadinessFailed && (
+        <section
+          role="alert"
+          className="rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-4 text-sm text-[var(--app-danger)]"
+        >
+          Не удалось проверить обязательные комплектующие. Обновите страницу и
+          повторите попытку.
+        </section>
+      )}
+
+      {editable && unresolvedRequiredComponentDecisions.length > 0 && (
+        <section className="rounded-2xl border border-[var(--app-warning-border)] bg-[var(--app-warning-soft)] p-4">
+          <h2 className="font-semibold text-[var(--app-text)]">
+            Перед завершением выберите обязательные комплектующие
+          </h2>
+          <p className="mt-1 text-sm text-[var(--app-muted)]">
+            Кнопка завершения станет доступна после выбора комплектующего в
+            каждой обязательной группе.
+          </p>
+          <ul className="mt-3 grid gap-1 text-sm text-[var(--app-warning)]">
+            {unresolvedRequiredComponentDecisions.map((decision) => (
+              <li key={`${decision.lineId}:${decision.needName}`}>
+                {decision.article} — {decision.productName}: {decision.needName}
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 
@@ -2395,7 +2706,7 @@ export default function CatalogPriceCalculationPage() {
                   </div>
 
                   <div className="overflow-x-auto rounded-2xl border border-[var(--app-border)]">
-                    <table className="w-full min-w-[1100px] border-collapse text-left text-sm">
+                    <table className="w-full min-w-[1300px] border-collapse text-left text-sm">
                       <thead className="bg-[var(--app-surface)] text-[var(--app-muted)]">
                         <tr>
                           <th className="px-4 py-3 font-medium">Строка</th>
@@ -2403,6 +2714,7 @@ export default function CatalogPriceCalculationPage() {
                           <th className="px-4 py-3 font-medium">Потребность</th>
                           <th className="px-4 py-3 font-medium">Комплектующее</th>
                           <th className="px-4 py-3 font-medium">Количество на единицу</th>
+                          <th className="px-4 py-3 font-medium">Статус обеспечения</th>
                           <th className="px-4 py-3 font-medium">Результат</th>
                         </tr>
                       </thead>
@@ -2433,6 +2745,19 @@ export default function CatalogPriceCalculationPage() {
                                   : row.status === "Removed"
                                     ? `${row.currentQuantityPerUnit ?? 0} → удаление`
                                     : row.quantityPerUnit ?? "—"}
+                              </td>
+                              <td className="px-4 py-4 text-[var(--app-text)]">
+                                {row.status === "Removed"
+                                  ? `${row.currentSupplyStatus ? getComponentSupplyStatusLabel(row.currentSupplyStatus) : "—"} → удаление`
+                                  : row.currentSupplyStatus &&
+                                      row.supplyStatus &&
+                                      row.currentSupplyStatus !== row.supplyStatus
+                                    ? `${getComponentSupplyStatusLabel(row.currentSupplyStatus)} → ${getComponentSupplyStatusLabel(row.supplyStatus)}`
+                                    : row.supplyStatus
+                                      ? getComponentSupplyStatusLabel(
+                                          row.supplyStatus,
+                                        )
+                                      : "—"}
                               </td>
                               <td className="px-4 py-4">
                                 <span
@@ -2873,7 +3198,12 @@ export default function CatalogPriceCalculationPage() {
                       componentQuantityMutation.isPending &&
                       componentQuantityMutation.variables?.lineId === line.lineId
                         ? componentQuantityMutation.variables.componentLineId
-                        : undefined
+                        : componentSupplyStatusMutation.isPending &&
+                            componentSupplyStatusMutation.variables?.lineId ===
+                              line.lineId
+                          ? componentSupplyStatusMutation.variables
+                              .componentLineId
+                          : undefined
                     }
                     removingComponentLineId={
                       removeComponentMutation.isPending &&
@@ -2904,6 +3234,9 @@ export default function CatalogPriceCalculationPage() {
                     }
                     onChangeComponentQuantity={
                       handleChangeComponentQuantity
+                    }
+                    onChangeComponentSupplyStatus={
+                      handleChangeComponentSupplyStatus
                     }
                     onRemoveComponent={handleRemoveComponent}
                   />

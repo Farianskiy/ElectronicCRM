@@ -12,4 +12,5 @@ public sealed record CatalogProductListItemResult(
     string PriceCurrency,
     decimal BasePriceAmount,
     string BasePriceCurrency,
-    decimal StockQuantity);
+    decimal StockQuantity,
+    bool IsArchived);

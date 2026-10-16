@@ -50,6 +50,8 @@ public sealed record CatalogPriceCalculationComponentImportPreviewRowResponse(
     Guid? NeedDefinitionId,
     Guid? ComponentProductId,
     int? CurrentQuantityPerUnit,
+    string? SupplyStatus,
+    string? CurrentSupplyStatus,
     string Status,
     string? Message);
 

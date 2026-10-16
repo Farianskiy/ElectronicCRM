@@ -93,6 +93,39 @@ public sealed class ProductTests
         Assert.Equal("general.value_is_invalid", result.Error.Code);
     }
 
+    [Fact]
+    public void ArchiveStoresDeletionMetadata()
+    {
+        var product = TestDataFactory.CreateProduct();
+        var userId = Guid.NewGuid();
+
+        var result = product.Archive(userId, "  Цена по запросу  ");
+
+        Assert.True(result.IsSuccess);
+        Assert.True(product.IsArchived);
+        Assert.Equal(userId, product.ArchivedByUserId);
+        Assert.Equal("Цена по запросу", product.ArchiveReason);
+        Assert.NotNull(product.ArchivedAtUtc);
+        Assert.Equal(product.ArchivedAtUtc, product.UpdatedAtUtc);
+    }
+
+    [Fact]
+    public void RestoreClearsDeletionMetadata()
+    {
+        var product = TestDataFactory.CreateProduct();
+        var archiveResult = product.Archive(Guid.NewGuid(), "Не используется");
+
+        Assert.True(archiveResult.IsSuccess);
+
+        product.Restore();
+
+        Assert.False(product.IsArchived);
+        Assert.Null(product.ArchivedByUserId);
+        Assert.Null(product.ArchivedAtUtc);
+        Assert.Null(product.ArchiveReason);
+        Assert.NotNull(product.UpdatedAtUtc);
+    }
+
     // Проверяет переименование товара и установку времени изменения.
     [Fact]
     public void RenameChangesNameAndUpdatedTimestamp()

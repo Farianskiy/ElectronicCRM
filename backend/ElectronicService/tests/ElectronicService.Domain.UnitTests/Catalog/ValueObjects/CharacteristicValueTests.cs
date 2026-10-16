@@ -43,6 +43,16 @@ public sealed class CharacteristicValueTests
         Assert.Equal("16.5", result.Value.ToString());
     }
 
+    // Проверяет, что масштаб decimal не создаёт ложных отличий при экспорте и повторном импорте правил.
+    [Fact]
+    public void NumberToStringRemovesInsignificantTrailingZeroes()
+    {
+        var result = CharacteristicValue.CreateNumber(125.0000m);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("125", result.Value.ToString());
+    }
+
     // Проверяет создание логического значения и отсутствие значений других типов.
     [Fact]
     public void CreateBooleanSetsOnlyBooleanValue()

@@ -13,4 +13,7 @@ public sealed record CatalogProductDetailsResult(
     string PriceCurrency,
     decimal StockQuantity,
     IReadOnlyCollection<CatalogProductCharacteristicResult> Characteristics,
-    IReadOnlyCollection<CatalogProductAliasResult> Aliases);
+    IReadOnlyCollection<CatalogProductAliasResult> Aliases,
+    bool IsArchived,
+    DateTime? ArchivedAtUtc,
+    string? ArchiveReason);

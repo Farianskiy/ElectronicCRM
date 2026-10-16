@@ -88,7 +88,7 @@ public sealed class CharacteristicValue : ValueObject
         return DataType switch
         {
             CharacteristicDataType.Text => TextValue ?? string.Empty,
-            CharacteristicDataType.Number => NumberValue?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+            CharacteristicDataType.Number => NumberValue?.ToString("0.############################", CultureInfo.InvariantCulture) ?? string.Empty,
             CharacteristicDataType.Boolean => BooleanValue?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
             _ => string.Empty
         };

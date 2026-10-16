@@ -570,6 +570,10 @@ public sealed class CatalogPriceCalculationWorkbookPreviewer
             headerRow,
             "АРТИКУЛ КОМПЛЕКТУЮЩЕГО");
         var quantityColumn = FindColumn(worksheet, headerRow, "НА ЕДИНИЦУ");
+        var supplyStatusColumn = FindColumn(
+            worksheet,
+            headerRow,
+            "СТАТУС ОБЕСПЕЧЕНИЯ");
         var mainLineIdColumn = FindColumn(
             worksheet,
             headerRow,
@@ -608,7 +612,8 @@ public sealed class CatalogPriceCalculationWorkbookPreviewer
                     component.NeedName,
                     component.ComponentProductId,
                     component.Article,
-                    component.QuantityPerUnit))
+                    component.QuantityPerUnit,
+                    component.SupplyStatus))
                 .ToArrayAsync(cancellationToken)
                 .ConfigureAwait(false);
 
@@ -725,6 +730,37 @@ public sealed class CatalogPriceCalculationWorkbookPreviewer
                     CatalogPriceCalculationComponentImportRowStatus.Invalid,
                     "Количество на единицу должно быть целым числом больше нуля."));
                 continue;
+            }
+
+            CatalogPriceCalculationLineComponentSupplyStatus?
+                requestedSupplyStatus = null;
+
+            if (supplyStatusColumn.HasValue)
+            {
+                var supplyStatusText = row.Cell(supplyStatusColumn.Value)
+                    .GetFormattedString()
+                    .Trim();
+
+                if (!TryParseSupplyStatus(
+                        supplyStatusText,
+                        out var parsedSupplyStatus))
+                {
+                    result.Add(CreateComponentProblemRow(
+                        rowNumber,
+                        mainArticle,
+                        needName,
+                        componentArticle,
+                        quantityPerUnit,
+                        mainLineId,
+                        componentLineId,
+                        needId,
+                        componentProductId,
+                        CatalogPriceCalculationComponentImportRowStatus.Invalid,
+                        "Укажите статус обеспечения: «Добавить в расчёт», «Уже имеется» или «Входит в поставку»."));
+                    continue;
+                }
+
+                requestedSupplyStatus = parsedSupplyStatus;
             }
 
             ExistingCalculationLine? mainLine = null;
@@ -850,17 +886,27 @@ public sealed class CatalogPriceCalculationWorkbookPreviewer
 
             var status = CatalogPriceCalculationComponentImportRowStatus.New;
             string? message = null;
+            var supplyStatus = requestedSupplyStatus
+                ?? existingComponent?.SupplyStatus
+                ?? CatalogPriceCalculationLineComponentSupplyStatus.ToPurchase;
 
             if (existingComponent is not null)
             {
                 componentLineId = existingComponent.ComponentLineId;
                 representedComponentLineIds.Add(existingComponent.ComponentLineId);
-                status = existingComponent.QuantityPerUnit == quantityPerUnit
+                var quantityChanged =
+                    existingComponent.QuantityPerUnit != quantityPerUnit;
+                var supplyStatusChanged =
+                    existingComponent.SupplyStatus != supplyStatus;
+                status = !quantityChanged && !supplyStatusChanged
                     ? CatalogPriceCalculationComponentImportRowStatus.Unchanged
                     : CatalogPriceCalculationComponentImportRowStatus.QuantityChanged;
                 message = status == CatalogPriceCalculationComponentImportRowStatus.Unchanged
                     ? "Комплектующее уже есть в проекте, изменений нет."
-                    : $"Количество на единицу изменится: {existingComponent.QuantityPerUnit} → {quantityPerUnit}.";
+                    : CreateComponentChangeMessage(
+                        existingComponent,
+                        quantityPerUnit,
+                        supplyStatus);
             }
 
             representedKeys.Add((
@@ -878,6 +924,8 @@ public sealed class CatalogPriceCalculationWorkbookPreviewer
                 need.NeedDefinitionId,
                 componentProduct.ProductId,
                 existingComponent?.QuantityPerUnit,
+                supplyStatus,
+                existingComponent?.SupplyStatus,
                 status,
                 message));
         }
@@ -910,6 +958,8 @@ public sealed class CatalogPriceCalculationWorkbookPreviewer
                 existingComponent.NeedDefinitionId,
                 existingComponent.ComponentProductId,
                 existingComponent.QuantityPerUnit,
+                null,
+                existingComponent.SupplyStatus,
                 CatalogPriceCalculationComponentImportRowStatus.Removed,
                 "Комплектующее отсутствует в загруженной выгрузке и будет удалено после подтверждения."));
         }
@@ -1458,8 +1508,93 @@ public sealed class CatalogPriceCalculationWorkbookPreviewer
             needId,
             componentProductId,
             null,
+            null,
+            null,
             status,
             message);
+    }
+
+    private static bool TryParseSupplyStatus(
+        string value,
+        out CatalogPriceCalculationLineComponentSupplyStatus status)
+    {
+        var normalized = NormalizeText(value);
+
+        if (normalized is "ДОБАВИТЬ В РАСЧЕТ" or "ДОБАВИТЬ В РАСЧЁТ"
+            || string.Equals(
+                value,
+                nameof(CatalogPriceCalculationLineComponentSupplyStatus.ToPurchase),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            status = CatalogPriceCalculationLineComponentSupplyStatus.ToPurchase;
+            return true;
+        }
+
+        if (string.Equals(
+                normalized,
+                "УЖЕ ИМЕЕТСЯ",
+                StringComparison.Ordinal)
+            || string.Equals(
+                value,
+                nameof(CatalogPriceCalculationLineComponentSupplyStatus.AlreadyAvailable),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            status = CatalogPriceCalculationLineComponentSupplyStatus.AlreadyAvailable;
+            return true;
+        }
+
+        if (string.Equals(
+                normalized,
+                "ВХОДИТ В ПОСТАВКУ",
+                StringComparison.Ordinal)
+            || string.Equals(
+                value,
+                nameof(CatalogPriceCalculationLineComponentSupplyStatus.IncludedInSupply),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            status = CatalogPriceCalculationLineComponentSupplyStatus.IncludedInSupply;
+            return true;
+        }
+
+        status = default;
+        return false;
+    }
+
+    private static string CreateComponentChangeMessage(
+        ExistingCalculationComponent existingComponent,
+        int quantityPerUnit,
+        CatalogPriceCalculationLineComponentSupplyStatus supplyStatus)
+    {
+        var changes = new List<string>(2);
+
+        if (existingComponent.QuantityPerUnit != quantityPerUnit)
+        {
+            changes.Add(
+                $"количество {existingComponent.QuantityPerUnit} → {quantityPerUnit}");
+        }
+
+        if (existingComponent.SupplyStatus != supplyStatus)
+        {
+            changes.Add(
+                $"статус «{GetSupplyStatusLabel(existingComponent.SupplyStatus)}» → «{GetSupplyStatusLabel(supplyStatus)}»");
+        }
+
+        return $"Изменится: {string.Join("; ", changes)}.";
+    }
+
+    private static string GetSupplyStatusLabel(
+        CatalogPriceCalculationLineComponentSupplyStatus status)
+    {
+        return status switch
+        {
+            CatalogPriceCalculationLineComponentSupplyStatus.ToPurchase =>
+                "Добавить в расчёт",
+            CatalogPriceCalculationLineComponentSupplyStatus.AlreadyAvailable =>
+                "Уже имеется",
+            CatalogPriceCalculationLineComponentSupplyStatus.IncludedInSupply =>
+                "Входит в поставку",
+            _ => status.ToString()
+        };
     }
 
     private static ParsedWorkbook ParseRows(
@@ -2012,7 +2147,8 @@ public sealed class CatalogPriceCalculationWorkbookPreviewer
         string NeedName,
         Guid ComponentProductId,
         string Article,
-        int QuantityPerUnit);
+        int QuantityPerUnit,
+        CatalogPriceCalculationLineComponentSupplyStatus SupplyStatus);
 
     private sealed record ComponentNeedReference(
         Guid NeedDefinitionId,

@@ -33,6 +33,7 @@ public sealed class ProductAuditHistoryReader
     {
         var productExists = await _dbContext
             .Set<Product>()
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .AnyAsync(
                 product => product.Id == productId,

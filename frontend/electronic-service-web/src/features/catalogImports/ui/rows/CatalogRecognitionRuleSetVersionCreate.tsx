@@ -15,7 +15,15 @@ import {
 import { getRecognitionLiteralDrafts } from "../../api/getRecognitionLiteralDrafts";
 import { getRecognitionIntegerDrafts } from "../../api/getRecognitionIntegerDrafts";
 import { getRecognitionMultiIntegerDrafts } from "../../api/getRecognitionMultiIntegerDrafts";
-import { recognitionRuleSetVersionsQueryRoot } from "../../api/getRecognitionRuleSetVersions";
+import {
+  getRecognitionRuleSetVersion,
+  recognitionRuleSetVersionsQueryRoot,
+  type RecognitionRuleSetVersionDetails,
+} from "../../api/getRecognitionRuleSetVersions";
+import {
+  getRecognitionRuleSetState,
+  recognitionRuleSetStateQueryRoot,
+} from "../../api/recognitionRuleSetActivation";
 
 interface CatalogRecognitionRuleSetVersionCreateProps {
   onOpenVersion?: (id: string) => void;
@@ -58,6 +66,27 @@ function kindLabel(kind: RuleKind): string {
   }
 }
 
+function isRuleKind(kind: number): kind is RuleKind {
+  return kind === 1 || kind === 2 || kind === 3;
+}
+
+function inheritedDrafts(
+  version: RecognitionRuleSetVersionDetails,
+): DraftOption[] {
+  return version.entries.flatMap((entry) =>
+    isRuleKind(entry.kind)
+      ? [
+          {
+            id: entry.draftId,
+            kind: entry.kind,
+            createdAtUtc: version.createdAtUtc,
+            description: `Уже работает в активной версии ${version.versionNumber}`,
+          },
+        ]
+      : [],
+  );
+}
+
 export function CatalogRecognitionRuleSetVersionCreate({
   manufacturerId,
   productTypeId,
@@ -75,7 +104,10 @@ export function CatalogRecognitionRuleSetVersionCreate({
     initialCharacteristicId,
   );
   const [page, setPage] = useState(1);
-  const [selected, setSelected] = useState<DraftOption[]>([]);
+  const [addedDrafts, setAddedDrafts] = useState<DraftOption[]>([]);
+  const [excludedInheritedKeys, setExcludedInheritedKeys] = useState<string[]>(
+    [],
+  );
   const [validationError, setValidationError] = useState<string | null>(null);
   const submitted = useRef(false);
 
@@ -88,6 +120,50 @@ export function CatalogRecognitionRuleSetVersionCreate({
     !access.isLoading &&
     !access.isError &&
     access.hasPermission("DictionariesManage");
+
+  const stateQuery = useQuery({
+    queryKey: [
+      ...recognitionRuleSetStateQueryRoot,
+      session?.userId,
+      manufacturerId,
+      productTypeId,
+      "version-create",
+    ],
+    queryFn: ({ signal }) =>
+      getRecognitionRuleSetState(manufacturerId, productTypeId, signal),
+    enabled: canCreate && !disabled,
+    staleTime: 0,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  const activeVersionId = stateQuery.data?.activeVersionId ?? null;
+
+  const activeVersionQuery = useQuery({
+    queryKey: [
+      ...recognitionRuleSetVersionsQueryRoot,
+      "active-base",
+      session?.userId,
+      activeVersionId,
+    ],
+    queryFn: ({ signal }) =>
+      getRecognitionRuleSetVersion(activeVersionId!, signal),
+    enabled: canCreate && !disabled && Boolean(activeVersionId),
+    staleTime: 0,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  const baseDrafts = activeVersionQuery.data
+    ? inheritedDrafts(activeVersionQuery.data)
+    : [];
+  const inheritedKeys = new Set(baseDrafts.map(draftKey));
+  const selected = [
+    ...baseDrafts.filter(
+      (draft) => !excludedInheritedKeys.includes(draftKey(draft)),
+    ),
+    ...addedDrafts.filter((draft) => !inheritedKeys.has(draftKey(draft))),
+  ].slice(0, 100);
 
   const selectedCharacteristic = characteristics.find(
     (item) => item.id === characteristicId,
@@ -197,22 +273,46 @@ export function CatalogRecognitionRuleSetVersionCreate({
     },
   });
 
-  const locked = disabled || !creation.isIdle;
+  const baseVersionIsLoading =
+    stateQuery.isPending ||
+    stateQuery.isFetching ||
+    (Boolean(activeVersionId) &&
+      (activeVersionQuery.isPending || activeVersionQuery.isFetching));
+  const baseVersionHasError =
+    stateQuery.isError ||
+    (Boolean(activeVersionId) && activeVersionQuery.isError);
+  const locked =
+    disabled ||
+    !creation.isIdle ||
+    baseVersionIsLoading ||
+    baseVersionHasError;
 
   function toggle(draft: DraftOption): void {
     if (locked || submitted.current) {
       return;
     }
 
-    setSelected((current) => {
-      const key = draftKey(draft);
+    const key = draftKey(draft);
+    const isInherited = inheritedKeys.has(key);
+    const isSelected = selected.some((item) => draftKey(item) === key);
 
-      if (current.some((item) => draftKey(item) === key)) {
-        return current.filter((item) => draftKey(item) !== key);
-      }
+    if (isInherited) {
+      setExcludedInheritedKeys((current) =>
+        isSelected
+          ? current.includes(key)
+            ? current
+            : [...current, key]
+          : current.filter((item) => item !== key),
+      );
+    } else {
+      setAddedDrafts((current) => {
+        if (isSelected) {
+          return current.filter((item) => draftKey(item) !== key);
+        }
 
-      return current.length >= 100 ? current : [...current, draft];
-    });
+        return selected.length >= 100 ? current : [...current, draft];
+      });
+    }
 
     setValidationError(null);
   }
@@ -257,10 +357,67 @@ export function CatalogRecognitionRuleSetVersionCreate({
       <h4 className="font-semibold">Создать версию набора правил</h4>
 
       <p className="text-[var(--app-muted)]">
-        Можно объединить черновики всех трёх видов. Выбранные элементы
-        сохраняются при переключении вида, характеристики и страницы. Создание
-        версии не проверяет совместную работу правил и не активирует их.
+        Новая версия автоматически сохраняет все правила, которые уже работают,
+        и добавляет к ним выбранные черновики. Выбранные элементы сохраняются
+        при переключении вида, характеристики и страницы. Создание версии не
+        активирует её.
       </p>
+
+      {baseVersionIsLoading && (
+        <p role="status" className="text-[var(--app-muted)]">
+          Загружаем правила действующей версии…
+        </p>
+      )}
+
+      {baseVersionHasError && (
+        <div
+          role="alert"
+          className="grid gap-2 rounded-xl border border-[var(--app-danger)] p-3 text-[var(--app-danger)]"
+        >
+          <p>
+            Не удалось загрузить действующую версию. Создание новой версии
+            заблокировано, чтобы случайно не потерять работающие правила.
+          </p>
+          <AppButton
+            type="button"
+            variant="secondary"
+            disabled={stateQuery.isFetching || activeVersionQuery.isFetching}
+            onClick={() => {
+              void stateQuery.refetch();
+              if (activeVersionId) {
+                void activeVersionQuery.refetch();
+              }
+            }}
+          >
+            Повторить загрузку действующих правил
+          </AppButton>
+        </div>
+      )}
+
+      {!baseVersionIsLoading &&
+        !baseVersionHasError &&
+        activeVersionQuery.data && (
+          <div className="rounded-xl border border-[var(--app-success-border)] bg-[var(--app-success-soft)] p-3">
+            <p className="font-medium">
+              В новую версию перенесены действующие правила
+            </p>
+            <p className="mt-1 text-[var(--app-muted)]">
+              Версия {activeVersionQuery.data.versionNumber}: {activeVersionQuery.data.name}.
+              Перенесено шаблонов: {activeVersionQuery.data.entries.length}.
+              Добавьте новые правила ниже.
+            </p>
+          </div>
+        )}
+
+      {!baseVersionIsLoading &&
+        !baseVersionHasError &&
+        stateQuery.isSuccess &&
+        !activeVersionId && (
+          <p className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-3 text-[var(--app-muted)]">
+            Действующей версии пока нет. Новая версия будет собрана только из
+            выбранных ниже черновиков.
+          </p>
+        )}
 
       <label className="grid gap-2">
         <span>Название версии</span>
@@ -429,7 +586,9 @@ export function CatalogRecognitionRuleSetVersionCreate({
         </p>
       )}
 
-      <p className="font-medium">Выбрано черновиков: {selected.length} / 100</p>
+      <p className="font-medium">
+        В новой версии будет шаблонов: {selected.length} / 100
+      </p>
 
       {selected.map((draft) => (
         <div

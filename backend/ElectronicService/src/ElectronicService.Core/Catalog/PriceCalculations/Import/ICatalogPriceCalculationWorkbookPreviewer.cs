@@ -1,3 +1,5 @@
+using ElectronicService.Domain.Catalog.PriceCalculations;
+
 namespace ElectronicService.Core.Catalog.PriceCalculations.Import;
 
 public interface ICatalogPriceCalculationWorkbookPreviewer
@@ -83,6 +85,8 @@ public sealed record CatalogPriceCalculationComponentImportPreviewRow(
     Guid? NeedDefinitionId,
     Guid? ComponentProductId,
     int? CurrentQuantityPerUnit,
+    CatalogPriceCalculationLineComponentSupplyStatus? SupplyStatus,
+    CatalogPriceCalculationLineComponentSupplyStatus? CurrentSupplyStatus,
     CatalogPriceCalculationComponentImportRowStatus Status,
     string? Message);
 

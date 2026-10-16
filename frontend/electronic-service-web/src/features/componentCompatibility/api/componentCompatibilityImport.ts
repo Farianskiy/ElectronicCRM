@@ -24,6 +24,7 @@ export async function previewComponentCompatibilityImport(
 export async function applyComponentCompatibilityImport(rows: Array<{
   componentProductId: string;
   needDefinitionId: string;
+  isActive: boolean;
   constraints: ComponentCompatibilityImportConstraint[];
 }>): Promise<ApplyComponentCompatibilityImportResponse> {
   const response =
@@ -35,10 +36,48 @@ export async function applyComponentCompatibilityImport(rows: Array<{
   return response.data;
 }
 
-export async function downloadComponentCompatibilityTemplate(): Promise<string> {
+export async function downloadCurrentComponentCompatibilityRules(
+  mainProductTypeCode: string,
+): Promise<string> {
+  const response = await httpClient.get<Blob>(
+    "/api/catalog/component-compatibility/import/export",
+    {
+      responseType: "blob",
+      params: { mainProductTypeCode },
+    },
+  );
+
+  return downloadFileResponse(
+    response,
+    `component-compatibility-${mainProductTypeCode}.xlsx`,
+  );
+}
+
+export async function downloadComponentCompatibilityTemplate(
+  mainProductTypeCode?: string,
+  characteristicCodes?: string[],
+  rangeCharacteristicCodes?: string[],
+): Promise<string> {
+  const params = new URLSearchParams();
+  if (mainProductTypeCode) {
+    params.set("mainProductTypeCode", mainProductTypeCode);
+  }
+  for (const code of characteristicCodes ?? []) {
+    params.append("characteristicCodes", code);
+  }
+  if (characteristicCodes?.length === 0) {
+    params.append("characteristicCodes", "");
+  }
+  for (const code of rangeCharacteristicCodes ?? []) {
+    params.append("rangeCharacteristicCodes", code);
+  }
+
   const response = await httpClient.get<Blob>(
     "/api/catalog/component-compatibility/import/template",
-    { responseType: "blob" },
+    {
+      responseType: "blob",
+      params,
+    },
   );
 
   return downloadFileResponse(

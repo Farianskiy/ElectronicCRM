@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { useState } from "react";
 import { RequirePermission } from "@/features/auth/ui/RequirePermission";
-import { getCatalogProductTypes } from "@/features/catalogMetadata/api/getCatalogProductTypes";
+import { getCatalogProductTypesIncludingArchived } from "@/features/catalogMetadata/api/getCatalogProductTypes";
 import { getCatalogProductTypeCharacteristicSchema } from "@/features/catalogProductTypes/api/getCatalogProductTypeCharacteristicSchema";
 import type { CatalogProductTypeCharacteristicSchemaItem } from "@/features/catalogProductTypes/model/types";
 import { AddOptionalCharacteristicToProductType } from "@/features/catalogProductTypes/ui/AddOptionalCharacteristicToProductType";
@@ -13,7 +13,8 @@ import { PageHeader } from "@/shared/ui/PageHeader";
 import { ProductTypeCharacteristicRequirednessControl } from "@/features/catalogProductTypes/ui/ProductTypeCharacteristicRequirednessControl";
 import { ProductTypeCharacteristicRemovalControl } from "@/features/catalogProductTypes/ui/ProductTypeCharacteristicRemovalControl";
 import { CreateCatalogProductTypeForm } from "@/features/catalogProductTypes/ui/CreateCatalogProductTypeForm";
-import { ComponentNeedsManager } from "@/features/componentCompatibility/ui/ComponentNeedsManager";
+import { ProductTypeKindManagement } from "@/features/catalogProductTypes/ui/ProductTypeKindManagement";
+import { ProductTypeLifecycleManagement } from "@/features/catalogProductTypes/ui/ProductTypeLifecycleManagement";
 
 function getErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
@@ -109,7 +110,7 @@ function CatalogProductTypesContent() {
 
   const productTypesQuery = useQuery({
     queryKey: ["catalog-product-types"],
-    queryFn: getCatalogProductTypes,
+    queryFn: getCatalogProductTypesIncludingArchived,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -203,7 +204,7 @@ function CatalogProductTypesContent() {
               }}
               options={productTypes.map((productType) => ({
                 value: productType.code,
-                label: `${productType.name} · ${formatProductTypeKind(productType.kind)}`,
+                label: `${productType.name} · ${formatProductTypeKind(productType.kind)}${productType.isArchived ? " · Архив" : ""}`,
               }))}
             />
           </div>
@@ -278,9 +279,16 @@ function CatalogProductTypesContent() {
                 </p>
 
                 {selectedProductType && (
-                  <span className="mt-3 inline-flex rounded-full border border-teal-500/30 bg-teal-500/10 px-3 py-1 text-xs font-medium text-teal-300">
-                    {formatProductTypeKind(selectedProductType.kind)}
-                  </span>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <span className="inline-flex rounded-full border border-teal-500/30 bg-teal-500/10 px-3 py-1 text-xs font-medium text-teal-300">
+                      {formatProductTypeKind(selectedProductType.kind)}
+                    </span>
+                    {selectedProductType.isArchived && (
+                      <span className="inline-flex rounded-full border border-slate-500/30 bg-slate-500/10 px-3 py-1 text-xs font-medium text-slate-300">
+                        Архив
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -320,19 +328,29 @@ function CatalogProductTypesContent() {
             </div>
           </section>
 
-          {selectedProductType?.kind === "MainProduct" && (
-            <ComponentNeedsManager
-              key={`component-needs-${selectedProductType.code}`}
-              productTypeCode={selectedProductType.code}
-              productTypeName={selectedProductType.name}
+          {selectedProductType && !selectedProductType.isArchived && (
+            <ProductTypeKindManagement
+              key={`kind-${selectedProductType.id}-${selectedProductType.kind}`}
+              productType={selectedProductType}
+              onChanged={setSchemaSuccessMessage}
             />
           )}
 
-          <AddOptionalCharacteristicToProductType
+          {selectedProductType && (
+            <ProductTypeLifecycleManagement
+              key={`lifecycle-${selectedProductType.id}-${selectedProductType.isArchived}`}
+              productType={selectedProductType}
+              onChanged={setSchemaSuccessMessage}
+            />
+          )}
+
+          {selectedProductType && !selectedProductType.isArchived && (
+            <AddOptionalCharacteristicToProductType
             key={`characteristics-${schema.productTypeCode}`}
             productTypeCode={schema.productTypeCode}
             productTypeName={schema.productTypeName}
-          />
+            />
+          )}
 
           {schema.characteristics.length === 0 ? (
             <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
@@ -343,6 +361,11 @@ function CatalogProductTypesContent() {
               <p className="mt-2 text-sm text-slate-400">
                 Для выбранного типа товара ещё не добавлены характеристики.
               </p>
+            </section>
+          ) : selectedProductType?.isArchived ? (
+            <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 text-sm text-slate-400">
+              Схема архивного типа доступна только для просмотра. Восстановите
+              тип, чтобы изменить характеристики.
             </section>
           ) : (
             <section className="grid gap-4">

@@ -30,7 +30,6 @@ import {
   createCatalogProductBulkEditorHref,
   hasCatalogProductBulkEditorFilters,
 } from "@/features/catalogProducts/model/bulkEditorFilters";
-import { ComponentCompatibilityImportPanel } from "@/features/componentCompatibility/ui/ComponentCompatibilityImportPanel";
 
 function getErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
@@ -79,9 +78,16 @@ function ProductRow({ product }: { product: CatalogProductListItem }) {
   return (
     <tr className="bg-[var(--app-panel)] transition-colors hover:bg-[var(--app-panel-hover)] motion-reduce:transition-none">
       <td className="min-w-[240px] max-w-[420px] px-4 py-4">
-        <p className="break-words font-medium text-[var(--app-text)]">
-          {product.name}
-        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="break-words font-medium text-[var(--app-text)]">
+            {product.name}
+          </p>
+          {product.isArchived && (
+            <span className="rounded-full border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] px-2 py-0.5 text-xs font-semibold text-[var(--app-danger)]">
+              Удалён
+            </span>
+          )}
+        </div>
       </td>
 
       <td className="px-4 py-4 text-[var(--app-muted)]">{product.article}</td>
@@ -125,6 +131,8 @@ interface AppliedCatalogFilters {
   manufacturer: string | null;
   characteristics: SearchProductCharacteristicRequest[];
   onlyInStock: boolean | null;
+  includeArchived: boolean;
+  onlyArchived: boolean;
 }
 
 const initialAppliedFilters: AppliedCatalogFilters = {
@@ -133,6 +141,8 @@ const initialAppliedFilters: AppliedCatalogFilters = {
   manufacturer: null,
   characteristics: [],
   onlyInStock: null,
+  includeArchived: false,
+  onlyArchived: false,
 };
 
 interface CharacteristicFilterFieldProps {
@@ -226,13 +236,13 @@ export default function CatalogProductsPage() {
   const canEditProducts = hasPermission("ProductsEdit");
   const canManagePrices = hasPermission("PricesManage");
   const canManageStock = hasPermission("StockManage");
-  const canManageDictionaries = hasPermission("DictionariesManage");
   const canBulkEdit = canEditProducts || canManagePrices || canManageStock;
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [productTypeCode, setProductTypeCode] = useState("");
   const [manufacturer, setManufacturer] = useState("");
   const [onlyInStock, setOnlyInStock] = useState(false);
+  const [archiveStatus, setArchiveStatus] = useState("active");
   const [stockManufacturerId, setStockManufacturerId] = useState("");
   const [stockFile, setStockFile] = useState<File | null>(null);
 
@@ -359,6 +369,8 @@ export default function CatalogProductsPage() {
       manufacturer: manufacturer || null,
       characteristics,
       onlyInStock: onlyInStock ? true : null,
+      includeArchived: canEditProducts && archiveStatus !== "active",
+      onlyArchived: canEditProducts && archiveStatus === "archived",
     });
 
     setPage(1);
@@ -369,6 +381,7 @@ export default function CatalogProductsPage() {
     setProductTypeCode("");
     setManufacturer("");
     setOnlyInStock(false);
+    setArchiveStatus("active");
     setCharacteristicValues({});
     setAppliedFilters(initialAppliedFilters);
     setPage(1);
@@ -538,7 +551,6 @@ export default function CatalogProductsPage() {
         </section>
       )}
 
-      {canManageDictionaries && <ComponentCompatibilityImportPanel />}
 
       <section
         aria-labelledby="catalog-filters-title"
@@ -637,6 +649,25 @@ export default function CatalogProductsPage() {
                 ]}
               />
             </label>
+
+            {canEditProducts && (
+              <label className="grid min-w-0 content-start gap-2">
+                <span className="text-sm font-medium text-[var(--app-text)]">
+                  Состояние
+                </span>
+
+                <AppSelect
+                  ariaLabel="Состояние товара"
+                  value={archiveStatus}
+                  onChange={setArchiveStatus}
+                  options={[
+                    { value: "active", label: "Активные" },
+                    { value: "archived", label: "Удалённые" },
+                    { value: "all", label: "Все" },
+                  ]}
+                />
+              </label>
+            )}
           </div>
 
           {productTypeCode && (

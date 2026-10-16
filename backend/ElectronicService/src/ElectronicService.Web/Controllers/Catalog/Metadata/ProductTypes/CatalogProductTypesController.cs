@@ -20,16 +20,20 @@ public sealed class CatalogProductTypesController : ControllerBase
     [HttpGet]
     [ProducesResponseType(typeof(IReadOnlyCollection<CatalogProductTypeResponse>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyCollection<CatalogProductTypeResponse>>> GetProductTypes(
+        [FromQuery] bool includeArchived = false,
         CancellationToken cancellationToken = default)
     {
         var result = await _handler
-            .Handle(new GetCatalogProductTypesQuery(), cancellationToken)
+            .Handle(
+                new GetCatalogProductTypesQuery(includeArchived),
+                cancellationToken)
             .ConfigureAwait(false);
 
         return Ok(result.Select(productType => new CatalogProductTypeResponse(
             productType.Id,
             productType.Code,
             productType.Name,
-            productType.Kind)).ToList());
+            productType.Kind,
+            productType.IsArchived)).ToList());
     }
 }

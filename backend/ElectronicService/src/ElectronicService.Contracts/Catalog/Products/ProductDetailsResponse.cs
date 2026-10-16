@@ -13,4 +13,7 @@ public sealed record ProductDetailsResponse(
     string PriceCurrency,
     decimal StockQuantity,
     IReadOnlyCollection<ProductCharacteristicResponse> Characteristics,
-    IReadOnlyCollection<ProductAliasResponse> Aliases);
+    IReadOnlyCollection<ProductAliasResponse> Aliases,
+    bool IsArchived,
+    DateTime? ArchivedAtUtc,
+    string? ArchiveReason);

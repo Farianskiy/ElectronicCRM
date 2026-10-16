@@ -31,6 +31,14 @@ public sealed class CatalogProductSearchController : ControllerBase
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        if ((request.IncludeArchived || request.OnlyArchived)
+            && !User.HasClaim(
+                PermissionClaimTypes.Permission,
+                UserPermissionCode.ProductsEdit.ToString()))
+        {
+            return Forbid();
+        }
+
         var characteristicFilters =
             request.Characteristics?
                 .Select(characteristic =>
@@ -47,7 +55,9 @@ public sealed class CatalogProductSearchController : ControllerBase
             Characteristics: characteristicFilters,
             Page: request.Page,
             PageSize: request.PageSize,
-            OnlyInStock: request.OnlyInStock);
+            OnlyInStock: request.OnlyInStock,
+            IncludeArchived: request.IncludeArchived,
+            OnlyArchived: request.OnlyArchived);
 
         var result = await _searchProductsQueryHandler
             .Handle(
@@ -69,7 +79,8 @@ public sealed class CatalogProductSearchController : ControllerBase
                     item.StockQuantity,
                     item.ManufacturerId,
                     item.BasePriceAmount,
-                    item.BasePriceCurrency))
+                    item.BasePriceCurrency,
+                    item.IsArchived))
             .ToList();
 
         var response = new ProductsListResponse(

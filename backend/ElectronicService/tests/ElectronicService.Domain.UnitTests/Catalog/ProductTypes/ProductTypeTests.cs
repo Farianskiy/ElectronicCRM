@@ -44,6 +44,52 @@ public sealed class ProductTypeTests
         Assert.Equal("general.value_is_invalid", result.Error.Code);
     }
 
+    [Fact]
+    public void ChangeKindKeepsIdentityAndChangesOnlyPurpose()
+    {
+        var productType = ProductType.Create(
+            "CONTACTOR_KTI",
+            "Контактор КТИ",
+            ProductTypeKind.Component).Value;
+        var originalId = productType.Id;
+
+        var result = productType.ChangeKind(ProductTypeKind.MainProduct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(originalId, productType.Id);
+        Assert.Equal("CONTACTOR_KTI", productType.Code);
+        Assert.Equal("Контактор КТИ", productType.Name);
+        Assert.Equal(ProductTypeKind.MainProduct, productType.Kind);
+    }
+
+    [Fact]
+    public void ChangeKindRejectsUnknownKind()
+    {
+        var productType = TestDataFactory.CreateProductType();
+
+        var result = productType.ChangeKind((ProductTypeKind)99);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("general.value_is_invalid", result.Error.Code);
+        Assert.Equal(ProductTypeKind.MainProduct, productType.Kind);
+    }
+
+    [Fact]
+    public void ArchiveAndRestoreChangeLifecycleState()
+    {
+        var productType = TestDataFactory.CreateProductType();
+
+        productType.Archive();
+
+        Assert.True(productType.IsArchived);
+        Assert.NotNull(productType.ArchivedAtUtc);
+
+        productType.Restore();
+
+        Assert.False(productType.IsArchived);
+        Assert.Null(productType.ArchivedAtUtc);
+    }
+
     // Проверяет сохранение всех настроек характеристики внутри типа товара.
     [Fact]
     public void AddCharacteristicStoresAllConfiguration()

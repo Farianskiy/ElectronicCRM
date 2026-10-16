@@ -1,6 +1,7 @@
 using ElectronicService.Contracts.Catalog.PriceCalculations;
 using ElectronicService.Core.Abstractions;
 using ElectronicService.Core.Catalog.PriceCalculations.ApplyCatalogPriceCalculationImport;
+using ElectronicService.Domain.Catalog.PriceCalculations;
 using ElectronicService.Web.Controllers.Catalog.PriceCalculations.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -106,6 +107,25 @@ public sealed class ApplyCatalogPriceCalculationImportController
                     title: ProblemTitle);
             }
 
+            CatalogPriceCalculationLineComponentSupplyStatus? supplyStatus = null;
+
+            if (action != CatalogPriceCalculationImportAction.Remove)
+            {
+                if (!Enum.TryParse<CatalogPriceCalculationLineComponentSupplyStatus>(
+                        row.SupplyStatus,
+                        ignoreCase: true,
+                        out var parsedSupplyStatus)
+                    || !Enum.IsDefined(parsedSupplyStatus))
+                {
+                    return Problem(
+                        detail: $"Неизвестный статус обеспечения комплектующего: '{row.SupplyStatus}'.",
+                        statusCode: StatusCodes.Status400BadRequest,
+                        title: ProblemTitle);
+                }
+
+                supplyStatus = parsedSupplyStatus;
+            }
+
             componentCommandRows.Add(
                 new ApplyCatalogPriceCalculationComponentImportRow(
                     action,
@@ -113,7 +133,8 @@ public sealed class ApplyCatalogPriceCalculationImportController
                     row.ExistingComponentLineId,
                     row.NeedDefinitionId,
                     row.ComponentProductId,
-                    row.QuantityPerUnit));
+                    row.QuantityPerUnit,
+                    supplyStatus));
         }
 
         var characteristicCommandRows =

@@ -51,7 +51,8 @@ public sealed class CatalogProductsController : ControllerBase
                 item.StockQuantity,
                 item.ManufacturerId,
                 item.BasePriceAmount,
-                item.BasePriceCurrency)).ToList(),
+                item.BasePriceCurrency,
+                item.IsArchived)).ToList(),
             result.Page,
             result.PageSize,
             result.TotalCount));

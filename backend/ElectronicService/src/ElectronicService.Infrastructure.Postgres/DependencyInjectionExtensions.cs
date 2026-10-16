@@ -22,6 +22,7 @@ using ElectronicService.Core.Catalog.Products.Audit;
 using ElectronicService.Core.Catalog.Products.GetAuditHistory;
 using ElectronicService.Core.Catalog.Products.StockImport;
 using ElectronicService.Core.Catalog.ProductTypes.Abstractions;
+using ElectronicService.Core.Catalog.ProductTypes.ChangeKind;
 using ElectronicService.Core.Catalog.Recognition.Abstractions;
 using ElectronicService.Core.Users;
 using ElectronicService.Core.Users.Access;
@@ -137,6 +138,7 @@ public static class DependencyInjectionExtensions
         services.AddScoped<ICatalogProductTypeSchemaReader, CatalogProductTypeSchemaReader>();
         services.AddScoped<IProductTypeSchemaRepository, ProductTypeSchemaRepository>();
         services.AddScoped<IProductTypeManagementRepository, ProductTypeManagementRepository>();
+        services.AddScoped<IProductTypeKindManagementRepository, ProductTypeKindManagementRepository>();
         services.AddScoped<ICatalogCharacteristicDefinitionsReader, CatalogCharacteristicDefinitionsReader>();
         services.AddScoped<ICharacteristicDefinitionRepository, CharacteristicDefinitionRepository>();
         services.AddScoped<IProductAuditRepository, ProductAuditRepository>();

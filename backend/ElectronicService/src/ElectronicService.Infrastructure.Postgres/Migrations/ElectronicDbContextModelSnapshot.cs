@@ -122,6 +122,31 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         });
                 });
 
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Components.ComponentCompatibilityConditionGroup", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ComponentOfferId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("component_offer_id");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ComponentOfferId", "Position")
+                        .IsUnique();
+
+                    b.ToTable("component_compatibility_condition_groups", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_component_condition_groups_position_non_negative", "\"position\" >= 0");
+                        });
+                });
+
             modelBuilder.Entity("ElectronicService.Domain.Catalog.Components.ComponentCompatibilityConstraint", b =>
                 {
                     b.Property<Guid>("Id")
@@ -132,21 +157,29 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("characteristic_definition_id");
 
-                    b.Property<Guid>("ComponentOfferId")
+                    b.Property<string>("ComparisonOperator")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("Equal")
+                        .HasColumnName("comparison_operator");
+
+                    b.Property<Guid>("ConditionGroupId")
                         .HasColumnType("uuid")
-                        .HasColumnName("component_offer_id");
+                        .HasColumnName("condition_group_id");
 
                     b.HasKey("Id");
 
                     b.HasIndex("CharacteristicDefinitionId");
 
-                    b.HasIndex("ComponentOfferId");
+                    b.HasIndex("ConditionGroupId");
 
                     b.ToTable("component_compatibility_constraints", null, t =>
                         {
                             t.HasCheckConstraint("ck_component_constraints_data_type_not_none", "\"expected_data_type\" <> 'None'");
 
-                            t.HasCheckConstraint("ck_component_constraints_only_one_value_type", "(\n    \"expected_data_type\" = 'Text'\n    AND \"expected_text\" IS NOT NULL\n    AND \"expected_number\" IS NULL\n    AND \"expected_boolean\" IS NULL\n)\nOR\n(\n    \"expected_data_type\" = 'Number'\n    AND \"expected_text\" IS NULL\n    AND \"expected_number\" IS NOT NULL\n    AND \"expected_boolean\" IS NULL\n)\nOR\n(\n    \"expected_data_type\" = 'Boolean'\n    AND \"expected_text\" IS NULL\n    AND \"expected_number\" IS NULL\n    AND \"expected_boolean\" IS NOT NULL\n)");
+                            t.HasCheckConstraint("ck_component_constraints_only_one_value_type", "(\r\n    \"expected_data_type\" = 'Text'\r\n    AND \"expected_text\" IS NOT NULL\r\n    AND \"expected_number\" IS NULL\r\n    AND \"expected_boolean\" IS NULL\r\n)\r\nOR\r\n(\r\n    \"expected_data_type\" = 'Number'\r\n    AND \"expected_text\" IS NULL\r\n    AND \"expected_number\" IS NOT NULL\r\n    AND \"expected_boolean\" IS NULL\r\n)\r\nOR\r\n(\r\n    \"expected_data_type\" = 'Boolean'\r\n    AND \"expected_text\" IS NULL\r\n    AND \"expected_number\" IS NULL\r\n    AND \"expected_boolean\" IS NOT NULL\r\n)");
                         });
                 });
 
@@ -166,6 +199,10 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
 
+                    b.Property<int>("DefaultQuantityPerUnit")
+                        .HasColumnType("integer")
+                        .HasColumnName("default_quantity_per_unit");
+
                     b.Property<Guid>("MainProductTypeId")
                         .HasColumnType("uuid")
                         .HasColumnName("main_product_type_id");
@@ -176,12 +213,21 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
 
+                    b.Property<string>("RequirementMode")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("requirement_mode");
+
                     b.HasKey("Id");
 
                     b.HasIndex("MainProductTypeId", "Code")
                         .IsUnique();
 
-                    b.ToTable("component_need_definitions", (string)null);
+                    b.ToTable("component_need_definitions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_component_need_default_quantity", "\"default_quantity_per_unit\" >= 1 AND \"default_quantity_per_unit\" <= 1000000");
+                        });
                 });
 
             modelBuilder.Entity("ElectronicService.Domain.Catalog.Components.ComponentOffer", b =>
@@ -198,9 +244,19 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
 
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
                     b.Property<Guid>("NeedDefinitionId")
                         .HasColumnType("uuid")
                         .HasColumnName("need_definition_id");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
 
                     b.HasKey("Id");
 
@@ -1505,6 +1561,12 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         .HasColumnType("character varying(32)")
                         .HasColumnName("selection_source");
 
+                    b.Property<string>("SupplyStatus")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("supply_status");
+
                     b.Property<decimal>("TotalAmount")
                         .HasPrecision(22, 2)
                         .HasColumnType("numeric(22,2)")
@@ -1907,11 +1969,21 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<DateTime?>("ArchivedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("archived_at_utc");
+
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("code");
+
+                    b.Property<bool>("IsArchived")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_archived");
 
                     b.Property<string>("Kind")
                         .IsRequired()
@@ -1931,6 +2003,8 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
 
                     b.HasIndex("Code")
                         .IsUnique();
+
+                    b.HasIndex("IsArchived");
 
                     b.HasIndex("Name");
 
@@ -1997,9 +2071,28 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("ArchiveReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("archive_reason");
+
+                    b.Property<DateTime?>("ArchivedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("archived_at_utc");
+
+                    b.Property<Guid?>("ArchivedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("archived_by_user_id");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
+
+                    b.Property<bool>("IsArchived")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_archived");
 
                     b.Property<Guid>("ManufacturerId")
                         .HasColumnType("uuid")
@@ -2020,6 +2113,8 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         .HasColumnName("xmin");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("IsArchived");
 
                     b.HasIndex("ManufacturerId");
 
@@ -3337,6 +3432,15 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                     b.ToTable("user_permission_overrides", (string)null);
                 });
 
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Components.ComponentCompatibilityConditionGroup", b =>
+                {
+                    b.HasOne("ElectronicService.Domain.Catalog.Components.ComponentOffer", null)
+                        .WithMany("ConditionGroups")
+                        .HasForeignKey("ComponentOfferId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("ElectronicService.Domain.Catalog.Components.ComponentCompatibilityConstraint", b =>
                 {
                     b.HasOne("ElectronicService.Domain.Catalog.Characteristics.CharacteristicDefinition", null)
@@ -3345,9 +3449,9 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("ElectronicService.Domain.Catalog.Components.ComponentOffer", null)
+                    b.HasOne("ElectronicService.Domain.Catalog.Components.ComponentCompatibilityConditionGroup", null)
                         .WithMany("Constraints")
-                        .HasForeignKey("ComponentOfferId")
+                        .HasForeignKey("ConditionGroupId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -4180,9 +4284,14 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("ElectronicService.Domain.Catalog.Components.ComponentOffer", b =>
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Components.ComponentCompatibilityConditionGroup", b =>
                 {
                     b.Navigation("Constraints");
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Components.ComponentOffer", b =>
+                {
+                    b.Navigation("ConditionGroups");
                 });
 
             modelBuilder.Entity("ElectronicService.Domain.Catalog.ImportBatches.CatalogImportBatch", b =>

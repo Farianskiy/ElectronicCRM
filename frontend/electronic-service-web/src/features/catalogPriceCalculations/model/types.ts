@@ -84,6 +84,7 @@ export interface CatalogPriceCalculationLineComponent {
   article: string;
   name: string;
   selectionSource: "Recommended" | "Manual";
+  supplyStatus: CatalogPriceCalculationLineComponentSupplyStatus;
   quantityPerUnit: number;
   totalQuantity: number;
   basePriceAmount: number;
@@ -93,6 +94,11 @@ export interface CatalogPriceCalculationLineComponent {
   createdAtUtc: string;
   updatedAtUtc?: string | null;
 }
+
+export type CatalogPriceCalculationLineComponentSupplyStatus =
+  | "ToPurchase"
+  | "AlreadyAvailable"
+  | "IncludedInSupply";
 
 export interface CatalogPriceCalculationManufacturerDiscount {
   discountId: string;
@@ -247,6 +253,8 @@ export interface CatalogPriceCalculationComponentImportPreviewRow {
   needDefinitionId: string | null;
   componentProductId: string | null;
   currentQuantityPerUnit: number | null;
+  supplyStatus: CatalogPriceCalculationLineComponentSupplyStatus | null;
+  currentSupplyStatus: CatalogPriceCalculationLineComponentSupplyStatus | null;
   status: CatalogPriceCalculationComponentImportRowStatus;
   message: string | null;
 }
@@ -311,6 +319,7 @@ export interface ApplyCatalogPriceCalculationImportRequest {
     needDefinitionId: string;
     componentProductId: string;
     quantityPerUnit: number | null;
+    supplyStatus: CatalogPriceCalculationLineComponentSupplyStatus | null;
   }>;
   characteristicRows: Array<{
     action: "Set" | "Remove";

@@ -15,6 +15,8 @@ export async function searchCatalogProducts(
       manufacturer: params.manufacturer,
       characteristics: params.characteristics ?? [],
       onlyInStock: params.onlyInStock ?? null,
+      includeArchived: params.includeArchived ?? false,
+      onlyArchived: params.onlyArchived ?? false,
       page: params.page,
       pageSize: params.pageSize,
     },

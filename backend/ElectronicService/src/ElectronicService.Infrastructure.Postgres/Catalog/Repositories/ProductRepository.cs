@@ -31,6 +31,7 @@ public sealed class ProductRepository : IProductRepository
         var normalizedArticle = article.Trim();
 
         return _dbContext.Products
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .AnyAsync(
                 product => product.ManufacturerId == manufacturerId
@@ -53,6 +54,19 @@ public sealed class ProductRepository : IProductRepository
         CancellationToken cancellationToken = default)
     {
         return _dbContext.Products
+            .Include(product => product.Characteristics)
+            .Include(product => product.Aliases)
+            .FirstOrDefaultAsync(
+                product => product.Id == productId,
+                cancellationToken);
+    }
+
+    public Task<Product?> GetByIdIncludingArchivedAsync(
+        Guid productId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Products
+            .IgnoreQueryFilters()
             .Include(product => product.Characteristics)
             .Include(product => product.Aliases)
             .FirstOrDefaultAsync(

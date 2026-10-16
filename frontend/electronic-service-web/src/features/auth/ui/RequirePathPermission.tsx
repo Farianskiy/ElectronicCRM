@@ -19,6 +19,10 @@ const protectedPaths: ReadonlyArray<{
   { path: "/catalog/import-reviews", permissions: ["CatalogImportsReview"] },
   { path: "/catalog/price-lists", permissions: ["PriceListsManage"] },
   { path: "/catalog/product-types", permissions: ["DictionariesManage"] },
+  {
+    path: "/catalog/component-compatibility",
+    permissions: ["DictionariesManage"],
+  },
   { path: "/catalog/characteristics", permissions: ["DictionariesManage"] },
   { path: "/catalog/recognition", permissions: ["DictionariesManage"] },
   {

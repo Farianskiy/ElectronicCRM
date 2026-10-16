@@ -19,6 +19,7 @@ export interface CatalogProductListItem {
   basePriceAmount: number;
   basePriceCurrency: string;
   stockQuantity: number;
+  isArchived: boolean;
 }
 
 export interface BulkUpdateCatalogProductRequest {
@@ -62,6 +63,8 @@ export interface AdvancedCatalogProductsSearchParams {
   manufacturer?: string | null;
   characteristics?: SearchProductCharacteristicRequest[];
   onlyInStock?: boolean | null;
+  includeArchived?: boolean;
+  onlyArchived?: boolean;
   page: number;
   pageSize: number;
 }
@@ -89,6 +92,9 @@ export interface CatalogProductDetails {
 
   characteristics: CatalogProductCharacteristic[];
   aliases: CatalogProductAlias[];
+  isArchived: boolean;
+  archivedAtUtc?: string | null;
+  archiveReason?: string | null;
 }
 export interface CreateCatalogProductRequest {
   article: string;

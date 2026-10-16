@@ -288,6 +288,7 @@ public sealed class CatalogPriceCalculationWorkbookExporter : ICatalogPriceCalcu
             "Прайс 100%",
             "Скидка, %",
             "Проектная цена",
+            "Статус обеспечения",
             "Сумма",
             "ID строки основного товара",
             "ID строки комплектующего",
@@ -328,11 +329,13 @@ public sealed class CatalogPriceCalculationWorkbookExporter : ICatalogPriceCalcu
                 worksheet.Cell(currentRow, 12).Value = component.BasePriceAmount;
                 worksheet.Cell(currentRow, 13).Value = component.DiscountPercent / 100m;
                 worksheet.Cell(currentRow, 14).Value = component.ProjectPriceAmount;
-                worksheet.Cell(currentRow, 15).Value = component.TotalAmount;
-                worksheet.Cell(currentRow, 16).Value = line.LineId.ToString();
-                worksheet.Cell(currentRow, 17).Value = component.ComponentLineId.ToString();
-                worksheet.Cell(currentRow, 18).Value = component.NeedDefinitionId.ToString();
-                worksheet.Cell(currentRow, 19).Value = component.ComponentProductId.ToString();
+                worksheet.Cell(currentRow, 15).Value =
+                    GetSupplyStatusLabel(component.SupplyStatus);
+                worksheet.Cell(currentRow, 16).Value = component.TotalAmount;
+                worksheet.Cell(currentRow, 17).Value = line.LineId.ToString();
+                worksheet.Cell(currentRow, 18).Value = component.ComponentLineId.ToString();
+                worksheet.Cell(currentRow, 19).Value = component.NeedDefinitionId.ToString();
+                worksheet.Cell(currentRow, 20).Value = component.ComponentProductId.ToString();
 
                 currentRow++;
             }
@@ -349,7 +352,11 @@ public sealed class CatalogPriceCalculationWorkbookExporter : ICatalogPriceCalcu
             worksheet.Range(2, 4, currentRow - 1, 4).Style.NumberFormat.Format = "#,##0.00";
             worksheet.Range(2, 10, currentRow - 1, 12).Style.NumberFormat.Format = "#,##0.00";
             worksheet.Range(2, 13, currentRow - 1, 13).Style.NumberFormat.Format = "0.00%";
-            worksheet.Range(2, 14, currentRow - 1, 15).Style.NumberFormat.Format = "#,##0.00";
+            worksheet.Range(2, 14, currentRow - 1, 14).Style.NumberFormat.Format = "#,##0.00";
+            worksheet.Range(2, 16, currentRow - 1, 16).Style.NumberFormat.Format = "#,##0.00";
+            worksheet.Range(2, 15, currentRow - 1, 15)
+                .CreateDataValidation()
+                .List("Добавить в расчёт,Уже имеется,Входит в поставку", true);
             worksheet.Range(1, 1, currentRow - 1, headers.Length).SetAutoFilter();
         }
 
@@ -363,8 +370,10 @@ public sealed class CatalogPriceCalculationWorkbookExporter : ICatalogPriceCalcu
         worksheet.Column(7).Width = 24;
         worksheet.Column(8).Width = 42;
         worksheet.Column(9).Width = 24;
-        worksheet.Columns(10, 15).Width = 18;
-        worksheet.Columns(16, 19).Hide();
+        worksheet.Columns(10, 14).Width = 18;
+        worksheet.Column(15).Width = 24;
+        worksheet.Column(16).Width = 18;
+        worksheet.Columns(17, 20).Hide();
 
         var usedRange = worksheet.RangeUsed();
 
@@ -646,6 +655,21 @@ public sealed class CatalogPriceCalculationWorkbookExporter : ICatalogPriceCalcu
             CatalogPriceCalculationStatus.Draft => "Черновик",
             CatalogPriceCalculationStatus.Completed => "Завершён",
             CatalogPriceCalculationStatus.Archived => "В архиве",
+            _ => status.ToString()
+        };
+    }
+
+    private static string GetSupplyStatusLabel(
+        CatalogPriceCalculationLineComponentSupplyStatus status)
+    {
+        return status switch
+        {
+            CatalogPriceCalculationLineComponentSupplyStatus.ToPurchase =>
+                "Добавить в расчёт",
+            CatalogPriceCalculationLineComponentSupplyStatus.AlreadyAvailable =>
+                "Уже имеется",
+            CatalogPriceCalculationLineComponentSupplyStatus.IncludedInSupply =>
+                "Входит в поставку",
             _ => status.ToString()
         };
     }

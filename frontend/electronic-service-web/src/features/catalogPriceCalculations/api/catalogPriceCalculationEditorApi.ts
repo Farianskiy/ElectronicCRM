@@ -3,6 +3,7 @@ import type {
   ApplyCatalogPriceCalculationImportRequest,
   ApplyCatalogPriceCalculationImportResponse,
   CatalogPriceCalculationDetails,
+  CatalogPriceCalculationLineComponentSupplyStatus,
   PreviewCatalogPriceCalculationImportRequest,
   PreviewCatalogPriceCalculationImportResponse,
   SearchCatalogPriceCalculationProductsParams,
@@ -111,6 +112,7 @@ export async function addCatalogPriceCalculationLineComponent(request: {
   componentProductId: string;
   quantityPerUnit: number;
   manualSelection?: boolean;
+  supplyStatus?: CatalogPriceCalculationLineComponentSupplyStatus;
 }): Promise<void> {
   await httpClient.post(
     `/api/catalog/price-calculations/${request.calculationId}/lines/${request.lineId}/components`,
@@ -119,7 +121,22 @@ export async function addCatalogPriceCalculationLineComponent(request: {
       componentProductId: request.componentProductId,
       quantityPerUnit: request.quantityPerUnit,
       manualSelection: request.manualSelection ?? false,
+      supplyStatus: request.supplyStatus ?? "ToPurchase",
     },
+  );
+}
+
+export async function changeCatalogPriceCalculationLineComponentSupplyStatus(
+  request: {
+    calculationId: string;
+    lineId: string;
+    componentLineId: string;
+    supplyStatus: CatalogPriceCalculationLineComponentSupplyStatus;
+  },
+): Promise<void> {
+  await httpClient.patch(
+    `/api/catalog/price-calculations/${request.calculationId}/lines/${request.lineId}/components/${request.componentLineId}/supply-status`,
+    { supplyStatus: request.supplyStatus },
   );
 }
 

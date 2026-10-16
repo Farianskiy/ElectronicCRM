@@ -83,6 +83,7 @@ public sealed record CatalogPriceCalculationLineComponentDetails(
     string Article,
     string Name,
     CatalogPriceCalculationLineComponentSelectionSource SelectionSource,
+    CatalogPriceCalculationLineComponentSupplyStatus SupplyStatus,
     int QuantityPerUnit,
     decimal TotalQuantity,
     decimal BasePriceAmount,

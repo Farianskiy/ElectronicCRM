@@ -26,7 +26,7 @@ public sealed class CatalogProductTypeSuggestionService
         cancellationToken.ThrowIfCancellationRequested();
 
         var productTypes = await _metadataReader
-            .GetProductTypesAsync(cancellationToken)
+            .GetProductTypesAsync(false, cancellationToken)
             .ConfigureAwait(false);
 
         var dictionaryTerms = await _dictionaryReader

@@ -20,7 +20,8 @@ public sealed record ApplyCatalogPriceCalculationComponentImportRowRequest(
     Guid? ExistingComponentLineId,
     Guid NeedDefinitionId,
     Guid ComponentProductId,
-    int? QuantityPerUnit);
+    int? QuantityPerUnit,
+    string? SupplyStatus);
 
 public sealed record ApplyCatalogPriceCalculationCharacteristicImportRowRequest(
     string Action,

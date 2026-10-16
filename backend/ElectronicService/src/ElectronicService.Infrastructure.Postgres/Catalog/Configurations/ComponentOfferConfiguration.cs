@@ -25,6 +25,12 @@ public sealed class ComponentOfferConfiguration
         builder.Property(offer => offer.CreatedAtUtc)
             .HasColumnName("created_at_utc")
             .IsRequired();
+        builder.Property(offer => offer.UpdatedAtUtc)
+            .HasColumnName("updated_at_utc");
+        builder.Property(offer => offer.IsActive)
+            .HasColumnName("is_active")
+            .HasDefaultValue(true)
+            .IsRequired();
 
         builder.HasOne<Product>()
             .WithMany()
@@ -35,11 +41,11 @@ public sealed class ComponentOfferConfiguration
             .HasForeignKey(offer => offer.NeedDefinitionId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasMany(offer => offer.Constraints)
+        builder.HasMany(offer => offer.ConditionGroups)
             .WithOne()
-            .HasForeignKey(constraint => constraint.ComponentOfferId)
+            .HasForeignKey(group => group.ComponentOfferId)
             .OnDelete(DeleteBehavior.Cascade);
-        builder.Navigation(offer => offer.Constraints)
+        builder.Navigation(offer => offer.ConditionGroups)
             .UsePropertyAccessMode(PropertyAccessMode.Field);
 
         builder.HasIndex(offer => new

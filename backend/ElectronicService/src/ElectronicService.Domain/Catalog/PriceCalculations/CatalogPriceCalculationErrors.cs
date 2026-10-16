@@ -80,6 +80,27 @@ public static class CatalogPriceCalculationErrors
             "Для завершения расчёта необходимо добавить хотя бы одну позицию.");
     }
 
+    public static DomainError RequiredComponentDecisionsMissing(
+        string productArticle,
+        IReadOnlyCollection<string> needNames)
+    {
+        var normalizedArticle = string.IsNullOrWhiteSpace(productArticle)
+            ? "без артикула"
+            : productArticle.Trim();
+        var normalizedNeedNames = needNames
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Select(name => name.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var needList = normalizedNeedNames.Length == 0
+            ? "обязательные комплектующие"
+            : string.Join(", ", normalizedNeedNames);
+
+        return new DomainError(
+            "catalog.price_calculation.required_component_decisions_missing",
+            $"Для товара '{normalizedArticle}' не выбраны обязательные комплектующие: {needList}.");
+    }
+
     public static DomainError LineNotFound(
         Guid lineId)
     {

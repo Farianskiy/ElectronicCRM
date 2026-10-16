@@ -7,7 +7,7 @@ namespace ElectronicService.Domain.Catalog.Components;
 
 public sealed class ComponentOffer : AggregateRoot
 {
-    private readonly List<ComponentCompatibilityConstraint> _constraints = [];
+    private readonly List<ComponentCompatibilityConditionGroup> _conditionGroups = [];
 
     private ComponentOffer(
         Guid id,
@@ -17,6 +17,7 @@ public sealed class ComponentOffer : AggregateRoot
     {
         ComponentProductId = componentProductId;
         NeedDefinitionId = needDefinitionId;
+        IsActive = true;
         CreatedAtUtc = DateTime.UtcNow;
     }
 
@@ -30,8 +31,17 @@ public sealed class ComponentOffer : AggregateRoot
 
     public DateTime CreatedAtUtc { get; private set; }
 
-    public IReadOnlyCollection<ComponentCompatibilityConstraint> Constraints =>
-        _constraints;
+    public DateTime? UpdatedAtUtc { get; private set; }
+
+    public bool IsActive { get; private set; }
+
+    public IReadOnlyCollection<ComponentCompatibilityConditionGroup> ConditionGroups =>
+        _conditionGroups;
+
+    public IEnumerable<ComponentCompatibilityConstraint> GetConstraints()
+    {
+        return _conditionGroups.SelectMany(group => group.Constraints);
+    }
 
     public static Result<ComponentOffer, DomainError> Create(
         Guid componentProductId,
@@ -47,38 +57,72 @@ public sealed class ComponentOffer : AggregateRoot
             return GeneralErrors.ValueIsInvalid(nameof(needDefinitionId));
         }
 
-        return new ComponentOffer(
+        var offer = new ComponentOffer(
             Guid.CreateVersion7(),
             componentProductId,
             needDefinitionId);
+
+        var groupResult = offer.AddConditionGroup();
+
+        return groupResult.IsSuccess
+            ? offer
+            : Result.Failure<ComponentOffer, DomainError>(groupResult.Error);
+    }
+
+    public Result<ComponentCompatibilityConditionGroup, DomainError>
+        AddConditionGroup()
+    {
+        var groupResult = ComponentCompatibilityConditionGroup.Create(
+            Id,
+            _conditionGroups.Count);
+
+        if (groupResult.IsFailure)
+        {
+            return groupResult;
+        }
+
+        _conditionGroups.Add(groupResult.Value);
+        UpdatedAtUtc = DateTime.UtcNow;
+        return groupResult;
+    }
+
+    public void ClearConditionGroups()
+    {
+        _conditionGroups.Clear();
+        UpdatedAtUtc = DateTime.UtcNow;
+    }
+
+    public void SetActive(bool isActive)
+    {
+        IsActive = isActive;
+        UpdatedAtUtc = DateTime.UtcNow;
     }
 
     public UnitResult<DomainError> AddConstraint(
         Guid characteristicDefinitionId,
-        CharacteristicValue expectedValue)
+        CharacteristicValue expectedValue,
+        ComponentCompatibilityComparisonOperator comparisonOperator =
+            ComponentCompatibilityComparisonOperator.Equal)
     {
         ArgumentNullException.ThrowIfNull(expectedValue);
 
-        if (_constraints.Any(constraint =>
-                constraint.CharacteristicDefinitionId == characteristicDefinitionId
-                && constraint.ExpectedValue == expectedValue))
+        var group = _conditionGroups.OrderBy(item => item.Position).FirstOrDefault();
+
+        if (group is null)
         {
-            return UnitResult.Failure(
-                ComponentCompatibilityErrors.ConstraintAlreadyExists(
-                    characteristicDefinitionId));
+            var groupResult = AddConditionGroup();
+
+            if (groupResult.IsFailure)
+            {
+                return UnitResult.Failure(groupResult.Error);
+            }
+
+            group = groupResult.Value;
         }
 
-        var result = ComponentCompatibilityConstraint.Create(
-            Id,
+        return group.AddConstraint(
             characteristicDefinitionId,
-            expectedValue);
-
-        if (result.IsFailure)
-        {
-            return UnitResult.Failure(result.Error);
-        }
-
-        _constraints.Add(result.Value);
-        return UnitResult.Success<DomainError>();
+            expectedValue,
+            comparisonOperator);
     }
 }

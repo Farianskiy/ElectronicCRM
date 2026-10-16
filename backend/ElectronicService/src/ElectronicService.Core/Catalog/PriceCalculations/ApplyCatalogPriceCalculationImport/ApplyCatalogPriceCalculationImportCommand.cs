@@ -1,3 +1,5 @@
+using ElectronicService.Domain.Catalog.PriceCalculations;
+
 namespace ElectronicService.Core.Catalog.PriceCalculations.ApplyCatalogPriceCalculationImport;
 
 public sealed record ApplyCatalogPriceCalculationImportCommand(
@@ -26,7 +28,8 @@ public sealed record ApplyCatalogPriceCalculationComponentImportRow(
     Guid? ExistingComponentLineId,
     Guid NeedDefinitionId,
     Guid ComponentProductId,
-    int? QuantityPerUnit);
+    int? QuantityPerUnit,
+    CatalogPriceCalculationLineComponentSupplyStatus? SupplyStatus);
 
 public enum CatalogPriceCalculationCharacteristicImportAction
 {

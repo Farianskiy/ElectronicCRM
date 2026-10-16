@@ -54,6 +54,7 @@ public sealed record CatalogPriceCalculationLineComponentResponse(
     string Article,
     string Name,
     string SelectionSource,
+    string SupplyStatus,
     int QuantityPerUnit,
     decimal TotalQuantity,
     decimal BasePriceAmount,

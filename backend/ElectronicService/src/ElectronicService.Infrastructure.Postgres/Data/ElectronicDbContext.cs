@@ -36,6 +36,10 @@ public sealed class ElectronicDbContext : DbContext
 
     public DbSet<ComponentOffer> ComponentOffers => Set<ComponentOffer>();
 
+    public DbSet<ComponentCompatibilityConditionGroup>
+        ComponentCompatibilityConditionGroups =>
+            Set<ComponentCompatibilityConditionGroup>();
+
     public DbSet<ComponentCompatibilityConstraint> ComponentCompatibilityConstraints =>
         Set<ComponentCompatibilityConstraint>();
 

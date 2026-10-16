@@ -22,8 +22,16 @@ public sealed class CreateProductTypeCommandHandler
     {
         ArgumentNullException.ThrowIfNull(command);
 
+        var generatedCode = string.IsNullOrWhiteSpace(command.Name)
+            ? string.Empty
+            : command.Name.Trim().ToUpperInvariant()
+                .Replace(" ", "_", StringComparison.Ordinal)
+                .Replace("-", "_", StringComparison.Ordinal);
+        var code = string.IsNullOrWhiteSpace(command.Code)
+            ? generatedCode[..Math.Min(generatedCode.Length, 100)]
+            : command.Code;
         var createResult = ProductType.Create(
-            command.Code,
+            code,
             command.Name,
             command.Kind);
 

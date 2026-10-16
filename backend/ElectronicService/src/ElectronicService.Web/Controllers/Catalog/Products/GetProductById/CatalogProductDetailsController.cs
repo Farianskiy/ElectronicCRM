@@ -35,6 +35,14 @@ public sealed class CatalogProductDetailsController : ControllerBase
             return NotFound();
         }
 
+        if (result.IsArchived
+            && !User.HasClaim(
+                PermissionClaimTypes.Permission,
+                UserPermissionCode.ProductsEdit.ToString()))
+        {
+            return NotFound();
+        }
+
         return Ok(new ProductDetailsResponse(
             result.Id,
             result.Article,
@@ -66,6 +74,9 @@ public sealed class CatalogProductDetailsController : ControllerBase
                     new ProductAliasResponse(
                         alias.Id,
                         alias.Value))
-                .ToList()));
+                .ToList(),
+            result.IsArchived,
+            result.ArchivedAtUtc,
+            result.ArchiveReason));
     }
 }

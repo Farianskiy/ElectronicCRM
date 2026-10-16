@@ -52,6 +52,14 @@ public sealed class Product : AggregateRoot
 
     public DateTime? UpdatedAtUtc { get; private set; }
 
+    public bool IsArchived { get; private set; }
+
+    public DateTime? ArchivedAtUtc { get; private set; }
+
+    public Guid? ArchivedByUserId { get; private set; }
+
+    public string? ArchiveReason { get; private set; }
+
     public uint Version { get; private set; }
 
     public IReadOnlyCollection<ProductCharacteristic> Characteristics => _characteristics;
@@ -59,6 +67,52 @@ public sealed class Product : AggregateRoot
     public IReadOnlyCollection<ProductAlias> Aliases => _aliases;
 
     public bool IsAvailable => StockQuantity.IsAvailable;
+
+    public UnitResult<DomainError> Archive(Guid archivedByUserId, string? reason)
+    {
+        if (archivedByUserId == Guid.Empty)
+        {
+            return UnitResult.Failure(
+                GeneralErrors.ValueIsInvalid(nameof(archivedByUserId)));
+        }
+
+        var normalizedReason = string.IsNullOrWhiteSpace(reason)
+            ? null
+            : reason.Trim();
+
+        if (normalizedReason?.Length > 500)
+        {
+            return UnitResult.Failure(
+                GeneralErrors.ValueIsInvalid(nameof(reason)));
+        }
+
+        if (IsArchived)
+        {
+            return UnitResult.Success<DomainError>();
+        }
+
+        IsArchived = true;
+        ArchivedAtUtc = DateTime.UtcNow;
+        ArchivedByUserId = archivedByUserId;
+        ArchiveReason = normalizedReason;
+        UpdatedAtUtc = ArchivedAtUtc;
+
+        return UnitResult.Success<DomainError>();
+    }
+
+    public void Restore()
+    {
+        if (!IsArchived)
+        {
+            return;
+        }
+
+        IsArchived = false;
+        ArchivedAtUtc = null;
+        ArchivedByUserId = null;
+        ArchiveReason = null;
+        UpdatedAtUtc = DateTime.UtcNow;
+    }
 
     public static Result<Product, DomainError> Create(
         string article,

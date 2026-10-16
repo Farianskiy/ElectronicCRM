@@ -17,6 +17,79 @@ public sealed class ComponentCompatibilityTests
         Assert.True(result.IsSuccess);
         Assert.Equal("MOUNTING_PANEL", result.Value.Code);
         Assert.Equal("Монтажная панель", result.Value.Name);
+        Assert.Equal(ComponentNeedRequirementMode.Optional, result.Value.RequirementMode);
+        Assert.Equal(1, result.Value.DefaultQuantityPerUnit);
+    }
+
+    [Fact]
+    public void NeedDefinitionStoresAssemblyRequirementAndDefaultQuantity()
+    {
+        var result = ComponentNeedDefinition.Create(
+            Guid.NewGuid(),
+            "FASTENERS",
+            "Крепёж",
+            ComponentNeedRequirementMode.RequiredForAssembly,
+            4);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(
+            ComponentNeedRequirementMode.RequiredForAssembly,
+            result.Value.RequirementMode);
+        Assert.Equal(4, result.Value.DefaultQuantityPerUnit);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(ComponentNeedDefinition.MaximumDefaultQuantityPerUnit + 1)]
+    public void NeedDefinitionRejectsInvalidDefaultQuantity(int quantity)
+    {
+        var result = ComponentNeedDefinition.Create(
+            Guid.NewGuid(),
+            "FASTENERS",
+            "Крепёж",
+            ComponentNeedRequirementMode.RequiredForAssembly,
+            quantity);
+
+        Assert.True(result.IsFailure);
+    }
+
+    [Fact]
+    public void NeedDefinitionChangesRequirementAndDefaultQuantity()
+    {
+        var need = ComponentNeedDefinition.Create(
+            Guid.NewGuid(),
+            "FASTENERS",
+            "Крепёж").Value;
+
+        var result = need.ChangeSettings(
+            ComponentNeedRequirementMode.RequiredForAssembly,
+            4);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(
+            ComponentNeedRequirementMode.RequiredForAssembly,
+            need.RequirementMode);
+        Assert.Equal(4, need.DefaultQuantityPerUnit);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(ComponentNeedDefinition.MaximumDefaultQuantityPerUnit + 1)]
+    public void NeedDefinitionRejectsInvalidChangedQuantity(int quantity)
+    {
+        var need = ComponentNeedDefinition.Create(
+            Guid.NewGuid(),
+            "FASTENERS",
+            "Крепёж").Value;
+
+        var result = need.ChangeSettings(
+            ComponentNeedRequirementMode.RequiredForAssembly,
+            quantity);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(ComponentNeedRequirementMode.Optional, need.RequirementMode);
+        Assert.Equal(1, need.DefaultQuantityPerUnit);
     }
 
     [Fact]
@@ -49,10 +122,10 @@ public sealed class ComponentCompatibilityTests
         };
 
         Assert.True(ComponentCompatibilityMatcher.IsCompatible(
-            offer.Constraints,
+            offer.ConditionGroups,
             compatibleValues));
         Assert.False(ComponentCompatibilityMatcher.IsCompatible(
-            offer.Constraints,
+            offer.ConditionGroups,
             incompatibleValues));
     }
 
@@ -67,8 +140,104 @@ public sealed class ComponentCompatibilityTests
             TestDataFactory.CreateNumberValue(800)).IsSuccess);
 
         Assert.False(ComponentCompatibilityMatcher.IsCompatible(
-            offer.Constraints,
+            offer.ConditionGroups,
             new Dictionary<Guid, CharacteristicValue>()));
+    }
+
+    [Fact]
+    public void MatcherUsesOrBetweenConditionGroups()
+    {
+        var offer = ComponentOffer.Create(Guid.NewGuid(), Guid.NewGuid()).Value;
+        var seriesId = Guid.NewGuid();
+        var currentId = Guid.NewGuid();
+
+        Assert.True(offer.AddConstraint(
+            seriesId,
+            TestDataFactory.CreateTextValue("КТИ")).IsSuccess);
+        Assert.True(offer.AddConstraint(
+            currentId,
+            TestDataFactory.CreateNumberValue(125)).IsSuccess);
+
+        var secondGroup = offer.AddConditionGroup().Value;
+        Assert.True(secondGroup.AddConstraint(
+            seriesId,
+            TestDataFactory.CreateTextValue("КМИ")).IsSuccess);
+        Assert.True(secondGroup.AddConstraint(
+            currentId,
+            TestDataFactory.CreateNumberValue(150)).IsSuccess);
+
+        var ktiValues = new Dictionary<Guid, CharacteristicValue>
+        {
+            [seriesId] = TestDataFactory.CreateTextValue("КТИ"),
+            [currentId] = TestDataFactory.CreateNumberValue(125)
+        };
+        var kmiValues = new Dictionary<Guid, CharacteristicValue>
+        {
+            [seriesId] = TestDataFactory.CreateTextValue("КМИ"),
+            [currentId] = TestDataFactory.CreateNumberValue(150)
+        };
+        var incompatibleValues = new Dictionary<Guid, CharacteristicValue>
+        {
+            [seriesId] = TestDataFactory.CreateTextValue("КТИ"),
+            [currentId] = TestDataFactory.CreateNumberValue(150)
+        };
+
+        Assert.True(ComponentCompatibilityMatcher.IsCompatible(
+            offer.ConditionGroups,
+            ktiValues));
+        Assert.True(ComponentCompatibilityMatcher.IsCompatible(
+            offer.ConditionGroups,
+            kmiValues));
+        Assert.False(ComponentCompatibilityMatcher.IsCompatible(
+            offer.ConditionGroups,
+            incompatibleValues));
+    }
+
+    [Fact]
+    public void MatcherIncludesNumericRangeBoundaries()
+    {
+        var offer = ComponentOffer.Create(Guid.NewGuid(), Guid.NewGuid()).Value;
+        var currentId = Guid.NewGuid();
+
+        Assert.True(offer.AddConstraint(
+            currentId,
+            TestDataFactory.CreateNumberValue(115),
+            ComponentCompatibilityComparisonOperator.GreaterThanOrEqual).IsSuccess);
+        Assert.True(offer.AddConstraint(
+            currentId,
+            TestDataFactory.CreateNumberValue(125),
+            ComponentCompatibilityComparisonOperator.LessThanOrEqual).IsSuccess);
+
+        Assert.True(ComponentCompatibilityMatcher.IsCompatible(
+            offer.ConditionGroups,
+            new Dictionary<Guid, CharacteristicValue>
+            {
+                [currentId] = TestDataFactory.CreateNumberValue(115)
+            }));
+        Assert.True(ComponentCompatibilityMatcher.IsCompatible(
+            offer.ConditionGroups,
+            new Dictionary<Guid, CharacteristicValue>
+            {
+                [currentId] = TestDataFactory.CreateNumberValue(120)
+            }));
+        Assert.True(ComponentCompatibilityMatcher.IsCompatible(
+            offer.ConditionGroups,
+            new Dictionary<Guid, CharacteristicValue>
+            {
+                [currentId] = TestDataFactory.CreateNumberValue(125)
+            }));
+        Assert.False(ComponentCompatibilityMatcher.IsCompatible(
+            offer.ConditionGroups,
+            new Dictionary<Guid, CharacteristicValue>
+            {
+                [currentId] = TestDataFactory.CreateNumberValue(114)
+            }));
+        Assert.False(ComponentCompatibilityMatcher.IsCompatible(
+            offer.ConditionGroups,
+            new Dictionary<Guid, CharacteristicValue>
+            {
+                [currentId] = TestDataFactory.CreateNumberValue(126)
+            }));
     }
 
     [Fact]

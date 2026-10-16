@@ -4,12 +4,28 @@ export type ProductNeedStatus =
   | "Included"
   | "NotApplicable";
 
+export type ComponentNeedRequirementMode =
+  | "Optional"
+  | "RequiredForAssembly";
+
+export type ComponentCompatibilityComparisonOperator =
+  | "Equal"
+  | "GreaterThanOrEqual"
+  | "LessThanOrEqual";
+
 export interface CompatibleComponent {
   productId: string;
   article: string;
   name: string;
   priceAmount: number;
   priceCurrency: string;
+  matchConditions: ComponentCompatibilityCondition[];
+}
+
+export interface ComponentCompatibilityCondition {
+  characteristicName: string;
+  actualValue: string;
+  expectedValues: string[];
 }
 
 export interface SelectedComponent {
@@ -28,6 +44,8 @@ export interface ProductNeedCompatibility {
   needDefinitionId: string;
   code: string;
   name: string;
+  requirementMode: ComponentNeedRequirementMode;
+  defaultQuantityPerUnit: number;
   status: ProductNeedStatus;
   compatibleComponents: CompatibleComponent[];
   selectedComponents: SelectedComponent[];
@@ -45,6 +63,8 @@ export interface ComponentNeed {
   mainProductTypeName: string;
   code: string;
   name: string;
+  requirementMode: ComponentNeedRequirementMode;
+  defaultQuantityPerUnit: number;
 }
 
 export interface ComponentOfferSummary {
@@ -56,6 +76,41 @@ export interface ComponentOfferSummary {
   constraintsCount: number;
 }
 
+export interface ComponentCompatibilityRuleConstraint {
+  characteristicDefinitionId: string;
+  characteristicName: string;
+  value: string;
+  comparisonOperator: ComponentCompatibilityComparisonOperator;
+}
+
+export interface ComponentCompatibilityRuleGroup {
+  id: string;
+  position: number;
+  constraints: ComponentCompatibilityRuleConstraint[];
+}
+
+export interface ComponentCompatibilityRule {
+  id: string;
+  componentProductId: string;
+  componentArticle: string;
+  componentName: string;
+  needDefinitionId: string;
+  needCode: string;
+  needName: string;
+  mainProductTypeCode: string;
+  mainProductTypeName: string;
+  isActive: boolean;
+  conditionGroups: ComponentCompatibilityRuleGroup[];
+}
+
+export interface ComponentCompatibilityRuleGroupInput {
+  constraints: Array<{
+    characteristicDefinitionId: string;
+    value: string;
+    comparisonOperator?: ComponentCompatibilityComparisonOperator;
+  }>;
+}
+
 export type ComponentCompatibilityImportRowStatus =
   | "Ready"
   | "AlreadyExists"
@@ -64,12 +119,16 @@ export type ComponentCompatibilityImportRowStatus =
   | "MainProductTypeNotFound"
   | "NeedNotFound"
   | "CharacteristicNotFound"
-  | "Duplicate";
+  | "Duplicate"
+  | "WillCreate"
+  | "WillUpdate"
+  | "Unchanged";
 
 export interface ComponentCompatibilityImportConstraint {
   characteristicDefinitionId: string;
   characteristicName: string;
   value: string;
+  comparisonOperator: ComponentCompatibilityComparisonOperator;
 }
 
 export interface ComponentCompatibilityImportPreviewRow {
@@ -79,6 +138,7 @@ export interface ComponentCompatibilityImportPreviewRow {
   need: string;
   componentProductId: string | null;
   needDefinitionId: string | null;
+  isActive: boolean;
   status: ComponentCompatibilityImportRowStatus;
   message: string | null;
   constraints: ComponentCompatibilityImportConstraint[];

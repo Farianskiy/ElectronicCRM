@@ -83,6 +83,7 @@ public sealed class GetCatalogPriceCalculationController
                         component.Article,
                         component.Name,
                         component.SelectionSource.ToString(),
+                        component.SupplyStatus.ToString(),
                         component.QuantityPerUnit,
                         component.TotalQuantity,
                         component.BasePriceAmount,

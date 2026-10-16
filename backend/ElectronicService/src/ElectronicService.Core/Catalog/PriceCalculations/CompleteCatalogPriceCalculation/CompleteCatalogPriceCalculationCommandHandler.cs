@@ -1,7 +1,9 @@
 using CSharpFunctionalExtensions;
 using ElectronicService.Core.Abstractions.Data;
+using ElectronicService.Core.Catalog.Components;
 using ElectronicService.Core.Catalog.PriceCalculations.Abstractions;
 using ElectronicService.Core.Users;
+using ElectronicService.Domain.Catalog.Components;
 using ElectronicService.Domain.Catalog.PriceCalculations;
 using ElectronicService.Domain.Common;
 
@@ -14,19 +16,25 @@ public sealed class CompleteCatalogPriceCalculationCommandHandler
     private readonly ICatalogPriceCalculationRepository
         _calculationRepository;
 
+    private readonly ICatalogComponentCompatibilityService
+        _componentCompatibilityService;
+
     private readonly IUnitOfWork _unitOfWork;
 
     public CompleteCatalogPriceCalculationCommandHandler(
         IUserRepository userRepository,
         ICatalogPriceCalculationRepository calculationRepository,
+        ICatalogComponentCompatibilityService componentCompatibilityService,
         IUnitOfWork unitOfWork)
     {
         ArgumentNullException.ThrowIfNull(userRepository);
         ArgumentNullException.ThrowIfNull(calculationRepository);
+        ArgumentNullException.ThrowIfNull(componentCompatibilityService);
         ArgumentNullException.ThrowIfNull(unitOfWork);
 
         _userRepository = userRepository;
         _calculationRepository = calculationRepository;
+        _componentCompatibilityService = componentCompatibilityService;
         _unitOfWork = unitOfWork;
     }
 
@@ -106,6 +114,45 @@ public sealed class CompleteCatalogPriceCalculationCommandHandler
                 DomainError>(
                     CatalogPriceCalculationErrors
                         .UserCannotModifyCalculation());
+        }
+
+        foreach (var line in calculation.Lines)
+        {
+            var compatibilityResult =
+                await _componentCompatibilityService
+                    .GetCompatibilityAsync(
+                        line.ProductId,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+            if (compatibilityResult.IsFailure)
+            {
+                return Result.Failure<
+                    CompleteCatalogPriceCalculationResult,
+                    DomainError>(compatibilityResult.Error);
+            }
+
+            var selectedNeedIds = line.Components
+                .Select(component => component.NeedDefinitionId)
+                .ToHashSet();
+            var unresolvedRequiredNeeds = compatibilityResult.Value.Needs
+                .Where(need =>
+                    need.RequirementMode
+                        == ComponentNeedRequirementMode.RequiredForAssembly
+                    && !selectedNeedIds.Contains(need.NeedDefinitionId))
+                .Select(need => need.Name)
+                .ToArray();
+
+            if (unresolvedRequiredNeeds.Length > 0)
+            {
+                return Result.Failure<
+                    CompleteCatalogPriceCalculationResult,
+                    DomainError>(
+                        CatalogPriceCalculationErrors
+                            .RequiredComponentDecisionsMissing(
+                                line.Article,
+                                unresolvedRequiredNeeds));
+            }
         }
 
         var completeResult =

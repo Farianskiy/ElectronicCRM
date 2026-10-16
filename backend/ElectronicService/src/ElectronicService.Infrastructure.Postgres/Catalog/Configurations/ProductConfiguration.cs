@@ -96,6 +96,21 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.Property(product => product.UpdatedAtUtc)
             .HasColumnName("updated_at_utc");
 
+        builder.Property(product => product.IsArchived)
+            .HasColumnName("is_archived")
+            .HasDefaultValue(false)
+            .IsRequired();
+
+        builder.Property(product => product.ArchivedAtUtc)
+            .HasColumnName("archived_at_utc");
+
+        builder.Property(product => product.ArchivedByUserId)
+            .HasColumnName("archived_by_user_id");
+
+        builder.Property(product => product.ArchiveReason)
+            .HasColumnName("archive_reason")
+            .HasMaxLength(500);
+
         builder.HasOne<ProductType>()
             .WithMany()
             .HasForeignKey(product => product.ProductTypeId)
@@ -125,6 +140,10 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.HasIndex(product => product.ProductTypeId);
 
         builder.HasIndex(product => product.ManufacturerId);
+
+        builder.HasIndex(product => product.IsArchived);
+
+        builder.HasQueryFilter(product => !product.IsArchived);
 
         builder.Property(product => product.Version)
             .IsRowVersion();

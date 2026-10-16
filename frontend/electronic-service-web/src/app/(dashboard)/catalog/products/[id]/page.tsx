@@ -1,12 +1,14 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { useCurrentUserAccess } from "@/features/auth/model/CurrentUserAccessContext";
 import { getCatalogProductDetails } from "@/features/catalogProducts/api/getCatalogProductDetails";
+import { archiveCatalogProduct } from "@/features/catalogProducts/api/archiveCatalogProduct";
+import { restoreCatalogProduct } from "@/features/catalogProducts/api/restoreCatalogProduct";
 import type { CatalogProductCharacteristic } from "@/features/catalogProducts/model/types";
 import { TechnicalProductEditor } from "@/features/catalogProducts/ui/TechnicalProductEditor";
 import { formatPrice } from "@/shared/lib/formatters";
@@ -62,6 +64,7 @@ function getProductIdFromParams(params: ReturnType<typeof useParams>): string {
 export default function CatalogProductDetailsPage() {
   const params = useParams();
   const productId = getProductIdFromParams(params);
+  const queryClient = useQueryClient();
 
   const { hasPermission } = useCurrentUserAccess();
   const canEditDetails = hasPermission("ProductsEdit");
@@ -78,6 +81,38 @@ export default function CatalogProductDetailsPage() {
   });
 
   const product = productQuery.data;
+
+  const archiveMutation = useMutation({
+    mutationFn: (reason: string) => archiveCatalogProduct(productId, reason),
+    onSuccess: async () => {
+      setIsEditorOpen(false);
+      await queryClient.invalidateQueries({
+        queryKey: ["catalog-product-details", productId],
+      });
+      await queryClient.invalidateQueries({ queryKey: ["catalog-products"] });
+    },
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: () => restoreCatalogProduct(productId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["catalog-product-details", productId],
+      });
+      await queryClient.invalidateQueries({ queryKey: ["catalog-products"] });
+    },
+  });
+
+  function handleArchive(): void {
+    const reason = window.prompt(
+      "Причина удаления (необязательно):",
+      "Позиция исключена из рабочего каталога",
+    );
+
+    if (reason !== null) {
+      archiveMutation.mutate(reason);
+    }
+  }
 
   return (
     <PageWorkspace
@@ -135,6 +170,23 @@ export default function CatalogProductDetailsPage() {
 
       {product && (
         <>
+          {product.isArchived && (
+            <section className="rounded-3xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-5 sm:p-6">
+              <h2 className="text-lg font-semibold text-[var(--app-danger)]">
+                Товар удалён из программы
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-[var(--app-text)]">
+                Он не участвует в поиске, новых расчётах, прайсах и загрузке
+                остатков. Старые расчёты сохранены.
+              </p>
+              {product.archiveReason && (
+                <p className="mt-2 text-sm text-[var(--app-muted)]">
+                  Причина: {product.archiveReason}
+                </p>
+              )}
+            </section>
+          )}
+
           <section
             aria-labelledby="product-overview-title"
             className="min-w-0 rounded-3xl border border-[var(--app-border)] bg-[var(--app-panel)] p-5 shadow-sm shadow-[var(--app-shadow)] sm:p-6"
@@ -157,6 +209,11 @@ export default function CatalogProductDetailsPage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-3 lg:shrink-0">
+                {product.isArchived && (
+                  <span className="inline-flex items-center rounded-full border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] px-4 py-2 text-sm font-semibold text-[var(--app-danger)]">
+                    Удалён
+                  </span>
+                )}
                 <span
                   className={[
                     "inline-flex items-center rounded-full border px-4 py-2",
@@ -169,7 +226,7 @@ export default function CatalogProductDetailsPage() {
                   {product.stockQuantity > 0 ? "В наличии" : "Нет в наличии"}
                 </span>
 
-                {canOpenEditor && (
+                {canOpenEditor && !product.isArchived && (
                   <AppButton
                     type="button"
                     variant="primary"
@@ -179,8 +236,41 @@ export default function CatalogProductDetailsPage() {
                     {isEditorOpen ? "Закрыть редактор" : "Редактировать товар"}
                   </AppButton>
                 )}
+
+                {canEditDetails && !product.isArchived && (
+                  <AppButton
+                    type="button"
+                    variant="dangerSolid"
+                    loading={archiveMutation.isPending}
+                    onClick={handleArchive}
+                  >
+                    Удалить из программы
+                  </AppButton>
+                )}
+
+                {canEditDetails && product.isArchived && (
+                  <AppButton
+                    type="button"
+                    variant="primary"
+                    loading={restoreMutation.isPending}
+                    onClick={() => restoreMutation.mutate()}
+                  >
+                    Восстановить товар
+                  </AppButton>
+                )}
               </div>
             </div>
+
+            {(archiveMutation.isError || restoreMutation.isError) && (
+              <p
+                role="alert"
+                className="mt-4 rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-3 text-sm text-[var(--app-danger)]"
+              >
+                {getErrorMessage(
+                  archiveMutation.error ?? restoreMutation.error,
+                )}
+              </p>
+            )}
 
             <div className="mt-6 grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-5">
               <InfoCard
@@ -197,12 +287,14 @@ export default function CatalogProductDetailsPage() {
             </div>
           </section>
 
-          <ProductComponentCompatibilityPanel
-            productId={product.id}
-            canEdit={canEditDetails}
-          />
+          {!product.isArchived && (
+            <ProductComponentCompatibilityPanel
+              productId={product.id}
+              canEdit={canEditDetails}
+            />
+          )}
 
-          {canEditDetails && (
+          {canEditDetails && !product.isArchived && (
             <ComponentOfferManager
               productId={product.id}
               productTypeCode={product.productTypeCode}

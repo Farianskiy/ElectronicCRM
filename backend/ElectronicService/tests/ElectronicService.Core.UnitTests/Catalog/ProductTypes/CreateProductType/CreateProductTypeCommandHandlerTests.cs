@@ -58,7 +58,7 @@ public sealed class CreateProductTypeCommandHandlerTests
     }
 
     [Fact]
-    public async Task HandleRejectsEmptyCodeBeforeRepositoryCall()
+    public async Task HandleGeneratesInternalCodeWhenCodeIsEmpty()
     {
         var repository = new FakeProductTypeManagementRepository();
         var handler = new CreateProductTypeCommandHandler(repository);
@@ -67,11 +67,11 @@ public sealed class CreateProductTypeCommandHandlerTests
             new CreateProductTypeCommand(" ", "Модульный автомат"),
             TestContext.Current.CancellationToken);
 
-        Assert.True(result.IsFailure);
-        Assert.Equal("general.value_is_required", result.Error.Code);
-        Assert.Null(repository.LastCheckedCode);
-        Assert.Null(repository.AddedProductType);
-        Assert.Equal(0, repository.SaveChangesCallsCount);
+        Assert.True(result.IsSuccess);
+        Assert.Equal("МОДУЛЬНЫЙ_АВТОМАТ", result.Value.Code);
+        Assert.Equal(result.Value.Code, repository.LastCheckedCode);
+        Assert.NotNull(repository.AddedProductType);
+        Assert.Equal(1, repository.SaveChangesCallsCount);
     }
 
     private sealed class FakeProductTypeManagementRepository

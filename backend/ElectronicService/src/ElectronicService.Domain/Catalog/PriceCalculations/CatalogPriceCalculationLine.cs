@@ -460,7 +460,9 @@ public sealed class CatalogPriceCalculationLine
         CatalogPriceCalculationLineComponentSelectionSource selectionSource,
         int quantityPerUnit,
         decimal basePriceAmount,
-        decimal discountPercent)
+        decimal discountPercent,
+        CatalogPriceCalculationLineComponentSupplyStatus supplyStatus =
+            CatalogPriceCalculationLineComponentSupplyStatus.ToPurchase)
     {
         var duplicateExists =
             _components.Any(
@@ -493,7 +495,8 @@ public sealed class CatalogPriceCalculationLine
                 quantityPerUnit,
                 basePriceAmount,
                 discountPercent,
-                Quantity);
+                Quantity,
+                supplyStatus);
 
         if (componentResult.IsFailure)
         {
@@ -569,6 +572,44 @@ public sealed class CatalogPriceCalculationLine
         var changeResult =
             component.ChangeQuantityPerUnit(
                 quantityPerUnit,
+                Quantity);
+
+        if (changeResult.IsFailure)
+        {
+            return changeResult;
+        }
+
+        Recalculate();
+        UpdatedAtUtc = DateTime.UtcNow;
+
+        return UnitResult.Success<DomainError>();
+    }
+
+    internal UnitResult<DomainError> ChangeComponentSupplyStatus(
+        Guid componentLineId,
+        CatalogPriceCalculationLineComponentSupplyStatus supplyStatus)
+    {
+        if (componentLineId == Guid.Empty)
+        {
+            return UnitResult.Failure(
+                GeneralErrors.ValueIsInvalid(
+                    nameof(componentLineId)));
+        }
+
+        var component =
+            _components.SingleOrDefault(
+                item => item.Id == componentLineId);
+
+        if (component is null)
+        {
+            return UnitResult.Failure(
+                CatalogPriceCalculationErrors
+                    .ComponentNotFound(componentLineId));
+        }
+
+        var changeResult =
+            component.ChangeSupplyStatus(
+                supplyStatus,
                 Quantity);
 
         if (changeResult.IsFailure)

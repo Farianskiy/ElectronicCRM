@@ -37,7 +37,6 @@ export function CreateCatalogProductTypeForm({
   onCreated: (code: string, name: string) => void;
 }) {
   const queryClient = useQueryClient();
-  const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [kind, setKind] = useState<CatalogProductTypeKind>("MainProduct");
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -50,7 +49,6 @@ export function CreateCatalogProductTypeForm({
         queryKey: ["catalog-product-types"],
       });
 
-      setCode("");
       setName("");
       setKind("MainProduct");
       setValidationError(null);
@@ -71,13 +69,7 @@ export function CreateCatalogProductTypeForm({
     mutation.reset();
     clearMessages();
 
-    const normalizedCode = code.trim();
     const normalizedName = name.trim();
-
-    if (normalizedCode.length === 0) {
-      setValidationError("Введите код типа товара.");
-      return;
-    }
 
     if (normalizedName.length === 0) {
       setValidationError("Введите название типа товара.");
@@ -85,7 +77,6 @@ export function CreateCatalogProductTypeForm({
     }
 
     mutation.mutate({
-      code: normalizedCode,
       name: normalizedName,
       kind,
     });
@@ -125,27 +116,7 @@ export function CreateCatalogProductTypeForm({
         </div>
       )}
 
-      <div className="mt-5 grid gap-4 lg:grid-cols-2">
-        <label className="grid gap-2">
-          <span className="text-sm text-slate-300">Код</span>
-
-          <input
-            value={code}
-            maxLength={100}
-            onChange={(event) => {
-              setCode(event.target.value);
-              clearMessages();
-            }}
-            placeholder="CIRCUIT_BREAKER"
-            className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-slate-100 outline-none placeholder:text-slate-600 focus:border-teal-400"
-          />
-
-          <span className="text-xs text-slate-500">
-            Пробелы и дефисы будут заменены символом подчёркивания, буквы —
-            приведены к верхнему регистру.
-          </span>
-        </label>
-
+      <div className="mt-5 grid gap-4">
         <label className="grid gap-2">
           <span className="text-sm text-slate-300">Название</span>
 

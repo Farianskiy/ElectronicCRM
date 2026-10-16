@@ -35,7 +35,36 @@ public sealed class ProductType : AggregateRoot
 
     public ProductTypeKind Kind { get; private set; }
 
+    public bool IsArchived { get; private set; }
+
+    public DateTime? ArchivedAtUtc { get; private set; }
+
     public IReadOnlyCollection<ProductTypeCharacteristic> Characteristics => _characteristics;
+
+    public UnitResult<DomainError> ChangeKind(ProductTypeKind kind)
+    {
+        if (!Enum.IsDefined(kind))
+        {
+            return UnitResult.Failure(
+                GeneralErrors.ValueIsInvalid(nameof(kind)));
+        }
+
+        Kind = kind;
+
+        return UnitResult.Success<DomainError>();
+    }
+
+    public void Archive()
+    {
+        IsArchived = true;
+        ArchivedAtUtc = DateTime.UtcNow;
+    }
+
+    public void Restore()
+    {
+        IsArchived = false;
+        ArchivedAtUtc = null;
+    }
 
     public static Result<ProductType, DomainError> Create(
         string code,

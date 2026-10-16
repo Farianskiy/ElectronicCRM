@@ -63,15 +63,17 @@ export function ProductComponentCompatibilityPanel({
     mutationFn: ({
       needDefinitionId,
       componentProductId,
+      quantity,
     }: {
       needDefinitionId: string;
       componentProductId: string;
+      quantity: number;
     }) =>
       selectProductComponent(
         productId,
         needDefinitionId,
         componentProductId,
-        1,
+        quantity,
       ),
     onSuccess: () => queryClient.invalidateQueries({ queryKey }),
   });
@@ -120,12 +122,13 @@ export function ProductComponentCompatibilityPanel({
   return (
     <section className="rounded-3xl border border-[var(--app-border)] bg-[var(--app-panel)] p-5 shadow-sm shadow-[var(--app-shadow)] sm:p-6">
       <h2 className="text-xl font-semibold text-[var(--app-text)]">
-        Комплектность
+        Совместимые комплектующие
       </h2>
 
       <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">
-        Пустые данные не считаются недостатком. Укажите состояние явно — после
-        этого система покажет подходящие комплектующие.
+        Подходящие позиции определяются по характеристикам товара и показываются
+        независимо от состава заводской поставки. Добавление здесь задаёт типовую
+        комплектацию карточки; фактический выбор для продажи выполняется в проекте.
       </p>
 
       <div className="mt-5 grid gap-4">
@@ -144,43 +147,62 @@ export function ProductComponentCompatibilityPanel({
                   {need.code}
                 </p>
 
+                <span
+                  className={`mt-2 inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${
+                    need.requirementMode === "RequiredForAssembly"
+                      ? "border-amber-500/30 bg-amber-500/10 text-amber-300"
+                      : "border-[var(--app-border)] text-[var(--app-muted)]"
+                  }`}
+                >
+                  {need.requirementMode === "RequiredForAssembly"
+                    ? "Требуется для монтажа"
+                    : "Необязательное"}
+                  {` · обычно ${need.defaultQuantityPerUnit} шт./ед.`}
+                </span>
+
                 {need.selectedComponents.length > 0 && (
                   <span className="mt-2 inline-flex rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-300">
-                    Закрыто комплектацией
+                    Задана типовая комплектация
                   </span>
                 )}
               </div>
 
               {canEdit ? (
-                <select
-                  value={need.status}
-                  disabled={statusMutation.isPending}
-                  onChange={(event) =>
-                    statusMutation.mutate({
-                      needDefinitionId: need.needDefinitionId,
-                      status: event.target.value as ProductNeedStatus,
-                    })
-                  }
-                  className="min-h-10 rounded-xl border border-[var(--app-border)] bg-[var(--app-panel)] px-3 text-sm text-[var(--app-text)]"
-                >
-                  {statusOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                <label className="grid gap-1 text-xs text-[var(--app-muted)]">
+                  Состав заводской поставки
+                  <select
+                    value={need.status}
+                    disabled={statusMutation.isPending}
+                    onChange={(event) =>
+                      statusMutation.mutate({
+                        needDefinitionId: need.needDefinitionId,
+                        status: event.target.value as ProductNeedStatus,
+                      })
+                    }
+                    className="min-h-10 rounded-xl border border-[var(--app-border)] bg-[var(--app-panel)] px-3 text-sm text-[var(--app-text)]"
+                  >
+                    {statusOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               ) : (
-                <span className="rounded-full border border-[var(--app-border)] px-3 py-1 text-xs text-[var(--app-muted)]">
-                  {statusOptions.find((option) => option.value === need.status)
-                    ?.label ?? need.status}
-                </span>
+                <div className="grid gap-1 text-xs text-[var(--app-muted)]">
+                  <span>Состав заводской поставки</span>
+                  <span className="rounded-full border border-[var(--app-border)] px-3 py-1">
+                    {statusOptions.find((option) => option.value === need.status)
+                      ?.label ?? need.status}
+                  </span>
+                </div>
               )}
             </div>
 
             {need.selectedComponents.length > 0 && (
               <div className="mt-4">
                 <h4 className="text-sm font-semibold text-[var(--app-text)]">
-                  Выбранные комплектующие
+                  Типовая комплектация товара
                 </h4>
 
                 <ul className="mt-2 grid gap-2">
@@ -249,69 +271,82 @@ export function ProductComponentCompatibilityPanel({
               </div>
             )}
 
-            {need.status === "Missing" && (
-              <div className="mt-4">
-                {need.compatibleComponents.length === 0 ? (
-                  <p className="text-sm text-[var(--app-danger)]">
-                    Совместимые комплектующие не найдены.
-                  </p>
-                ) : (
-                  <ul className="grid gap-2">
-                    {need.compatibleComponents.map((component) => (
-                      <li
-                        key={component.productId}
-                        className="flex flex-col justify-between gap-3 rounded-xl border border-[var(--app-accent-border)] bg-[var(--app-accent-soft)] px-4 py-3 sm:flex-row sm:items-center"
-                      >
-                        <Link
-                          href={`/catalog/products/${component.productId}`}
-                          className="min-w-0 text-sm"
-                        >
-                          <span className="block font-medium text-[var(--app-text)]">
-                            {component.name}
-                          </span>
-                          <span className="mt-1 block text-xs text-[var(--app-muted)]">
-                            {component.article} · {" "}
-                            {formatPrice(
-                              component.priceAmount,
-                              component.priceCurrency,
-                            )}
-                          </span>
-                        </Link>
+            <div className="mt-4">
+              <h4 className="text-sm font-semibold text-[var(--app-text)]">
+                Подходящие варианты
+              </h4>
 
-                        {canEdit && (
-                          <button
-                            type="button"
-                            disabled={
-                              isSelectionPending ||
-                              need.selectedComponents.some(
-                                (selection) =>
-                                  selection.componentProductId ===
-                                  component.productId,
-                              )
-                            }
-                            onClick={() =>
-                              selectionMutation.mutate({
-                                needDefinitionId: need.needDefinitionId,
-                                componentProductId: component.productId,
-                              })
-                            }
-                            className="rounded-xl bg-[var(--app-accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-                          >
-                            {need.selectedComponents.some(
+              {need.compatibleComponents.length === 0 ? (
+                <p className="mt-2 text-sm text-[var(--app-muted)]">
+                  По действующим правилам подходящих комплектующих не найдено.
+                </p>
+              ) : (
+                <ul className="mt-2 grid gap-2">
+                  {need.compatibleComponents.map((component) => (
+                    <li
+                      key={component.productId}
+                      className="flex flex-col justify-between gap-3 rounded-xl border border-[var(--app-accent-border)] bg-[var(--app-accent-soft)] px-4 py-3 sm:flex-row sm:items-center"
+                    >
+                      <Link
+                        href={`/catalog/products/${component.productId}`}
+                        className="min-w-0 text-sm"
+                      >
+                        <span className="block font-medium text-[var(--app-text)]">
+                          {component.name}
+                        </span>
+                        <span className="mt-1 block text-xs text-[var(--app-muted)]">
+                          {component.article} · {" "}
+                          {formatPrice(
+                            component.priceAmount,
+                            component.priceCurrency,
+                          )}
+                        </span>
+                        <span className="mt-2 block text-xs leading-5 text-[var(--app-muted)]">
+                          {component.matchConditions.length === 0
+                            ? "Подходит ко всем товарам этого типа."
+                            : `Подходит: ${component.matchConditions
+                                .map(
+                                  (condition) =>
+                                    `${condition.characteristicName} — ${condition.actualValue}`,
+                                )
+                                .join("; ")}.`}
+                        </span>
+                      </Link>
+
+                      {canEdit && (
+                        <button
+                          type="button"
+                          disabled={
+                            isSelectionPending ||
+                            need.selectedComponents.some(
                               (selection) =>
                                 selection.componentProductId ===
                                 component.productId,
                             )
-                              ? "Добавлено"
-                              : "Добавить"}
-                          </button>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
+                          }
+                          onClick={() =>
+                              selectionMutation.mutate({
+                                needDefinitionId: need.needDefinitionId,
+                                componentProductId: component.productId,
+                                quantity: need.defaultQuantityPerUnit,
+                              })
+                          }
+                          className="rounded-xl bg-[var(--app-accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                        >
+                          {need.selectedComponents.some(
+                            (selection) =>
+                              selection.componentProductId ===
+                              component.productId,
+                          )
+                            ? "В типовой комплектации"
+                            : "Добавить в типовую"}
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </article>
         ))}
       </div>

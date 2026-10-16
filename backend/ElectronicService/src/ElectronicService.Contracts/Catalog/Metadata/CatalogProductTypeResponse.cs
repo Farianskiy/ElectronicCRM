@@ -4,4 +4,5 @@ public sealed record CatalogProductTypeResponse(
     Guid Id,
     string Code,
     string Name,
-    string Kind);
+    string Kind,
+    bool IsArchived);

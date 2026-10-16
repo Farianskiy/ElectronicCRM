@@ -183,7 +183,8 @@ public sealed class AddCatalogPriceCalculationLineComponentCommandHandler
             priceSource.ManufacturerName,
             selectionSource,
             command.QuantityPerUnit,
-            priceSource.BasePriceAmount);
+            priceSource.BasePriceAmount,
+            command.SupplyStatus);
 
         if (addResult.IsFailure)
         {
@@ -209,6 +210,7 @@ public sealed class AddCatalogPriceCalculationLineComponentCommandHandler
             componentLine.Article,
             componentLine.Name,
             componentLine.SelectionSource,
+            componentLine.SupplyStatus,
             componentLine.QuantityPerUnit,
             componentLine.BasePriceAmount,
             componentLine.DiscountPercent,

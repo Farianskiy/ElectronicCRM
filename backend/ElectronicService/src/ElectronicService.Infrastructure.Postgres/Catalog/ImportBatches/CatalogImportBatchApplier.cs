@@ -199,6 +199,7 @@ public sealed class CatalogImportBatchApplier : ICatalogImportBatchApplier
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var existingProductKeys = await _dbContext.Products
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .Select(product => new
             {
@@ -214,6 +215,7 @@ public sealed class CatalogImportBatchApplier : ICatalogImportBatchApplier
             .ToArray();
 
         var existingProducts = await _dbContext.Products
+            .IgnoreQueryFilters()
             .Include(product => product.Characteristics)
             .Include(product => product.Aliases)
             .Where(product => existingProductIds.Contains(product.Id))
@@ -228,6 +230,15 @@ public sealed class CatalogImportBatchApplier : ICatalogImportBatchApplier
         {
             var article = preparedRow.Data.Article!;
             var productExists = existingProductsByArticle.ContainsKey(article);
+
+            if (productExists
+                && existingProductsByArticle[article].IsArchived)
+            {
+                return Result.Failure<CatalogImportApplyExecutionResult, DomainError>(
+                    CatalogImportErrors.ProductArticleIsArchived(
+                        article,
+                        preparedRow.RowNumber));
+            }
 
             if (batch.ImportMode == CatalogImportMode.CreateOnly && productExists)
             {
