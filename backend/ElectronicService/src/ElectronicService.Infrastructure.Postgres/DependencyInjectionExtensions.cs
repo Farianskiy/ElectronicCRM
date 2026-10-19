@@ -18,6 +18,7 @@ using ElectronicService.Core.Catalog.PriceCalculations.Import;
 using ElectronicService.Core.Catalog.PriceLists.Abstractions;
 using ElectronicService.Core.Catalog.PriceLists.Import;
 using ElectronicService.Core.Catalog.Products.Abstractions;
+using ElectronicService.Core.Catalog.Products.ExportProducts;
 using ElectronicService.Core.Catalog.Products.Audit;
 using ElectronicService.Core.Catalog.Products.GetAuditHistory;
 using ElectronicService.Core.Catalog.Products.StockImport;
@@ -117,6 +118,7 @@ public static class DependencyInjectionExtensions
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<CatalogDataSeeder>();
         services.AddScoped<ICatalogProductsReader, CatalogProductsReader>();
+        services.AddScoped<ICatalogProductsWorkbookExporter, CatalogProductsWorkbookExporter>();
         services.AddScoped<ICatalogProductReplacementsReader, CatalogProductReplacementsReader>();
         services.AddScoped<IProductRepository, ProductRepository>();
         services.AddScoped<

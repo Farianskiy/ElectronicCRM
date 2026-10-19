@@ -29,6 +29,10 @@ export function ComponentOfferManager({
 }) {
   const queryClient = useQueryClient();
   const offersQueryKey = ["component-offers", productId];
+  const [placementMode, setPlacementMode] = useState<"accessory" | "need">(
+    "accessory",
+  );
+  const [mainProductTypeCode, setMainProductTypeCode] = useState("");
   const [needId, setNeedId] = useState("");
   const [values, setValues] = useState<Record<string, string>>({});
   const productTypesQuery = useQuery({
@@ -47,22 +51,28 @@ export function ComponentOfferManager({
     () => needsQuery.data?.find((need) => need.id === needId),
     [needId, needsQuery.data],
   );
+  const selectedMainProductTypeCode =
+    placementMode === "need"
+      ? selectedNeed?.mainProductTypeCode
+      : mainProductTypeCode;
   const characteristicsQuery = useQuery({
     queryKey: [
       "catalog-product-type-characteristics",
-      selectedNeed?.mainProductTypeCode,
+      selectedMainProductTypeCode,
     ],
     queryFn: () =>
       getCatalogProductTypeCharacteristics(
-        selectedNeed?.mainProductTypeCode ?? "",
+        selectedMainProductTypeCode ?? "",
       ),
-    enabled: Boolean(selectedNeed),
+    enabled: Boolean(selectedMainProductTypeCode),
   });
   const createMutation = useMutation({
     mutationFn: () =>
       createComponentOffer(
         productId,
-        needId,
+        placementMode === "need"
+          ? { needDefinitionId: needId }
+          : { mainProductTypeCode },
         Object.entries(values)
           .filter(([, value]) => value.trim().length > 0)
           .flatMap(([characteristicDefinitionId, value]) =>
@@ -85,6 +95,9 @@ export function ComponentOfferManager({
   const currentProductType = productTypesQuery.data?.find(
     (productType) => productType.code === productTypeCode,
   );
+  const mainProductTypes = (productTypesQuery.data ?? []).filter(
+    (productType) => productType.kind === "MainProduct",
+  );
 
   if (!currentProductType || currentProductType.kind !== "Component") {
     return null;
@@ -93,7 +106,10 @@ export function ComponentOfferManager({
   function handleSubmit(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
 
-    if (needId) {
+    if (
+      (placementMode === "need" && needId) ||
+      (placementMode === "accessory" && mainProductTypeCode)
+    ) {
       createMutation.mutate();
     }
   }
@@ -105,36 +121,102 @@ export function ComponentOfferManager({
       </h2>
 
       <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">
-        Выберите группу, к которой относится комплектующее. Оставьте все
-        характеристики пустыми, если оно подходит всем товарам выбранного
-        типа. Несколько допустимых значений одной характеристики разделяйте
-        точкой с запятой: например, 115; 125.
+        Для обычного сопутствующего товара выберите «Совместимый аксессуар» —
+        потребность создавать не нужно. Потребность выбирайте только для
+        обязательной сборки, количества или отдельной группы выбора. Пустые
+        условия означают совместимость со всеми товарами выбранного типа.
       </p>
 
       <form onSubmit={handleSubmit} className="mt-5 grid gap-4">
+        <fieldset className="grid gap-3 sm:grid-cols-2">
+          <legend className="mb-2 text-sm font-medium text-[var(--app-text)]">
+            Как использовать комплектующее
+          </legend>
+
+          <label className="flex gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
+            <input
+              type="radio"
+              checked={placementMode === "accessory"}
+              onChange={() => {
+                setPlacementMode("accessory");
+                setNeedId("");
+                setValues({});
+              }}
+            />
+            <span>
+              <span className="block text-sm font-semibold text-[var(--app-text)]">
+                Совместимый аксессуар
+              </span>
+              <span className="mt-1 block text-xs text-[var(--app-muted)]">
+                Показывается как подходящий вариант, но не обязателен.
+              </span>
+            </span>
+          </label>
+
+          <label className="flex gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
+            <input
+              type="radio"
+              checked={placementMode === "need"}
+              onChange={() => {
+                setPlacementMode("need");
+                setMainProductTypeCode("");
+                setValues({});
+              }}
+            />
+            <span>
+              <span className="block text-sm font-semibold text-[var(--app-text)]">
+                В составе потребности
+              </span>
+              <span className="mt-1 block text-xs text-[var(--app-muted)]">
+                Для монтажа, количества или отдельной группы выбора.
+              </span>
+            </span>
+          </label>
+        </fieldset>
+
         <label className="grid gap-2">
           <span className="text-sm font-medium text-[var(--app-text)]">
-            Группа комплектующих
+            {placementMode === "need"
+              ? "Группа комплектующих"
+              : "Тип основного товара"}
           </span>
 
-          <select
-            value={needId}
-            onChange={(event) => {
-              setNeedId(event.target.value);
-              setValues({});
-            }}
-            className="min-h-11 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] px-3 text-sm text-[var(--app-text)]"
-          >
-            <option value="">Выберите группу комплектующих</option>
-            {(needsQuery.data ?? []).map((need) => (
-              <option key={need.id} value={need.id}>
-                {need.mainProductTypeName} · {need.name}
-              </option>
-            ))}
-          </select>
+          {placementMode === "need" ? (
+            <select
+              value={needId}
+              onChange={(event) => {
+                setNeedId(event.target.value);
+                setValues({});
+              }}
+              className="min-h-11 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] px-3 text-sm text-[var(--app-text)]"
+            >
+              <option value="">Выберите группу комплектующих</option>
+              {(needsQuery.data ?? []).map((need) => (
+                <option key={need.id} value={need.id}>
+                  {need.mainProductTypeName} · {need.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <select
+              value={mainProductTypeCode}
+              onChange={(event) => {
+                setMainProductTypeCode(event.target.value);
+                setValues({});
+              }}
+              className="min-h-11 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] px-3 text-sm text-[var(--app-text)]"
+            >
+              <option value="">Выберите тип основного товара</option>
+              {mainProductTypes.map((productType) => (
+                <option key={productType.id} value={productType.code}>
+                  {productType.name}
+                </option>
+              ))}
+            </select>
+          )}
         </label>
 
-        {selectedNeed && (
+        {selectedMainProductTypeCode && (
           <div className="grid gap-3 md:grid-cols-2">
             {(characteristicsQuery.data ?? []).map((characteristic) => (
               <label
@@ -164,7 +246,10 @@ export function ComponentOfferManager({
 
         <button
           type="submit"
-          disabled={!needId || createMutation.isPending}
+          disabled={
+            createMutation.isPending ||
+            (placementMode === "need" ? !needId : !mainProductTypeCode)
+          }
           className="justify-self-start rounded-xl bg-[var(--app-accent)] px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
         >
           Сохранить совместимость
@@ -188,7 +273,7 @@ export function ComponentOfferManager({
               key={offer.id}
               className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-3 text-sm text-[var(--app-text)]"
             >
-              {offer.needName} ·{" "}
+              {offer.needName ?? "Совместимый аксессуар"} ·{" "}
               {offer.constraintsCount === 0
                 ? "подходит всем товарам типа"
                 : `условий: ${offer.constraintsCount}`}

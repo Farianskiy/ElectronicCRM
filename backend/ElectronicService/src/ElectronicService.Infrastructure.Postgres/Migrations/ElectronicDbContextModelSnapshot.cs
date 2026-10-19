@@ -250,7 +250,11 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         .HasDefaultValue(true)
                         .HasColumnName("is_active");
 
-                    b.Property<Guid>("NeedDefinitionId")
+                    b.Property<Guid>("MainProductTypeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("main_product_type_id");
+
+                    b.Property<Guid?>("NeedDefinitionId")
                         .HasColumnType("uuid")
                         .HasColumnName("need_definition_id");
 
@@ -263,7 +267,12 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                     b.HasIndex("NeedDefinitionId");
 
                     b.HasIndex("ComponentProductId", "NeedDefinitionId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"need_definition_id\" IS NOT NULL");
+
+                    b.HasIndex("MainProductTypeId", "ComponentProductId")
+                        .IsUnique()
+                        .HasFilter("\"need_definition_id\" IS NULL");
 
                     b.ToTable("component_offers", (string)null);
                 });
@@ -3509,11 +3518,16 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("ElectronicService.Domain.Catalog.ProductTypes.ProductType", null)
+                        .WithMany()
+                        .HasForeignKey("MainProductTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("ElectronicService.Domain.Catalog.Components.ComponentNeedDefinition", null)
                         .WithMany()
                         .HasForeignKey("NeedDefinitionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
                 });
 
             modelBuilder.Entity("ElectronicService.Domain.Catalog.Components.ProductComponentNeedState", b =>

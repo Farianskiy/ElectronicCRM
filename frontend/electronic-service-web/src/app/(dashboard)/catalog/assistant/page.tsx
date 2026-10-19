@@ -15,6 +15,7 @@ import type {
   CatalogAssistantReplacement,
 } from "@/features/catalogAssistant/model/types";
 import { CatalogAssistantBatchPreview } from "@/features/catalogAssistant/ui/CatalogAssistantBatchPreview";
+import { CatalogAssistantProductCompatibility } from "@/features/catalogAssistant/ui/CatalogAssistantProductCompatibility";
 import { useCurrentUserAccess } from "@/features/auth/model/CurrentUserAccessContext";
 import { applyCatalogPriceCalculationImport } from "@/features/catalogPriceCalculations/api/catalogPriceCalculationEditorApi";
 import { getMyCatalogPriceCalculations } from "@/features/catalogPriceCalculations/api/getMyCatalogPriceCalculations";
@@ -59,9 +60,11 @@ function isBatchRequest(message: string): boolean {
 function ProductCard({
   product,
   score,
+  defaultComponentsExpanded = false,
 }: {
   product: CatalogAssistantProduct;
   score?: number;
+  defaultComponentsExpanded?: boolean;
 }) {
   return (
     <article className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
@@ -99,6 +102,11 @@ function ProductCard({
           Открыть карточку
         </Link>
       </div>
+
+      <CatalogAssistantProductCompatibility
+        productId={product.id}
+        defaultExpanded={defaultComponentsExpanded}
+      />
     </article>
   );
 }
@@ -592,7 +600,7 @@ export default function CatalogAssistantPage() {
       {response && response.sourceProduct && (
         <section className="grid gap-4">
           <h2 className="text-xl font-semibold text-white">Исходный товар</h2>
-          <ProductCard product={response.sourceProduct} />
+          <ProductCard product={response.sourceProduct} defaultComponentsExpanded />
         </section>
       )}
 
@@ -617,7 +625,11 @@ export default function CatalogAssistantPage() {
           <h2 className="text-xl font-semibold text-white">Найденные товары</h2>
 
           {response.products.map((product) => (
-            <ProductCard key={product.id} product={product} />
+            <ProductCard
+              key={product.id}
+              product={product}
+              defaultComponentsExpanded={response.products.length === 1}
+            />
           ))}
         </section>
       )}

@@ -1,5 +1,6 @@
 using ElectronicService.Domain.Catalog.Components;
 using ElectronicService.Domain.Catalog.Products;
+using ElectronicService.Domain.Catalog.ProductTypes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -19,9 +20,11 @@ public sealed class ComponentOfferConfiguration
         builder.Property(offer => offer.ComponentProductId)
             .HasColumnName("component_product_id")
             .IsRequired();
-        builder.Property(offer => offer.NeedDefinitionId)
-            .HasColumnName("need_definition_id")
+        builder.Property(offer => offer.MainProductTypeId)
+            .HasColumnName("main_product_type_id")
             .IsRequired();
+        builder.Property(offer => offer.NeedDefinitionId)
+            .HasColumnName("need_definition_id");
         builder.Property(offer => offer.CreatedAtUtc)
             .HasColumnName("created_at_utc")
             .IsRequired();
@@ -40,6 +43,10 @@ public sealed class ComponentOfferConfiguration
             .WithMany()
             .HasForeignKey(offer => offer.NeedDefinitionId)
             .OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne<ProductType>()
+            .WithMany()
+            .HasForeignKey(offer => offer.MainProductTypeId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasMany(offer => offer.ConditionGroups)
             .WithOne()
@@ -52,6 +59,15 @@ public sealed class ComponentOfferConfiguration
         {
             offer.ComponentProductId,
             offer.NeedDefinitionId
-        }).IsUnique();
+        })
+            .IsUnique()
+            .HasFilter("\"need_definition_id\" IS NOT NULL");
+        builder.HasIndex(offer => new
+        {
+            offer.MainProductTypeId,
+            offer.ComponentProductId
+        })
+            .IsUnique()
+            .HasFilter("\"need_definition_id\" IS NULL");
     }
 }

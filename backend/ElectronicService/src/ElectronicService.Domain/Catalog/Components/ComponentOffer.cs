@@ -12,10 +12,12 @@ public sealed class ComponentOffer : AggregateRoot
     private ComponentOffer(
         Guid id,
         Guid componentProductId,
-        Guid needDefinitionId)
+        Guid mainProductTypeId,
+        Guid? needDefinitionId)
         : base(id)
     {
         ComponentProductId = componentProductId;
+        MainProductTypeId = mainProductTypeId;
         NeedDefinitionId = needDefinitionId;
         IsActive = true;
         CreatedAtUtc = DateTime.UtcNow;
@@ -27,7 +29,9 @@ public sealed class ComponentOffer : AggregateRoot
 
     public Guid ComponentProductId { get; private set; }
 
-    public Guid NeedDefinitionId { get; private set; }
+    public Guid MainProductTypeId { get; private set; }
+
+    public Guid? NeedDefinitionId { get; private set; }
 
     public DateTime CreatedAtUtc { get; private set; }
 
@@ -45,11 +49,17 @@ public sealed class ComponentOffer : AggregateRoot
 
     public static Result<ComponentOffer, DomainError> Create(
         Guid componentProductId,
-        Guid needDefinitionId)
+        Guid mainProductTypeId,
+        Guid? needDefinitionId = null)
     {
         if (componentProductId == Guid.Empty)
         {
             return GeneralErrors.ValueIsInvalid(nameof(componentProductId));
+        }
+
+        if (mainProductTypeId == Guid.Empty)
+        {
+            return GeneralErrors.ValueIsInvalid(nameof(mainProductTypeId));
         }
 
         if (needDefinitionId == Guid.Empty)
@@ -60,6 +70,7 @@ public sealed class ComponentOffer : AggregateRoot
         var offer = new ComponentOffer(
             Guid.CreateVersion7(),
             componentProductId,
+            mainProductTypeId,
             needDefinitionId);
 
         var groupResult = offer.AddConditionGroup();

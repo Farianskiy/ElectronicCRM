@@ -32,6 +32,7 @@ public sealed record ComponentCompatibilityImportPreviewRow(
     string MainProductType,
     string Need,
     Guid? ComponentProductId,
+    Guid? MainProductTypeId,
     Guid? NeedDefinitionId,
     bool IsActive,
     ComponentCompatibilityImportRowStatus Status,
@@ -46,7 +47,8 @@ public sealed record ComponentCompatibilityImportPreview(
 
 public sealed record ApplyComponentCompatibilityImportRow(
     Guid ComponentProductId,
-    Guid NeedDefinitionId,
+    Guid MainProductTypeId,
+    Guid? NeedDefinitionId,
     bool IsActive,
     IReadOnlyList<ComponentCompatibilityImportConstraint> Constraints);
 

@@ -95,7 +95,13 @@ public sealed class ComponentCompatibilityTests
     [Fact]
     public void MatcherUsesOrInsideOneCharacteristicAndAcrossCharacteristics()
     {
-        var offer = ComponentOffer.Create(Guid.NewGuid(), Guid.NewGuid()).Value;
+        var componentId = Guid.NewGuid();
+        var mainProductTypeId = Guid.NewGuid();
+        var offer = ComponentOffer.Create(componentId, mainProductTypeId).Value;
+
+        Assert.Equal(componentId, offer.ComponentProductId);
+        Assert.Equal(mainProductTypeId, offer.MainProductTypeId);
+        Assert.Null(offer.NeedDefinitionId);
         var heightId = Guid.NewGuid();
         var widthId = Guid.NewGuid();
 

@@ -129,11 +129,24 @@ public sealed class CatalogComponentCompatibilityController : ControllerBase
             return BadRequest("Некорректный оператор условия совместимости.");
         }
 
-        var result = await _service.CreateOfferAsync(
-            componentProductId,
-            request.NeedDefinitionId,
-            constraints,
-            cancellationToken).ConfigureAwait(false);
+        if (!request.NeedDefinitionId.HasValue
+            && string.IsNullOrWhiteSpace(request.MainProductTypeCode))
+        {
+            return BadRequest(
+                ComponentCompatibilityErrors.MainProductTypeRequired().Message);
+        }
+
+        var result = request.NeedDefinitionId.HasValue
+            ? await _service.CreateOfferAsync(
+                componentProductId,
+                request.NeedDefinitionId.Value,
+                constraints,
+                cancellationToken).ConfigureAwait(false)
+            : await _service.CreateAccessoryOfferAsync(
+                componentProductId,
+                request.MainProductTypeCode!,
+                constraints,
+                cancellationToken).ConfigureAwait(false);
 
         if (result.IsFailure)
         {
@@ -145,6 +158,7 @@ public sealed class CatalogComponentCompatibilityController : ControllerBase
             new ComponentOfferResponse(
                 result.Value.Id,
                 result.Value.ComponentProductId,
+                result.Value.MainProductTypeId,
                 result.Value.NeedDefinitionId,
                 result.Value.ConstraintsCount));
     }
@@ -163,6 +177,7 @@ public sealed class CatalogComponentCompatibilityController : ControllerBase
 
         return Ok(result.Select(offer => new ComponentOfferSummaryResponse(
             offer.Id,
+            offer.MainProductTypeId,
             offer.NeedDefinitionId,
             offer.NeedCode,
             offer.NeedName,
@@ -351,13 +366,27 @@ public sealed class CatalogComponentCompatibilityController : ControllerBase
                             component.Name,
                             component.PriceAmount,
                             component.PriceCurrency,
+                            component.StockQuantity,
                             component.MatchConditions.Select(condition =>
                                 new ComponentCompatibilityConditionResponse(
                                     condition.CharacteristicName,
                                     condition.ActualValue,
                                     condition.ExpectedValues)).ToList())).ToList(),
                     need.SelectedComponents.Select(MapSelectedComponent)
-                        .ToList())).ToList()));
+                        .ToList())).ToList(),
+            result.Value.Accessories.Select(component =>
+                new CompatibleComponentResponse(
+                    component.ProductId,
+                    component.Article,
+                    component.Name,
+                    component.PriceAmount,
+                    component.PriceCurrency,
+                    component.StockQuantity,
+                    component.MatchConditions.Select(condition =>
+                        new ComponentCompatibilityConditionResponse(
+                            condition.CharacteristicName,
+                            condition.ActualValue,
+                            condition.ExpectedValues)).ToList())).ToList()));
     }
 
     private static SelectedComponentResponse MapSelectedComponent(
@@ -383,6 +412,7 @@ public sealed class CatalogComponentCompatibilityController : ControllerBase
             rule.ComponentProductId,
             rule.ComponentArticle,
             rule.ComponentName,
+            rule.MainProductTypeId,
             rule.NeedDefinitionId,
             rule.NeedCode,
             rule.NeedName,

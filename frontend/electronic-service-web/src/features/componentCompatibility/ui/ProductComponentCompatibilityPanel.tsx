@@ -114,8 +114,9 @@ export function ProductComponentCompatibilityPanel({
   }
 
   const needs = compatibilityQuery.data?.needs ?? [];
+  const accessories = compatibilityQuery.data?.accessories ?? [];
 
-  if (needs.length === 0) {
+  if (needs.length === 0 && accessories.length === 0) {
     return null;
   }
 
@@ -132,6 +133,52 @@ export function ProductComponentCompatibilityPanel({
       </p>
 
       <div className="mt-5 grid gap-4">
+        {accessories.length > 0 && (
+          <article className="rounded-2xl border border-[var(--app-accent-border)] bg-[var(--app-accent-soft)] p-4">
+            <h3 className="font-semibold text-[var(--app-text)]">
+              Совместимые аксессуары
+            </h3>
+            <p className="mt-1 text-sm text-[var(--app-muted)]">
+              Не входят в обязательную комплектацию и приобретаются по выбору.
+            </p>
+
+            <ul className="mt-3 grid gap-2">
+              {accessories.map((component) => (
+                <li
+                  key={component.productId}
+                  className="rounded-xl border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-3"
+                >
+                  <Link
+                    href={`/catalog/products/${component.productId}`}
+                    className="block min-w-0 text-sm"
+                  >
+                    <span className="block font-medium text-[var(--app-text)]">
+                      {component.name}
+                    </span>
+                    <span className="mt-1 block text-xs text-[var(--app-muted)]">
+                      {component.article} ·{" "}
+                      {formatPrice(
+                        component.priceAmount,
+                        component.priceCurrency,
+                      )}
+                    </span>
+                    <span className="mt-2 block text-xs leading-5 text-[var(--app-muted)]">
+                      {component.matchConditions.length === 0
+                        ? "Подходит ко всем товарам этого типа."
+                        : `Подходит: ${component.matchConditions
+                            .map(
+                              (condition) =>
+                                `${condition.characteristicName} — ${condition.actualValue}`,
+                            )
+                            .join("; ")}.`}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </article>
+        )}
+
         {needs.map((need) => (
           <article
             key={need.needDefinitionId}

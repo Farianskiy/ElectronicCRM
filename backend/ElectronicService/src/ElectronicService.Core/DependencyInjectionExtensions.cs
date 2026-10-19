@@ -84,6 +84,7 @@ using ElectronicService.Core.Catalog.Products.BulkUpdateProducts;
 using ElectronicService.Core.Catalog.Products.GetAuditHistory;
 using ElectronicService.Core.Catalog.Products.GetProductById;
 using ElectronicService.Core.Catalog.Products.GetProducts;
+using ElectronicService.Core.Catalog.Products.ExportProducts;
 using ElectronicService.Core.Catalog.Products.GetReplacements;
 using ElectronicService.Core.Catalog.Products.PreviewProductTypeMigration;
 using ElectronicService.Core.Catalog.Products.RemoveAlias;
@@ -143,6 +144,7 @@ public static class DependencyInjectionExtensions
         services.AddScoped<MakeUserRegularCommandHandler>();
         services.AddScoped<BlockUserCommandHandler>();
         services.AddScoped<GetCatalogProductsQueryHandler>();
+        services.AddScoped<ExportCatalogProductsQueryHandler>();
         services.AddScoped<GetCatalogProductByIdQueryHandler>();
         services.AddScoped<SearchProductsQueryHandler>();
         services.AddScoped<GetProductReplacementsQueryHandler>();

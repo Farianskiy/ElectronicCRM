@@ -89,6 +89,8 @@ public sealed class CatalogProductsReader : ICatalogProductsReader
         var storedItems = await productsQuery
             .OrderBy(item => item.Product.Name.NormalizedValue)
             .ThenBy(item => item.Product.Article.Value)
+            .ThenBy(item => item.Manufacturer.Id)
+            .ThenBy(item => item.Product.Id)
             .Skip((normalizedPage - 1) * normalizedPageSize)
             .Take(normalizedPageSize)
             .Select(item => new StoredCatalogProductListItem(

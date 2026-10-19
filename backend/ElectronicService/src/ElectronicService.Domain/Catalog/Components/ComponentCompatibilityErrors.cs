@@ -22,9 +22,11 @@ public static class ComponentCompatibilityErrors
 
     public static DomainError OfferAlreadyExists(
         Guid componentProductId,
-        Guid needId) => new(
+        Guid? needId) => new(
         "catalog.component_offer.already_exists",
-        $"Комплектующее '{componentProductId}' уже привязано к потребности '{needId}'.");
+        needId.HasValue
+            ? $"Комплектующее '{componentProductId}' уже привязано к потребности '{needId}'."
+            : $"Комплектующее '{componentProductId}' уже добавлено как совместимый аксессуар для этого типа товара.");
 
     public static DomainError OfferNotFound(Guid offerId) => new(
         "catalog.component_offer.not_found",

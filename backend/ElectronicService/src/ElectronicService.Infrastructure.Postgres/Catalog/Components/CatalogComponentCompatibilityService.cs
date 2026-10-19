@@ -180,6 +180,70 @@ public sealed class CatalogComponentCompatibilityService
     {
         ArgumentNullException.ThrowIfNull(constraints);
 
+        var need = await _dbContext.ComponentNeedDefinitions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                item => item.Id == needDefinitionId,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        if (need is null)
+        {
+            return ComponentCompatibilityErrors.NeedNotFound(needDefinitionId);
+        }
+
+        return await CreateOfferForScopeAsync(
+            componentProductId,
+            need.MainProductTypeId,
+            need.Id,
+            constraints,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<Result<ComponentOfferResult, DomainError>>
+        CreateAccessoryOfferAsync(
+            Guid componentProductId,
+            string mainProductTypeCode,
+            IReadOnlyCollection<ComponentCompatibilityConstraintInput> constraints,
+            CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(constraints);
+
+        var normalizedCode = NormalizeCode(mainProductTypeCode);
+        var mainProductType = await _dbContext.ProductTypes
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                item => item.Code == normalizedCode,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        if (mainProductType is null)
+        {
+            return CatalogErrors.ProductTypeNotFound(normalizedCode);
+        }
+
+        if (mainProductType.Kind != ProductTypeKind.MainProduct)
+        {
+            return ComponentCompatibilityErrors.MainProductTypeRequired();
+        }
+
+        return await CreateOfferForScopeAsync(
+            componentProductId,
+            mainProductType.Id,
+            null,
+            constraints,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<Result<ComponentOfferResult, DomainError>>
+        CreateOfferForScopeAsync(
+            Guid componentProductId,
+            Guid mainProductTypeId,
+            Guid? needDefinitionId,
+            IReadOnlyCollection<ComponentCompatibilityConstraintInput> constraints,
+            CancellationToken cancellationToken)
+    {
+
         var component = await _dbContext.Products
             .FirstOrDefaultAsync(
                 product => product.Id == componentProductId,
@@ -202,19 +266,9 @@ public sealed class CatalogComponentCompatibilityService
             return ComponentCompatibilityErrors.ComponentProductRequired();
         }
 
-        var need = await _dbContext.ComponentNeedDefinitions
-            .FirstOrDefaultAsync(
-                item => item.Id == needDefinitionId,
-                cancellationToken)
-            .ConfigureAwait(false);
-
-        if (need is null)
-        {
-            return ComponentCompatibilityErrors.NeedNotFound(needDefinitionId);
-        }
-
         var offerExists = await _dbContext.ComponentOffers.AnyAsync(
             offer => offer.ComponentProductId == componentProductId
+                && offer.MainProductTypeId == mainProductTypeId
                 && offer.NeedDefinitionId == needDefinitionId,
             cancellationToken).ConfigureAwait(false);
 
@@ -227,6 +281,7 @@ public sealed class CatalogComponentCompatibilityService
 
         var offerResult = ComponentOffer.Create(
             componentProductId,
+            mainProductTypeId,
             needDefinitionId);
 
         if (offerResult.IsFailure)
@@ -245,7 +300,7 @@ public sealed class CatalogComponentCompatibilityService
             .ConfigureAwait(false);
 
         var allowedDefinitionIds = await _dbContext.ProductTypeCharacteristics
-            .Where(relation => relation.ProductTypeId == need.MainProductTypeId)
+            .Where(relation => relation.ProductTypeId == mainProductTypeId)
             .Select(relation => relation.CharacteristicDefinitionId)
             .ToHashSetAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -256,7 +311,7 @@ public sealed class CatalogComponentCompatibilityService
             {
                 return CatalogErrors.CharacteristicIsNotAllowedForProductType(
                     input.CharacteristicDefinitionId,
-                    need.MainProductTypeId);
+                    mainProductTypeId);
             }
 
             if (!definitions.TryGetValue(
@@ -311,6 +366,7 @@ public sealed class CatalogComponentCompatibilityService
         return new ComponentOfferResult(
             offer.Id,
             offer.ComponentProductId,
+            offer.MainProductTypeId,
             offer.NeedDefinitionId,
             offer.GetConstraints().Count());
     }
@@ -322,17 +378,19 @@ public sealed class CatalogComponentCompatibilityService
     {
         return await (
             from offer in _dbContext.ComponentOffers.AsNoTracking()
-            join need in _dbContext.ComponentNeedDefinitions.AsNoTracking()
-                on offer.NeedDefinitionId equals need.Id
             join productType in _dbContext.ProductTypes.AsNoTracking()
-                on need.MainProductTypeId equals productType.Id
+                on offer.MainProductTypeId equals productType.Id
+            join needItem in _dbContext.ComponentNeedDefinitions.AsNoTracking()
+                on offer.NeedDefinitionId equals (Guid?)needItem.Id into needGroup
+            from need in needGroup.DefaultIfEmpty()
             where offer.ComponentProductId == componentProductId
-            orderby productType.Name, need.Name
+            orderby productType.Name, need == null ? string.Empty : need.Name
             select new ComponentOfferSummaryResult(
                 offer.Id,
-                need.Id,
-                need.Code,
-                need.Name,
+                offer.MainProductTypeId,
+                offer.NeedDefinitionId,
+                need == null ? null : need.Code,
+                need == null ? null : need.Name,
                 productType.Code,
                 offer.ConditionGroups.SelectMany(item => item.Constraints).Count()))
             .ToListAsync(cancellationToken)
@@ -353,15 +411,13 @@ public sealed class CatalogComponentCompatibilityService
         if (!string.IsNullOrWhiteSpace(mainProductTypeCode))
         {
             var normalizedCode = NormalizeCode(mainProductTypeCode);
-            var needIds =
-                from need in _dbContext.ComponentNeedDefinitions.AsNoTracking()
-                join productType in _dbContext.ProductTypes.AsNoTracking()
-                    on need.MainProductTypeId equals productType.Id
-                where productType.Code == normalizedCode
-                select need.Id;
+            var productTypeIds = _dbContext.ProductTypes
+                .AsNoTracking()
+                .Where(productType => productType.Code == normalizedCode)
+                .Select(productType => productType.Id);
 
             offersQuery = offersQuery.Where(offer =>
-                needIds.Contains(offer.NeedDefinitionId));
+                productTypeIds.Contains(offer.MainProductTypeId));
         }
 
         var offers = await offersQuery
@@ -406,11 +462,6 @@ public sealed class CatalogComponentCompatibilityService
             return ComponentCompatibilityErrors.OfferNotFound(offerId);
         }
 
-        var need = await _dbContext.ComponentNeedDefinitions
-            .AsNoTracking()
-            .FirstAsync(item => item.Id == offer.NeedDefinitionId, cancellationToken)
-            .ConfigureAwait(false);
-
         var requestedDefinitionIds = conditionGroups
             .SelectMany(group => group.Constraints)
             .Select(input => input.CharacteristicDefinitionId)
@@ -423,7 +474,7 @@ public sealed class CatalogComponentCompatibilityService
             .ConfigureAwait(false);
         var allowedDefinitionIds = await _dbContext.ProductTypeCharacteristics
             .AsNoTracking()
-            .Where(relation => relation.ProductTypeId == need.MainProductTypeId)
+            .Where(relation => relation.ProductTypeId == offer.MainProductTypeId)
             .Select(relation => relation.CharacteristicDefinitionId)
             .ToHashSetAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -446,7 +497,7 @@ public sealed class CatalogComponentCompatibilityService
                 {
                     return CatalogErrors.CharacteristicIsNotAllowedForProductType(
                         input.CharacteristicDefinitionId,
-                        need.MainProductTypeId);
+                        offer.MainProductTypeId);
                 }
 
                 if (!definitions.TryGetValue(
@@ -864,7 +915,7 @@ public sealed class CatalogComponentCompatibilityService
             .Include(offer => offer.ConditionGroups)
             .ThenInclude(group => group.Constraints)
             .Where(offer => offer.IsActive
-                && needIds.Contains(offer.NeedDefinitionId))
+                && offer.MainProductTypeId == product.ProductTypeId)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
@@ -916,10 +967,10 @@ public sealed class CatalogComponentCompatibilityService
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        var results = needs.Select(need =>
+        IReadOnlyCollection<CompatibleComponentResult> MapCompatibleComponents(
+            IEnumerable<ComponentOffer> candidateOffers)
         {
-            var compatibleComponents = offers
-                .Where(offer => offer.NeedDefinitionId == need.Id)
+            return candidateOffers
                 .Where(offer => ComponentCompatibilityMatcher.IsCompatible(
                     offer.ConditionGroups,
                     characteristicValues))
@@ -955,9 +1006,16 @@ public sealed class CatalogComponentCompatibilityService
                     item.Component.Name.Value,
                     item.Component.Price.Amount,
                     item.Component.Price.Currency,
+                    item.Component.StockQuantity.Value,
                     item.MatchConditions))
                 .OrderBy(component => component.Name, StringComparer.OrdinalIgnoreCase)
                 .ToList();
+        }
+
+        var results = needs.Select(need =>
+        {
+            var compatibleComponents = MapCompatibleComponents(offers
+                .Where(offer => offer.NeedDefinitionId == need.Id));
 
             return new ProductNeedCompatibilityResult(
                 need.Id,
@@ -973,7 +1031,13 @@ public sealed class CatalogComponentCompatibilityService
                     .ToList());
         }).ToList();
 
-        return new ProductComponentCompatibilityResult(product.Id, results);
+        var accessories = MapCompatibleComponents(offers
+            .Where(offer => offer.NeedDefinitionId is null));
+
+        return new ProductComponentCompatibilityResult(
+            product.Id,
+            results,
+            accessories);
     }
 
     public async Task<UnitResult<DomainError>> ValidateManualSelectionAsync(
@@ -1068,7 +1132,8 @@ public sealed class CatalogComponentCompatibilityService
             .Distinct()
             .ToArray();
         var needIds = offers
-            .Select(offer => offer.NeedDefinitionId)
+            .Where(offer => offer.NeedDefinitionId.HasValue)
+            .Select(offer => offer.NeedDefinitionId!.Value)
             .Distinct()
             .ToArray();
         var definitionIds = offers
@@ -1087,8 +1152,8 @@ public sealed class CatalogComponentCompatibilityService
             .Where(need => needIds.Contains(need.Id))
             .ToDictionaryAsync(need => need.Id, cancellationToken)
             .ConfigureAwait(false);
-        var typeIds = needs.Values
-            .Select(need => need.MainProductTypeId)
+        var typeIds = offers
+            .Select(offer => offer.MainProductTypeId)
             .Distinct()
             .ToArray();
         var productTypes = await _dbContext.ProductTypes
@@ -1104,21 +1169,24 @@ public sealed class CatalogComponentCompatibilityService
 
         return offers
             .Where(offer => components.ContainsKey(offer.ComponentProductId)
-                && needs.ContainsKey(offer.NeedDefinitionId))
+                && productTypes.ContainsKey(offer.MainProductTypeId))
             .Select(offer =>
             {
                 var component = components[offer.ComponentProductId];
-                var need = needs[offer.NeedDefinitionId];
-                var productType = productTypes[need.MainProductTypeId];
+                var need = offer.NeedDefinitionId.HasValue
+                    ? needs.GetValueOrDefault(offer.NeedDefinitionId.Value)
+                    : null;
+                var productType = productTypes[offer.MainProductTypeId];
 
                 return new ComponentCompatibilityRuleResult(
                     offer.Id,
                     component.Id,
                     component.Article.Value,
                     component.Name.Value,
-                    need.Id,
-                    need.Code,
-                    need.Name,
+                    offer.MainProductTypeId,
+                    offer.NeedDefinitionId,
+                    need?.Code,
+                    need?.Name,
                     productType.Code,
                     productType.Name,
                     offer.IsActive,
@@ -1149,7 +1217,8 @@ public sealed class CatalogComponentCompatibilityService
             })
             .OrderBy(rule => rule.MainProductTypeName,
                 StringComparer.OrdinalIgnoreCase)
-            .ThenBy(rule => rule.NeedName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(rule => rule.NeedName ?? "Совместимые аксессуары",
+                StringComparer.OrdinalIgnoreCase)
             .ThenBy(rule => rule.ComponentName, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }

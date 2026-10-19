@@ -111,6 +111,7 @@ public sealed class CatalogComponentCompatibilityImportController
                     row.MainProductType,
                     row.Need,
                     row.ComponentProductId,
+                    row.MainProductTypeId,
                     row.NeedDefinitionId,
                     row.IsActive,
                     row.Status.ToString(),
@@ -147,6 +148,7 @@ public sealed class CatalogComponentCompatibilityImportController
         var rows = (request.Rows ?? [])
             .Select(row => new ApplyComponentCompatibilityImportRow(
                 row.ComponentProductId,
+                row.MainProductTypeId,
                 row.NeedDefinitionId,
                 row.IsActive,
                 (row.Constraints ?? [])

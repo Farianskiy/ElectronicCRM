@@ -32,7 +32,6 @@ public sealed class CatalogComponentCompatibilityWorkbookService
         CancellationToken cancellationToken = default)
     {
         ProductTypeReference? selectedType = null;
-        IReadOnlyCollection<NeedReference> selectedNeeds = [];
         IReadOnlyCollection<CharacteristicReference> selectedCharacteristics = [];
 
         if (!string.IsNullOrWhiteSpace(mainProductTypeCode))
@@ -55,17 +54,6 @@ public sealed class CatalogComponentCompatibilityWorkbookService
                     "Выбранный тип основного товара не найден.");
             }
 
-            selectedNeeds = await _dbContext.ComponentNeedDefinitions
-                .AsNoTracking()
-                .Where(item => item.MainProductTypeId == selectedType.Id)
-                .OrderBy(item => item.Name)
-                .Select(item => new NeedReference(
-                    item.Id,
-                    item.MainProductTypeId,
-                    item.Code,
-                    item.Name))
-                .ToArrayAsync(cancellationToken)
-                .ConfigureAwait(false);
             selectedCharacteristics = await (
                     from relation in _dbContext.ProductTypeCharacteristics
                         .AsNoTracking()
@@ -132,8 +120,7 @@ public sealed class CatalogComponentCompatibilityWorkbookService
 
         worksheet.Cell(2, 1).Value = "АРТИКУЛ-001";
         worksheet.Cell(2, 2).Value = selectedType?.Code ?? "КОНТАКТОР";
-        worksheet.Cell(2, 3).Value = selectedNeeds.FirstOrDefault()?.Name
-            ?? "ДОПОЛНИТЕЛЬНЫЙ КОНТАКТ";
+        worksheet.Cell(2, 3).Value = string.Empty;
         worksheet.Cell(2, 4).Value = "Да";
         if (headers.Count > 4)
         {
@@ -149,7 +136,7 @@ public sealed class CatalogComponentCompatibilityWorkbookService
         instructions.Cell(4, 1).Value =
             "2. Тип основного товара можно указать кодом или названием.";
         instructions.Cell(5, 1).Value =
-            "3. Потребность можно указать кодом или названием для выбранного типа товара.";
+            "3. Оставьте «Потребность» пустой для обычного совместимого аксессуара. Укажите код или название только для обязательной сборки, количества или отдельной группы выбора.";
         instructions.Cell(6, 1).Value =
             selectedType is null
                 ? "4. Переименуйте колонки «Характеристика 1/2» в реальные коды или названия характеристик."
@@ -157,7 +144,7 @@ public sealed class CatalogComponentCompatibilityWorkbookService
         instructions.Cell(7, 1).Value =
             "5. Несколько допустимых значений одной характеристики разделяйте точкой с запятой.";
         instructions.Cell(8, 1).Value =
-            "6. Повторите артикул, тип и потребность в новой строке, чтобы добавить альтернативный вариант совместимости.";
+            "6. Повторите артикул, тип и ту же потребность (либо снова оставьте её пустой) в новой строке, чтобы добавить альтернативный вариант совместимости.";
         instructions.Cell(9, 1).Value =
             "7. В одной строке разные характеристики работают одновременно (И); повторные строки работают как варианты (ИЛИ).";
         instructions.Cell(10, 1).Value =
@@ -208,12 +195,11 @@ public sealed class CatalogComponentCompatibilityWorkbookService
             .Where(item => item.MainProductTypeId == selectedType.Id)
             .ToDictionaryAsync(item => item.Id, cancellationToken)
             .ConfigureAwait(false);
-        var needIds = needs.Keys.ToArray();
         var offers = await _dbContext.ComponentOffers
             .AsNoTracking()
             .Include(item => item.ConditionGroups)
             .ThenInclude(group => group.Constraints)
-            .Where(item => needIds.Contains(item.NeedDefinitionId))
+            .Where(item => item.MainProductTypeId == selectedType.Id)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
         var componentIds = offers
@@ -269,7 +255,9 @@ public sealed class CatalogComponentCompatibilityWorkbookService
         foreach (var offer in offers
                      .Where(item => components.ContainsKey(item.ComponentProductId))
                      .OrderBy(
-                         item => needs[item.NeedDefinitionId].Name,
+                         item => item.NeedDefinitionId.HasValue
+                             ? needs[item.NeedDefinitionId.Value].Name
+                             : "Совместимые аксессуары",
                          StringComparer.OrdinalIgnoreCase)
                      .ThenBy(
                          item => components[item.ComponentProductId].Article.Value,
@@ -286,7 +274,9 @@ public sealed class CatalogComponentCompatibilityWorkbookService
                 worksheet.Cell(rowNumber, 1).Value =
                     components[offer.ComponentProductId].Article.Value;
                 worksheet.Cell(rowNumber, 2).Value = selectedType.Code;
-                worksheet.Cell(rowNumber, 3).Value = needs[offer.NeedDefinitionId].Name;
+                worksheet.Cell(rowNumber, 3).Value = offer.NeedDefinitionId.HasValue
+                    ? needs[offer.NeedDefinitionId.Value].Name
+                    : string.Empty;
                 worksheet.Cell(rowNumber, 4).Value = offer.IsActive ? "Да" : "Нет";
 
                 if (group is not null)
@@ -461,33 +451,38 @@ public sealed class CatalogComponentCompatibilityWorkbookService
                 }
 
                 var mainType = mainTypeCandidates[0];
-                var needCandidates = referenceData.Needs
-                    .Where(item =>
-                        item.MainProductTypeId == mainType.Id
-                        && (string.Equals(
-                                Normalize(item.Code),
-                                Normalize(needValue),
-                                StringComparison.Ordinal)
-                            || string.Equals(
-                                Normalize(item.Name),
-                                Normalize(needValue),
-                                StringComparison.Ordinal)))
-                    .ToArray();
-
-                if (needCandidates.Length != 1)
+                NeedReference? need = null;
+                if (needValue.Length > 0)
                 {
-                    rows.Add(ProblemRow(
-                        rowNumber,
-                        article,
-                        mainTypeValue,
-                        needValue,
-                        ComponentCompatibilityImportRowStatus.NeedNotFound,
-                        "Потребность не найдена для выбранного типа товара."));
-                    continue;
+                    var needCandidates = referenceData.Needs
+                        .Where(item =>
+                            item.MainProductTypeId == mainType.Id
+                            && (string.Equals(
+                                    Normalize(item.Code),
+                                    Normalize(needValue),
+                                    StringComparison.Ordinal)
+                                || string.Equals(
+                                    Normalize(item.Name),
+                                    Normalize(needValue),
+                                    StringComparison.Ordinal)))
+                        .ToArray();
+
+                    if (needCandidates.Length != 1)
+                    {
+                        rows.Add(ProblemRow(
+                            rowNumber,
+                            article,
+                            mainTypeValue,
+                            needValue,
+                            ComponentCompatibilityImportRowStatus.NeedNotFound,
+                            "Потребность не найдена для выбранного типа товара."));
+                        continue;
+                    }
+
+                    need = needCandidates[0];
                 }
 
                 var component = componentCandidates[0];
-                var need = needCandidates[0];
                 var constraintResult = CreateConstraints(
                     row,
                     headers,
@@ -515,7 +510,8 @@ public sealed class CatalogComponentCompatibilityWorkbookService
 
                 var groupSignature = CreateGroupSignature(
                     component.Id,
-                    need.Id,
+                    mainType.Id,
+                    need?.Id,
                     constraintResult.Value);
 
                 if (!representedGroups.Add(groupSignature))
@@ -534,9 +530,10 @@ public sealed class CatalogComponentCompatibilityWorkbookService
                     rowNumber,
                     article,
                     mainType.Name,
-                    need.Name,
+                    need?.Name ?? string.Empty,
                     component.Id,
-                    need.Id,
+                    mainType.Id,
+                    need?.Id,
                     activeResult.Value,
                     ComponentCompatibilityImportRowStatus.Ready,
                     null,
@@ -578,13 +575,17 @@ public sealed class CatalogComponentCompatibilityWorkbookService
 
         if (rows.Any(row =>
                 row.ComponentProductId == Guid.Empty
+                || row.MainProductTypeId == Guid.Empty
                 || row.NeedDefinitionId == Guid.Empty))
         {
             return Failure<int>("В запросе есть некорректные правила.");
         }
 
         var groupedRows = rows
-            .GroupBy(row => (row.ComponentProductId, row.NeedDefinitionId))
+            .GroupBy(row => (
+                row.ComponentProductId,
+                row.MainProductTypeId,
+                row.NeedDefinitionId))
             .ToArray();
         var requestedKeys = groupedRows.Select(group => group.Key).ToHashSet();
 
@@ -606,7 +607,15 @@ public sealed class CatalogComponentCompatibilityWorkbookService
         }
 
         var productIds = rows.Select(row => row.ComponentProductId).Distinct().ToArray();
-        var needIds = rows.Select(row => row.NeedDefinitionId).Distinct().ToArray();
+        var needIds = rows
+            .Where(row => row.NeedDefinitionId.HasValue)
+            .Select(row => row.NeedDefinitionId!.Value)
+            .Distinct()
+            .ToArray();
+        var mainProductTypeIds = rows
+            .Select(row => row.MainProductTypeId)
+            .Distinct()
+            .ToArray();
         var definitionIds = rows
             .SelectMany(row => row.Constraints)
             .Select(item => item.CharacteristicDefinitionId)
@@ -625,14 +634,15 @@ public sealed class CatalogComponentCompatibilityWorkbookService
             .Where(item => needIds.Contains(item.Id))
             .ToDictionaryAsync(item => item.Id, cancellationToken)
             .ConfigureAwait(false);
+        var mainProductTypes = await _dbContext.ProductTypes
+            .Where(item => mainProductTypeIds.Contains(item.Id)
+                && item.Kind == ProductTypeKind.MainProduct)
+            .ToDictionaryAsync(item => item.Id, cancellationToken)
+            .ConfigureAwait(false);
         var definitions = await _dbContext.CharacteristicDefinitions
             .Where(item => definitionIds.Contains(item.Id))
             .ToDictionaryAsync(item => item.Id, cancellationToken)
             .ConfigureAwait(false);
-        var mainProductTypeIds = needs.Values
-            .Select(need => need.MainProductTypeId)
-            .Distinct()
-            .ToArray();
         var allowedPairs = await _dbContext.ProductTypeCharacteristics
             .Where(item => mainProductTypeIds.Contains(item.ProductTypeId))
             .Select(item => new
@@ -649,21 +659,32 @@ public sealed class CatalogComponentCompatibilityWorkbookService
             .Include(item => item.ConditionGroups)
             .ThenInclude(group => group.Constraints)
             .Where(item => productIds.Contains(item.ComponentProductId)
-                && needIds.Contains(item.NeedDefinitionId))
+                && mainProductTypeIds.Contains(item.MainProductTypeId))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
         var targetExistingOffers = existingOffers
             .Where(item => requestedKeys.Contains(
-                (item.ComponentProductId, item.NeedDefinitionId)))
+                (item.ComponentProductId,
+                    item.MainProductTypeId,
+                    item.NeedDefinitionId)))
             .ToList();
         var existingByKey = targetExistingOffers.ToDictionary(
-            item => (item.ComponentProductId, item.NeedDefinitionId));
+            item => (
+                item.ComponentProductId,
+                item.MainProductTypeId,
+                item.NeedDefinitionId));
         var preparedRules = new List<PreparedImportRule>();
 
         foreach (var ruleRows in groupedRows)
         {
             if (!componentIds.Contains(ruleRows.Key.ComponentProductId)
-                || !needs.TryGetValue(ruleRows.Key.NeedDefinitionId, out var need))
+                || !mainProductTypes.ContainsKey(ruleRows.Key.MainProductTypeId)
+                || (ruleRows.Key.NeedDefinitionId.HasValue
+                    && (!needs.TryGetValue(
+                            ruleRows.Key.NeedDefinitionId.Value,
+                            out var selectedNeed)
+                        || selectedNeed.MainProductTypeId !=
+                            ruleRows.Key.MainProductTypeId)))
             {
                 return Failure<int>(
                     "Состав каталога изменился. Выполните предпросмотр повторно.");
@@ -687,7 +708,7 @@ public sealed class CatalogComponentCompatibilityWorkbookService
                             constraint.CharacteristicDefinitionId,
                             out var definition)
                         || !allowed.Contains(
-                            (need.MainProductTypeId, definition.Id)))
+                            (ruleRows.Key.MainProductTypeId, definition.Id)))
                     {
                         return Failure<int>(
                             "Характеристика больше не разрешена для типа товара.");
@@ -725,6 +746,7 @@ public sealed class CatalogComponentCompatibilityWorkbookService
 
             preparedRules.Add(new PreparedImportRule(
                 ruleRows.Key.ComponentProductId,
+                ruleRows.Key.MainProductTypeId,
                 ruleRows.Key.NeedDefinitionId,
                 ruleRows.First().IsActive,
                 preparedGroups));
@@ -743,6 +765,7 @@ public sealed class CatalogComponentCompatibilityWorkbookService
             ComponentOffer offer;
             var key = (
                 preparedRule.ComponentProductId,
+                preparedRule.MainProductTypeId,
                 preparedRule.NeedDefinitionId);
 
             if (existingByKey.TryGetValue(key, out var existingOffer))
@@ -754,6 +777,7 @@ public sealed class CatalogComponentCompatibilityWorkbookService
             {
                 var offerResult = ComponentOffer.Create(
                     preparedRule.ComponentProductId,
+                    preparedRule.MainProductTypeId,
                     preparedRule.NeedDefinitionId);
 
                 if (offerResult.IsFailure)
@@ -854,12 +878,16 @@ public sealed class CatalogComponentCompatibilityWorkbookService
             characteristics,
             definitions,
             existingOffers.ToDictionary(
-                item => (item.ComponentProductId, item.NeedDefinitionId),
+                item => (
+                    item.ComponentProductId,
+                    item.MainProductTypeId,
+                    item.NeedDefinitionId),
                 item => new ExistingRuleReference(
                     item.IsActive,
                     item.ConditionGroups
                         .Select(group => CreateGroupSignature(
                             item.ComponentProductId,
+                            item.MainProductTypeId,
                             item.NeedDefinitionId,
                             group.Constraints.Select(constraint =>
                                 new ComponentCompatibilityImportConstraint(
@@ -1125,7 +1153,8 @@ public sealed class CatalogComponentCompatibilityWorkbookService
 
     private static string CreateGroupSignature(
         Guid componentProductId,
-        Guid needDefinitionId,
+        Guid mainProductTypeId,
+        Guid? needDefinitionId,
         IReadOnlyCollection<ComponentCompatibilityImportConstraint> constraints)
     {
         var values = constraints
@@ -1137,7 +1166,9 @@ public sealed class CatalogComponentCompatibilityWorkbookService
                 + $"{item.ComparisonOperator}:"
                 + Normalize(item.Value));
 
-        return $"{componentProductId:N}|{needDefinitionId:N}|{string.Join('|', values)}";
+        return $"{componentProductId:N}|{mainProductTypeId:N}|"
+            + $"{needDefinitionId?.ToString("N") ?? "DIRECT"}|"
+            + string.Join('|', values);
     }
 
     private static ComponentCompatibilityImportPreviewRow ProblemRow(
@@ -1155,6 +1186,7 @@ public sealed class CatalogComponentCompatibilityWorkbookService
             need,
             null,
             null,
+            null,
             true,
             status,
             message,
@@ -1163,7 +1195,9 @@ public sealed class CatalogComponentCompatibilityWorkbookService
 
     private static List<ComponentCompatibilityImportPreviewRow> ClassifyPreviewRows(
         IReadOnlyCollection<ComponentCompatibilityImportPreviewRow> rows,
-        IReadOnlyDictionary<(Guid ProductId, Guid NeedId), ExistingRuleReference>
+        IReadOnlyDictionary<
+            (Guid ProductId, Guid MainProductTypeId, Guid? NeedId),
+            ExistingRuleReference>
             existingRules)
     {
         var result = rows.ToList();
@@ -1171,10 +1205,11 @@ public sealed class CatalogComponentCompatibilityWorkbookService
             .Select((row, index) => new { Row = row, Index = index })
             .Where(item => item.Row.Status == ComponentCompatibilityImportRowStatus.Ready
                 && item.Row.ComponentProductId.HasValue
-                && item.Row.NeedDefinitionId.HasValue)
+                && item.Row.MainProductTypeId.HasValue)
             .GroupBy(item => (
                 ProductId: item.Row.ComponentProductId!.Value,
-                NeedId: item.Row.NeedDefinitionId!.Value));
+                MainProductTypeId: item.Row.MainProductTypeId!.Value,
+                NeedId: item.Row.NeedDefinitionId));
 
         foreach (var ruleRows in validGroups)
         {
@@ -1195,6 +1230,7 @@ public sealed class CatalogComponentCompatibilityWorkbookService
             var groupSignatures = ruleRows
                 .Select(item => CreateGroupSignature(
                     ruleRows.Key.ProductId,
+                    ruleRows.Key.MainProductTypeId,
                     ruleRows.Key.NeedId,
                     item.Row.Constraints))
                 .ToHashSet(StringComparer.Ordinal);
@@ -1435,7 +1471,8 @@ public sealed class CatalogComponentCompatibilityWorkbookService
 
     private sealed record PreparedImportRule(
         Guid ComponentProductId,
-        Guid NeedDefinitionId,
+        Guid MainProductTypeId,
+        Guid? NeedDefinitionId,
         bool IsActive,
         IReadOnlyCollection<IReadOnlyCollection<(
             Guid DefinitionId,
@@ -1448,7 +1485,9 @@ public sealed class CatalogComponentCompatibilityWorkbookService
         IReadOnlyCollection<NeedReference> Needs,
         IReadOnlyCollection<CharacteristicReference> Characteristics,
         IReadOnlyDictionary<Guid, CharacteristicDefinition> Definitions,
-        IReadOnlyDictionary<(Guid ProductId, Guid NeedId), ExistingRuleReference>
+        IReadOnlyDictionary<
+            (Guid ProductId, Guid MainProductTypeId, Guid? NeedId),
+            ExistingRuleReference>
             ExistingRules);
 
     private sealed record ExistingRuleReference(

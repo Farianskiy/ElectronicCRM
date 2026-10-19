@@ -29,7 +29,8 @@ public sealed record ComponentCompatibilityConditionGroupRequest(
     IReadOnlyCollection<ComponentCompatibilityConstraintRequest>? Constraints);
 
 public sealed record CreateComponentOfferRequest(
-    Guid NeedDefinitionId,
+    Guid? NeedDefinitionId,
+    string? MainProductTypeCode,
     IReadOnlyCollection<ComponentCompatibilityConstraintRequest> Constraints);
 
 public sealed record UpdateComponentOfferRequest(
@@ -39,14 +40,16 @@ public sealed record UpdateComponentOfferRequest(
 public sealed record ComponentOfferResponse(
     Guid Id,
     Guid ComponentProductId,
-    Guid NeedDefinitionId,
+    Guid MainProductTypeId,
+    Guid? NeedDefinitionId,
     int ConstraintsCount);
 
 public sealed record ComponentOfferSummaryResponse(
     Guid Id,
-    Guid NeedDefinitionId,
-    string NeedCode,
-    string NeedName,
+    Guid MainProductTypeId,
+    Guid? NeedDefinitionId,
+    string? NeedCode,
+    string? NeedName,
     string MainProductTypeCode,
     int ConstraintsCount);
 
@@ -66,9 +69,10 @@ public sealed record ComponentCompatibilityRuleResponse(
     Guid ComponentProductId,
     string ComponentArticle,
     string ComponentName,
-    Guid NeedDefinitionId,
-    string NeedCode,
-    string NeedName,
+    Guid MainProductTypeId,
+    Guid? NeedDefinitionId,
+    string? NeedCode,
+    string? NeedName,
     string MainProductTypeCode,
     string MainProductTypeName,
     bool IsActive,
@@ -100,6 +104,7 @@ public sealed record CompatibleComponentResponse(
     string Name,
     decimal PriceAmount,
     string PriceCurrency,
+    decimal StockQuantity,
     IReadOnlyCollection<ComponentCompatibilityConditionResponse> MatchConditions);
 
 public sealed record ComponentCompatibilityConditionResponse(
@@ -119,4 +124,5 @@ public sealed record ProductNeedCompatibilityResponse(
 
 public sealed record ProductComponentCompatibilityResponse(
     Guid ProductId,
-    IReadOnlyCollection<ProductNeedCompatibilityResponse> Needs);
+    IReadOnlyCollection<ProductNeedCompatibilityResponse> Needs,
+    IReadOnlyCollection<CompatibleComponentResponse> Accessories);

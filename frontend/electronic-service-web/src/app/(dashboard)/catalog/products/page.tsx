@@ -6,6 +6,7 @@ import Link from "next/link";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { searchCatalogProducts } from "@/features/catalogProducts/api/searchCatalogProducts";
+import { exportCatalogProducts } from "@/features/catalogProducts/api/exportCatalogProducts";
 import { formatPrice } from "@/shared/lib/formatters";
 import { PageWorkspace } from "@/shared/ui/PageWorkspace";
 import { getCatalogManufacturers } from "@/features/catalogMetadata/api/getCatalogManufacturers";
@@ -344,6 +345,10 @@ export default function CatalogProductsPage() {
         queryKey: ["catalog-products"],
       });
     },
+  });
+
+  const exportProductsMutation = useMutation({
+    mutationFn: exportCatalogProducts,
   });
 
   const products = productsQuery.data?.items ?? [];
@@ -769,6 +774,23 @@ export default function CatalogProductsPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            {productsQuery.data && totalCount > 0 && (
+              <AppButton
+                type="button"
+                variant="secondary"
+                loading={exportProductsMutation.isPending}
+                onClick={() =>
+                  exportProductsMutation.mutate({
+                    ...appliedFilters,
+                    page: 1,
+                    pageSize: 100,
+                  })
+                }
+              >
+                Выгрузить Excel
+              </AppButton>
+            )}
+
             {canBulkEdit &&
               productsQuery.data &&
               totalCount > 0 &&
@@ -788,6 +810,15 @@ export default function CatalogProductsPage() {
             )}
           </div>
         </div>
+
+        {exportProductsMutation.isError && (
+          <div
+            role="alert"
+            className="mt-5 rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-4 text-sm text-[var(--app-danger)]"
+          >
+            Не удалось выгрузить Excel. {getErrorMessage(exportProductsMutation.error)}
+          </div>
+        )}
 
         {productsQuery.isError && (
           <div

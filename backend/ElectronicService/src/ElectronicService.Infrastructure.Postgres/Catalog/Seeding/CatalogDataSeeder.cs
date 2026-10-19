@@ -112,6 +112,11 @@ public sealed partial class CatalogDataSeeder
     // Это список типов товаров, которые нужно добавить в БД
     private static readonly CatalogProductTypeSeed[] ProductTypes =
     [
+        new(
+            "COMPONENT_GENERIC",
+            "Комплектующие",
+            ProductTypeKind.Component),
+
         new("MODULAR_CIRCUIT_BREAKER", "Модульный автомат"),
         new("DIFFERENTIAL_CIRCUIT_BREAKER", "Дифференциальный автомат"),
         new("RCD", "УЗО"),
@@ -778,7 +783,10 @@ public sealed partial class CatalogDataSeeder
 
         foreach (var seed in missingProductTypes)
         {
-            var productTypeResult = ProductType.Create(seed.Code, seed.Name);
+            var productTypeResult = ProductType.Create(
+                seed.Code,
+                seed.Name,
+                seed.Kind);
 
             if (productTypeResult.IsFailure)
             {

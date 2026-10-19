@@ -23,7 +23,8 @@ export async function previewComponentCompatibilityImport(
 
 export async function applyComponentCompatibilityImport(rows: Array<{
   componentProductId: string;
-  needDefinitionId: string;
+  mainProductTypeId: string;
+  needDefinitionId: string | null;
   isActive: boolean;
   constraints: ComponentCompatibilityImportConstraint[];
 }>): Promise<ApplyComponentCompatibilityImportResponse> {

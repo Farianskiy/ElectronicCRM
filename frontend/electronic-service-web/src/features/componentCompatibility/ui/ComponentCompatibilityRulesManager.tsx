@@ -216,7 +216,9 @@ export function ComponentCompatibilityRulesManager({
       normalizedSearch.length === 0 ||
       rule.componentArticle.toLocaleLowerCase("ru").includes(normalizedSearch) ||
       rule.componentName.toLocaleLowerCase("ru").includes(normalizedSearch) ||
-      rule.needName.toLocaleLowerCase("ru").includes(normalizedSearch);
+      (rule.needName ?? "совместимые аксессуары")
+        .toLocaleLowerCase("ru")
+        .includes(normalizedSearch);
     const matchesActivity =
       activityFilter === "all" ||
       (activityFilter === "active" && rule.isActive) ||
@@ -321,7 +323,9 @@ export function ComponentCompatibilityRulesManager({
                   </span>
                 </div>
                 <p className="mt-2 text-sm text-[var(--app-muted)]">
-                  Потребность: {rule.needName}
+                  {rule.needName
+                    ? `Потребность: ${rule.needName}`
+                    : "Совместимый аксессуар без потребности"}
                 </p>
               </div>
 

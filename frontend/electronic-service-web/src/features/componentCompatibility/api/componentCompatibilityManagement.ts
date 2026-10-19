@@ -60,7 +60,10 @@ export async function getComponentOffers(
 
 export async function createComponentOffer(
   componentProductId: string,
-  needDefinitionId: string,
+  scope: {
+    needDefinitionId?: string;
+    mainProductTypeCode?: string;
+  },
   constraints: Array<{
     characteristicDefinitionId: string;
     value: string;
@@ -69,7 +72,7 @@ export async function createComponentOffer(
 ): Promise<void> {
   await httpClient.post(
     `/api/catalog/component-compatibility/products/${encodeURIComponent(componentProductId)}/offers`,
-    { needDefinitionId, constraints },
+    { ...scope, constraints },
   );
 }
 

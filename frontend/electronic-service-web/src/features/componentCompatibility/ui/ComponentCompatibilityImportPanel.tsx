@@ -126,7 +126,7 @@ export function ComponentCompatibilityImportPanel({
         (row) =>
           (row.status === "WillCreate" || row.status === "WillUpdate") &&
           row.componentProductId !== null &&
-          row.needDefinitionId !== null,
+          row.mainProductTypeId !== null,
       ),
     [previewMutation.data?.rows],
   );
@@ -164,7 +164,8 @@ export function ComponentCompatibilityImportPanel({
     applyMutation.mutate(
       readyRows.map((row) => ({
         componentProductId: row.componentProductId as string,
-        needDefinitionId: row.needDefinitionId as string,
+        mainProductTypeId: row.mainProductTypeId as string,
+        needDefinitionId: row.needDefinitionId,
         isActive: row.isActive,
         constraints: row.constraints,
       })),
@@ -200,10 +201,12 @@ export function ComponentCompatibilityImportPanel({
       </div>
       <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">
         Одна или несколько строк с одинаковыми артикулом, типом и потребностью
-        образуют одно правило. Каждая повторная строка — альтернативный вариант.
+        образуют одно правило. Пустая потребность создаёт обычный совместимый
+        аксессуар. Каждая повторная строка — альтернативный вариант.
         В одной строке разные характеристики работают одновременно. {" "}
         Обязательные колонки: «Артикул комплектующего» (можно «Артикул»),
-        «Тип основного товара» и «Потребность». Остальные заполненные колонки
+        «Тип основного товара» и «Потребность» (значение можно не заполнять).
+        Остальные заполненные колонки
         считаются характеристиками совместимости; варианты разделяются точкой с
         запятой.
       </p>
@@ -215,7 +218,7 @@ export function ComponentCompatibilityImportPanel({
               Колонки условий
             </h3>
             <p className="mt-1 text-sm text-[var(--app-muted)]">
-              Артикул, тип товара, потребность и состояние добавляются всегда.
+              Артикул, тип товара, необязательная потребность и состояние добавляются всегда.
               Отметьте только характеристики, которые нужны в новом файле.
             </p>
           </div>
@@ -518,7 +521,7 @@ export function ComponentCompatibilityImportPanel({
                       {row.mainProductType || "—"}
                     </td>
                     <td className="px-4 py-4 text-[var(--app-text)]">
-                      {row.need || "—"}
+                      {row.need || "Совместимый аксессуар"}
                     </td>
                     <td className="px-4 py-4 text-[var(--app-muted)]">
                       {row.constraints.length === 0

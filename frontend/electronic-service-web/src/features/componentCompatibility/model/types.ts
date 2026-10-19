@@ -19,6 +19,7 @@ export interface CompatibleComponent {
   name: string;
   priceAmount: number;
   priceCurrency: string;
+  stockQuantity: number;
   matchConditions: ComponentCompatibilityCondition[];
 }
 
@@ -54,6 +55,7 @@ export interface ProductNeedCompatibility {
 export interface ProductComponentCompatibility {
   productId: string;
   needs: ProductNeedCompatibility[];
+  accessories: CompatibleComponent[];
 }
 
 export interface ComponentNeed {
@@ -69,9 +71,10 @@ export interface ComponentNeed {
 
 export interface ComponentOfferSummary {
   id: string;
-  needDefinitionId: string;
-  needCode: string;
-  needName: string;
+  mainProductTypeId: string;
+  needDefinitionId: string | null;
+  needCode: string | null;
+  needName: string | null;
   mainProductTypeCode: string;
   constraintsCount: number;
 }
@@ -94,9 +97,10 @@ export interface ComponentCompatibilityRule {
   componentProductId: string;
   componentArticle: string;
   componentName: string;
-  needDefinitionId: string;
-  needCode: string;
-  needName: string;
+  mainProductTypeId: string;
+  needDefinitionId: string | null;
+  needCode: string | null;
+  needName: string | null;
   mainProductTypeCode: string;
   mainProductTypeName: string;
   isActive: boolean;
@@ -137,6 +141,7 @@ export interface ComponentCompatibilityImportPreviewRow {
   mainProductType: string;
   need: string;
   componentProductId: string | null;
+  mainProductTypeId: string | null;
   needDefinitionId: string | null;
   isActive: boolean;
   status: ComponentCompatibilityImportRowStatus;

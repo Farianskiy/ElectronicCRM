@@ -26,14 +26,16 @@ public sealed record ComponentNeedResult(
 public sealed record ComponentOfferResult(
     Guid Id,
     Guid ComponentProductId,
-    Guid NeedDefinitionId,
+    Guid MainProductTypeId,
+    Guid? NeedDefinitionId,
     int ConstraintsCount);
 
 public sealed record ComponentOfferSummaryResult(
     Guid Id,
-    Guid NeedDefinitionId,
-    string NeedCode,
-    string NeedName,
+    Guid MainProductTypeId,
+    Guid? NeedDefinitionId,
+    string? NeedCode,
+    string? NeedName,
     string MainProductTypeCode,
     int ConstraintsCount);
 
@@ -53,9 +55,10 @@ public sealed record ComponentCompatibilityRuleResult(
     Guid ComponentProductId,
     string ComponentArticle,
     string ComponentName,
-    Guid NeedDefinitionId,
-    string NeedCode,
-    string NeedName,
+    Guid MainProductTypeId,
+    Guid? NeedDefinitionId,
+    string? NeedCode,
+    string? NeedName,
     string MainProductTypeCode,
     string MainProductTypeName,
     bool IsActive,
@@ -67,6 +70,7 @@ public sealed record CompatibleComponentResult(
     string Name,
     decimal PriceAmount,
     string PriceCurrency,
+    decimal StockQuantity,
     IReadOnlyCollection<ComponentCompatibilityConditionResult> MatchConditions);
 
 public sealed record ComponentCompatibilityConditionResult(
@@ -97,7 +101,8 @@ public sealed record ProductNeedCompatibilityResult(
 
 public sealed record ProductComponentCompatibilityResult(
     Guid ProductId,
-    IReadOnlyCollection<ProductNeedCompatibilityResult> Needs);
+    IReadOnlyCollection<ProductNeedCompatibilityResult> Needs,
+    IReadOnlyCollection<CompatibleComponentResult> Accessories);
 
 public interface ICatalogComponentCompatibilityService
 {
@@ -122,6 +127,12 @@ public interface ICatalogComponentCompatibilityService
     Task<Result<ComponentOfferResult, DomainError>> CreateOfferAsync(
         Guid componentProductId,
         Guid needDefinitionId,
+        IReadOnlyCollection<ComponentCompatibilityConstraintInput> constraints,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<ComponentOfferResult, DomainError>> CreateAccessoryOfferAsync(
+        Guid componentProductId,
+        string mainProductTypeCode,
         IReadOnlyCollection<ComponentCompatibilityConstraintInput> constraints,
         CancellationToken cancellationToken = default);
 
