@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { deleteCatalogImportBatch } from "../../api/deleteCatalogImportBatch";
 import { downloadCatalogImportFile } from "../../api/downloadCatalogImportFile";
 import { catalogImportQueryKeys } from "../../model/queryKeys";
+import { getCatalogImportModeLabel } from "../../model/catalogImportMode";
 import type { CatalogImportBatchDetails } from "../../model/types";
 import { CatalogImportStatusBadge } from "../status";
 import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
@@ -116,9 +117,7 @@ export function CatalogImportBatchOverview({
             <div className="flex items-baseline gap-1.5">
               <dt className="text-[var(--app-muted)]">Режим:</dt>
               <dd className="font-semibold text-[var(--app-text)]">
-                {batch.importMode === "CreateOnly"
-                  ? "Добавление новых"
-                  : "Обновление характеристик"}
+                {getCatalogImportModeLabel(batch.importMode)}
               </dd>
             </div>
 

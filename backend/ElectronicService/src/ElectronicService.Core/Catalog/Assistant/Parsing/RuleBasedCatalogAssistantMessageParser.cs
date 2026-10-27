@@ -46,6 +46,8 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser : ICatalogAss
 
         var normalizedMessage = NormalizeText(message);
         var intent = ResolveIntent(normalizedMessage);
+        var useGenericVoltmeterTextSearch =
+            IsGenericVoltmeterRequest(normalizedMessage);
 
         var terms = await _dictionaryReader
             .GetApprovedTermsAsync(cancellationToken)
@@ -96,6 +98,13 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser : ICatalogAss
                     break;
 
                 case CatalogDictionaryTermKind.Characteristic:
+                    if (useGenericVoltmeterTextSearch
+                        && IsGenericVoltmeterPhrase(term.NormalizedPhrase))
+                    {
+                        dictionarySearchTokens.Add("ВОЛЬТМЕТРА");
+                        break;
+                    }
+
                     if (!string.IsNullOrWhiteSpace(term.TargetCode))
                     {
                         AddOrReplaceCharacteristic(
@@ -120,6 +129,13 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser : ICatalogAss
 
         foreach (var recognizedCharacteristic in recognitionResult.Characteristics)
         {
+            if (useGenericVoltmeterTextSearch
+                && IsGenericVoltmeterPhrase(
+                    NormalizeText(recognizedCharacteristic.RawValue)))
+            {
+                continue;
+            }
+
             AddOrReplaceCharacteristic(
                 characteristics,
                 recognizedCharacteristic.CharacteristicCode,
@@ -156,13 +172,13 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser : ICatalogAss
 
         manufacturer = manufacturerSelection.Manufacturer;
 
-        search = string.Equals(
-        productTypeCode,
-        "SCHMP_CABINET",
-        StringComparison.Ordinal)
-            ? ExtractCabinetDimensions(message)
-                ?? ExtractSearchToken(message, recognitionResult)
-            : ExtractSearchToken(message, recognitionResult);
+        search = ExtractCabinetSearchText(message)
+            ?? ExtractSearchToken(message, recognitionResult);
+
+        if (useGenericVoltmeterTextSearch)
+        {
+            search = "ВОЛЬТМЕТРА";
+        }
 
         if (search is null
         && productTypeCode is null
@@ -238,22 +254,67 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser : ICatalogAss
         return CatalogAssistantIntent.SearchProducts;
     }
 
-    private static string? ExtractCabinetDimensions(string message)
+    private static bool IsGenericVoltmeterRequest(string normalizedMessage)
+    {
+        return normalizedMessage.Contains("ВОЛЬТМЕТР", StringComparison.Ordinal)
+            && !ContainsVoltageKind(normalizedMessage);
+    }
+
+    private static bool IsGenericVoltmeterPhrase(string normalizedPhrase)
+    {
+        return normalizedPhrase.Contains("ВОЛЬТМЕТР", StringComparison.Ordinal)
+            && !ContainsVoltageKind(normalizedPhrase);
+    }
+
+    private static bool ContainsVoltageKind(string normalizedText)
+    {
+        return normalizedText.Contains("ЛИНЕЙН", StringComparison.Ordinal)
+            || normalizedText.Contains("ФАЗН", StringComparison.Ordinal);
+    }
+
+    private static string? ExtractCabinetSearchText(string message)
     {
         var match = CabinetDimensionsRegex().Match(message);
 
-        if (!match.Success)
+        if (!match.Success || !CabinetMarkerRegex().IsMatch(message))
         {
             return null;
+        }
+
+        var normalizedMessage = NormalizeText(message);
+        var searchTerms = new List<string>();
+
+        if (CabinetWordRegex().IsMatch(normalizedMessage))
+        {
+            // "КОРПУ" is a frequent unfinished/typo form entered by users.
+            // Normalize it here instead of turning a useful request into an
+            // empty search or asking about every remaining word separately.
+            searchTerms.Add("КОРПУС");
+        }
+
+        if (ContainsWholeTerm(normalizedMessage, "ВРУ"))
+        {
+            searchTerms.Add("ВРУ");
+        }
+
+        if (ContainsWholeTerm(normalizedMessage, "ЩМП"))
+        {
+            searchTerms.Add("ЩМП");
         }
 
         var width = match.Groups["width"].Value;
         var height = match.Groups["height"].Value;
         var depth = match.Groups["depth"];
 
-        return depth.Success
-            ? $"{width}Х{height}Х{depth.Value}"
-            : $"{width}Х{height}";
+        searchTerms.Add(width);
+        searchTerms.Add(height);
+
+        if (depth.Success)
+        {
+            searchTerms.Add(depth.Value);
+        }
+
+        return string.Join(' ', searchTerms);
     }
 
     private static string? ExtractSearchToken(
@@ -661,7 +722,11 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser : ICatalogAss
         "ПО",
         "СЕРИИ",
         "СЕРИЯ",
-        "ТИПА"
+        "ТИПА",
+        "КОРПУС",
+        "КОРПУ",
+        "ВРУ",
+        "ЩМП"
     };
 
     [GeneratedRegex(
@@ -669,6 +734,18 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser : ICatalogAss
     RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
     RegexTimeoutMilliseconds)]
     private static partial Regex CabinetDimensionsRegex();
+
+    [GeneratedRegex(
+        @"(?<![\p{L}\p{N}])(?:КОРПУС|КОРПУ|ВРУ|ЩМП)(?![\p{L}\p{N}])",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+        RegexTimeoutMilliseconds)]
+    private static partial Regex CabinetMarkerRegex();
+
+    [GeneratedRegex(
+        @"(?<![\p{L}\p{N}])(?:КОРПУС|КОРПУ)(?![\p{L}\p{N}])",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+        RegexTimeoutMilliseconds)]
+    private static partial Regex CabinetWordRegex();
 
 
     [GeneratedRegex(

@@ -6,6 +6,11 @@ public sealed record GetCatalogImportRowProblemCodesResponse(
     int TotalRowsCount,
     int ErrorRowsCount,
     int WarningRowsCount,
+    int StrictRowsCount,
+    int CatalogAnalogyRowsCount,
+    int AwaitingConfirmationRowsCount,
+    int ConflictRowsCount,
+    int RequiredMissingRowsCount,
     IReadOnlyCollection<CatalogImportRowProblemCodeResponse> Items);
 
 public sealed record CatalogImportRowProblemCodeResponse(

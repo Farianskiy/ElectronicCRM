@@ -40,6 +40,31 @@ public sealed class UpdateCatalogImportRowController : ControllerBase
 
         var confirmedSpans = request.ConfirmedSpans?.ToDictionary(item => item.Key, item => new CatalogImportConfirmedSpan(item.Value.ProductName, item.Value.Start, item.Value.Length));
 
+        var analogyDecisions = new List<CatalogImportAnalogyDecision>();
+
+        foreach (var decision in request.AnalogyDecisions ?? [])
+        {
+            if (!Enum.TryParse<CatalogImportAnalogyDecisionKind>(
+                    decision.Decision,
+                    ignoreCase: true,
+                    out var kind))
+            {
+                return BadRequest(new ProblemDetails
+                {
+                    Title = ProblemTitle,
+                    Detail = "Решение по предложению аналогов должно быть Accepted или Rejected.",
+                    Status = StatusCodes.Status400BadRequest
+                });
+            }
+
+            analogyDecisions.Add(
+                new CatalogImportAnalogyDecision(
+                    decision.CharacteristicDefinitionId,
+                    kind,
+                    decision.Reason,
+                    decision.FeedbackId));
+        }
+
         var command = new UpdateCatalogImportRowCommand(
             batchId,
             rowId,
@@ -51,7 +76,8 @@ public sealed class UpdateCatalogImportRowController : ControllerBase
             request.Price,
             request.StockQuantity,
             request.Characteristics ?? new Dictionary<string, string>(StringComparer.Ordinal),
-            confirmedSpans);
+            confirmedSpans,
+            analogyDecisions);
 
         var result = await handler
             .Handle(command, cancellationToken)
@@ -72,6 +98,7 @@ public sealed class UpdateCatalogImportRowController : ControllerBase
             value.Data.Price,
             value.Data.StockQuantity,
             value.Data.Characteristics,
+            MapOrigins(value.Data.CharacteristicOrigins),
             value.Data.ProductTypeId,
             value.Data.ProductTypeResolutionSource,
             value.Data.ProductTypeResolutionConfidence);
@@ -109,4 +136,25 @@ public sealed class UpdateCatalogImportRowController : ControllerBase
 
         return Ok(response);
     }
+
+    private static Dictionary<string, CatalogImportCharacteristicOriginResponse> MapOrigins(
+        IReadOnlyDictionary<string, CatalogImportCharacteristicValueOrigin>? origins) =>
+        (origins ?? new Dictionary<string, CatalogImportCharacteristicValueOrigin>(StringComparer.Ordinal))
+        .ToDictionary(
+            item => item.Key,
+            item => new CatalogImportCharacteristicOriginResponse(
+                item.Value.Source.ToString(),
+                item.Value.Confidence,
+                item.Value.RawValue,
+                item.Value.AnalogyConfigurationId,
+                item.Value.AnalogyConfigurationVersion,
+                item.Value.AnalogySupportingProductIds ?? [],
+                item.Value.AnalogyConfigurationHash,
+                item.Value.AnalogyCandidateSnapshotId,
+                item.Value.AnalogyCandidateSnapshotCreatedAtUtc,
+                item.Value.AnalogyFamilyAnchor,
+                item.Value.AnalogySupportingProductCount,
+                item.Value.TrainingExampleIds ?? [],
+                item.Value.TrainingSourceRowIds ?? []),
+            StringComparer.Ordinal);
 }

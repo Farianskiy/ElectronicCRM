@@ -11,6 +11,7 @@ using ElectronicService.Domain.Catalog.ImportBatches;
 using ElectronicService.Domain.Catalog.ProductTypes;
 using ElectronicService.Domain.Common;
 using ElectronicService.Core.Catalog.Recognition.Effective;
+using ElectronicService.Core.Catalog.Products.Analogies;
 using static ElectronicService.Core.Catalog.Recognition.Effective.CatalogRecognitionCharacteristicValueNormalizer;
 
 namespace ElectronicService.Core.Catalog.ImportBatches.Analysis;
@@ -27,17 +28,20 @@ public sealed class CatalogImportRecognitionEnrichmentService : ICatalogImportRe
 
     private readonly ICatalogEffectiveRecognitionService _recognitionService;
     private readonly ICatalogImportRowValidator _rowValidator;
+    private readonly PreviewCatalogProductAnalogiesQueryHandler? _analogyPreview;
     private CatalogRecognitionRunContext? _runContext;
 
     public CatalogImportRecognitionEnrichmentService(
         ICatalogEffectiveRecognitionService recognitionService,
-        ICatalogImportRowValidator rowValidator)
+        ICatalogImportRowValidator rowValidator,
+        PreviewCatalogProductAnalogiesQueryHandler? analogyPreview = null)
     {
         ArgumentNullException.ThrowIfNull(recognitionService);
         ArgumentNullException.ThrowIfNull(rowValidator);
 
         _recognitionService = recognitionService;
         _rowValidator = rowValidator;
+        _analogyPreview = analogyPreview;
     }
 
     public async Task<Result<CatalogImportRecognitionEnrichmentResult, DomainError>> EnrichAsync(
@@ -73,6 +77,9 @@ public sealed class CatalogImportRecognitionEnrichmentService : ICatalogImportRe
         const int failedRecognitionRowsCount = 0;
 
         var appliedValues = new List<CatalogImportRecognitionAppliedValue>(MaximumAppliedValueDetails);
+        var analogyScopes = new Dictionary<
+            (Guid ManufacturerId, Guid ProductTypeId),
+            CatalogProductAnalogyPreparedScope>();
 
         foreach (var row in analysis.Rows.OrderBy(row => row.RowNumber))
         {
@@ -136,6 +143,25 @@ public sealed class CatalogImportRecognitionEnrichmentService : ICatalogImportRe
                     item => item.Key,
                     item => item.Value,
                     StringComparer.Ordinal);
+
+            // An analogy value is a derived value, not user input. Reanalysis must
+            // calculate it from the current configuration and the current catalog
+            // snapshot instead of allowing the previously saved value to block a
+            // new proposal. Excel and manual values remain untouched.
+            var invalidatedAnalogyValueKeys = new HashSet<string>(StringComparer.Ordinal);
+            if (_analogyPreview is not null)
+            {
+                foreach (var definitionKey in characteristicOrigins
+                             .Where(item => item.Value.Source
+                                 == CatalogImportCharacteristicValueSource.CatalogAnalogy)
+                             .Select(item => item.Key)
+                             .ToArray())
+                {
+                    characteristics.Remove(definitionKey);
+                    characteristicOrigins.Remove(definitionKey);
+                    invalidatedAnalogyValueKeys.Add(definitionKey);
+                }
+            }
 
             var characteristicRecognitionSuggestions = new Dictionary<string, CatalogImportCharacteristicRecognitionSuggestion>(StringComparer.Ordinal);
 
@@ -214,6 +240,43 @@ public sealed class CatalogImportRecognitionEnrichmentService : ICatalogImportRe
 
                 if (HasCharacteristicValue(characteristics, definitionKey))
                 {
+                    if (characteristicOrigins.TryGetValue(
+                            definitionKey,
+                            out var existingOrigin)
+                        && existingOrigin.Source
+                            == CatalogImportCharacteristicValueSource.CatalogAnalogy
+                        && recognizedCharacteristic.Confidence
+                            >= MinimumAutomaticFillConfidence
+                        && IsAutomaticFillSourceAllowed(recognizedCharacteristic)
+                        && TryNormalizeRecognizedValue(
+                            definition,
+                            recognizedCharacteristic.NormalizedValue,
+                            data.Manufacturer,
+                            out var strictRecognitionValue))
+                    {
+                        characteristics[definitionKey] = strictRecognitionValue;
+                        characteristicOrigins[definitionKey] =
+                            CatalogImportCharacteristicValueOrigin.FromRecognition(
+                                recognizedCharacteristic);
+
+                        appliedValuesInCurrentRow.Add(
+                            new CatalogImportRecognitionAppliedValue(
+                                row.RowNumber,
+                                definition.Id,
+                                definition.Code,
+                                definition.Name,
+                                strictRecognitionValue,
+                                recognizedCharacteristic.RawValue,
+                                recognizedCharacteristic.Source,
+                                recognizedCharacteristic.Confidence,
+                                recognizedCharacteristic.StartIndex,
+                                recognizedCharacteristic.Length,
+                                recognizedCharacteristic.Priority,
+                                recognizedCharacteristic.RecognizerKey));
+
+                        continue;
+                    }
+
                     if (recognizedCharacteristic.Confidence >= MinimumAutomaticFillConfidence
                         && IsAutomaticFillSourceAllowed(recognizedCharacteristic)
                         && TryNormalizeRecognizedValue(
@@ -323,6 +386,90 @@ public sealed class CatalogImportRecognitionEnrichmentService : ICatalogImportRe
                         recognizedCharacteristic.RecognizerKey));
             }
 
+            var analogyFilledValues = 0;
+            if (_analogyPreview is not null
+                && data.ManufacturerId.HasValue
+                && data.ManufacturerId.Value != Guid.Empty)
+            {
+                var known = new Dictionary<string, string>(StringComparer.Ordinal);
+                foreach (var characteristic in characteristics)
+                {
+                    if (Guid.TryParse(characteristic.Key, out var definitionId)
+                        && definitionsByCode.Values.FirstOrDefault(x => x.Id == definitionId) is { } definition
+                        && !string.IsNullOrWhiteSpace(characteristic.Value))
+                    {
+                        known[definition.Code] = characteristic.Value;
+                    }
+                }
+
+                var scopeKey = (
+                    ManufacturerId: data.ManufacturerId.Value,
+                    ProductTypeId: productType.Id);
+
+                if (!analogyScopes.TryGetValue(scopeKey, out var analogyScope))
+                {
+                    analogyScope = await _analogyPreview.PrepareScopeAsync(
+                            scopeKey.ManufacturerId,
+                            scopeKey.ProductTypeId,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                    analogyScopes[scopeKey] = analogyScope;
+                }
+
+                var analogy = PreviewCatalogProductAnalogiesQueryHandler.EvaluatePrepared(
+                    new CatalogProductAnalogyRequest(
+                        data.Name ?? string.Empty,
+                        data.Article,
+                        data.ManufacturerId.Value,
+                        productType.Id,
+                        known),
+                    analogyScope);
+                foreach (var proposal in analogy.CharacteristicProposals.Where(x =>
+                    x.IsSuggested
+                    && x.Mode == CatalogProductAnalogyMode.AutoFill
+                    && x.IsAutoFillAllowed))
+                {
+                    if (!definitionsByCode.TryGetValue(proposal.CharacteristicCode, out var definition)) continue;
+                    var key = definition.Id.ToString();
+                    if (HasCharacteristicValue(characteristics, key)
+                        || HasInvalidExplicitExcelValue(existingIssues, key)
+                        || !TryNormalizeRecognizedValue(definition, proposal.ProposedValue,
+                            data.Manufacturer, out var normalizedAnalogyValue)) continue;
+                    characteristics[key] = normalizedAnalogyValue;
+                    var supportingProductIds = proposal.SupportingProductIds
+                        .ToHashSet();
+                    var familyAnchor = analogy.Matches
+                        .Where(match => supportingProductIds.Contains(match.ProductId))
+                        .Select(match => match.MatchedFamilyAnchor)
+                        .FirstOrDefault(anchor => !string.IsNullOrWhiteSpace(anchor));
+                    characteristicOrigins[key] = CatalogImportCharacteristicValueOrigin.FromCatalogAnalogy(
+                        proposal.ProposedValue, proposal.SupportRatio, analogy.ConfigurationId,
+                        analogy.ConfigurationVersion, proposal.SupportingProductIds,
+                        analogy.ConfigurationHash, analogy.CandidateSnapshotId,
+                        analogy.CandidateSnapshotCreatedAtUtc, familyAnchor,
+                        proposal.SupportingProductCount);
+                    analogyFilledValues++;
+                }
+            }
+
+            foreach (var definitionKey in invalidatedAnalogyValueKeys.Where(key =>
+                         !HasCharacteristicValue(characteristics, key)))
+            {
+                var definitionName = Guid.TryParse(definitionKey, out var definitionId)
+                    ? definitionsByCode.Values.FirstOrDefault(item => item.Id == definitionId)?.Name
+                    : null;
+
+                recognitionWarnings.Add(
+                    new CatalogImportRowIssue(
+                        "characteristic.analogy_stale",
+                        $"Ранее заполненное по аналогам значение характеристики "
+                        + $"'{definitionName ?? definitionKey}' больше не подтверждается "
+                        + "текущей конфигурацией и текущим снимком каталога. "
+                        + "Значение удалено; проверьте строку и при необходимости укажите его вручную.",
+                        definitionKey,
+                        null));
+            }
+
             var enrichedData = data with
             {
                 Characteristics = characteristics,
@@ -348,7 +495,8 @@ public sealed class CatalogImportRecognitionEnrichmentService : ICatalogImportRe
 
             var combinedWarnings = existingWarnings
                 .Where(warning => !string.Equals(warning.Code, "characteristic.low_confidence", StringComparison.Ordinal)
-                    && !string.Equals(warning.Code, "characteristic.recognition_conflict", StringComparison.Ordinal))
+                    && !string.Equals(warning.Code, "characteristic.recognition_conflict", StringComparison.Ordinal)
+                    && !string.Equals(warning.Code, "characteristic.analogy_stale", StringComparison.Ordinal))
                 .Concat(validationResult.Warnings)
                 .Concat(recognitionWarnings)
                 .Distinct()
@@ -380,10 +528,10 @@ public sealed class CatalogImportRecognitionEnrichmentService : ICatalogImportRe
                     replaceResult.Error);
             }
 
-            if (appliedValuesInCurrentRow.Count > 0)
+            if (appliedValuesInCurrentRow.Count > 0 || analogyFilledValues > 0)
             {
                 filledRowsCount++;
-                filledValuesCount += appliedValuesInCurrentRow.Count;
+                filledValuesCount += appliedValuesInCurrentRow.Count + analogyFilledValues;
             }
 
             var remainingAppliedValueDetailsCapacity = MaximumAppliedValueDetails - appliedValues.Count;

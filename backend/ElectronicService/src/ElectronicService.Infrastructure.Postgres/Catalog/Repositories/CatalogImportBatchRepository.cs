@@ -1,4 +1,5 @@
 using ElectronicService.Core.Catalog.ImportBatches.Abstractions;
+using ElectronicService.Core.Catalog.ImportBatches.Analysis;
 using ElectronicService.Domain.Catalog.ImportBatches;
 using ElectronicService.Infrastructure.Postgres.Data;
 using Microsoft.EntityFrameworkCore;
@@ -9,6 +10,9 @@ namespace ElectronicService.Infrastructure.Postgres.Catalog.Repositories;
 public sealed class CatalogImportBatchRepository
     : ICatalogImportBatchRepository
 {
+    private static readonly JsonSerializerOptions JsonOptions =
+        new(JsonSerializerDefaults.Web) { PropertyNameCaseInsensitive = true };
+
     private readonly ElectronicDbContext
         _dbContext;
 
@@ -28,6 +32,82 @@ public sealed class CatalogImportBatchRepository
             .Select(batch => (uint?)batch.Version)
             .SingleOrDefaultAsync(cancellationToken);
     }
+
+    public async Task<CatalogImportApplicationPlan> GetApplicationPlanAsync(
+        Guid batchId,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedRows = await _dbContext.CatalogImportRows
+            .AsNoTracking()
+            .Where(row => row.BatchId == batchId
+                && row.Status == CatalogImportRowStatus.Valid)
+            .Select(row => row.NormalizedDataJson)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        var rowKeys = normalizedRows
+            .Select(json =>
+            {
+                try
+                {
+                    var data = JsonSerializer.Deserialize<
+                        CatalogImportNormalizedRowData>(json, JsonOptions);
+                    return data is not null
+                        && !string.IsNullOrWhiteSpace(data.Article)
+                        && data.ManufacturerId is Guid manufacturerId
+                        && manufacturerId != Guid.Empty
+                        ? new ProductImportKey(
+                            data.Article.Trim().ToUpperInvariant(),
+                            manufacturerId)
+                        : (ProductImportKey?)null;
+                }
+                catch (JsonException)
+                {
+                    return null;
+                }
+                catch (NotSupportedException)
+                {
+                    return null;
+                }
+            })
+            .Where(key => key.HasValue)
+            .Select(key => key!.Value)
+            .ToArray();
+
+        if (rowKeys.Length == 0)
+        {
+            return new CatalogImportApplicationPlan(0, 0);
+        }
+
+        var manufacturerIds = rowKeys
+            .Select(key => key.ManufacturerId)
+            .Distinct()
+            .ToArray();
+        var products = await _dbContext.Products
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(product => manufacturerIds.Contains(product.ManufacturerId))
+            .Select(product => new
+            {
+                Article = product.Article.Value,
+                product.ManufacturerId
+            })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        var existingKeys = products
+            .Select(product => new ProductImportKey(
+                product.Article.Trim().ToUpperInvariant(),
+                product.ManufacturerId))
+            .ToHashSet();
+        var updateCount = rowKeys.Count(existingKeys.Contains);
+
+        return new CatalogImportApplicationPlan(
+            rowKeys.Length - updateCount,
+            updateCount);
+    }
+
+    private readonly record struct ProductImportKey(
+        string NormalizedArticle,
+        Guid ManufacturerId);
 
     public void Add(CatalogImportBatch batch)
     {
@@ -109,11 +189,14 @@ public sealed class CatalogImportBatchRepository
     string? search,
     string? issueCode,
     CatalogImportRowProblemKind? problemKind,
-    string? manufacturerGroupKey)
+    string? manufacturerGroupKey,
+    CatalogImportRowKnowledgeState? knowledgeState = null)
     {
         IQueryable<CatalogImportRow> query;
 
-        if (search is null && manufacturerGroupKey is null)
+        var knowledgeStateValue = knowledgeState?.ToString();
+
+        if (search is null && manufacturerGroupKey is null && knowledgeState is null)
         {
             query = _dbContext.CatalogImportRows.AsNoTracking();
         }
@@ -157,6 +240,53 @@ public sealed class CatalogImportBatchRepository
                                 'Ё',
                                 'Е'
                               ) = CAST({manufacturerGroupKey} AS text)
+                    )
+                )
+                AND
+                (
+                    CAST({knowledgeStateValue} AS text) IS NULL
+                    OR
+                    (
+                        CAST({knowledgeStateValue} AS text) = 'Strict'
+                        AND jsonb_path_exists(
+                            rows.normalized_data_json,
+                            '$.characteristicOrigins.* ? (@.source == "Excel" || @.source == "Recognition" || @.source == "Manual")'::jsonpath
+                        )
+                    )
+                    OR
+                    (
+                        CAST({knowledgeStateValue} AS text) = 'CatalogAnalogy'
+                        AND jsonb_path_exists(
+                            rows.normalized_data_json,
+                            '$.characteristicOrigins.* ? (@.source == "CatalogAnalogy")'::jsonpath
+                        )
+                    )
+                    OR
+                    (
+                        CAST({knowledgeStateValue} AS text) = 'AwaitingConfirmation'
+                        AND rows.warnings_json @> jsonb_build_array(
+                            jsonb_build_object('code', 'characteristic.low_confidence')
+                        )
+                    )
+                    OR
+                    (
+                        CAST({knowledgeStateValue} AS text) = 'Conflict'
+                        AND
+                        (
+                            rows.issues_json @> jsonb_build_array(jsonb_build_object('code', 'characteristic.value_conflict'))
+                            OR rows.warnings_json @> jsonb_build_array(jsonb_build_object('code', 'characteristic.value_conflict'))
+                            OR rows.issues_json @> jsonb_build_array(jsonb_build_object('code', 'characteristic.recognition_conflict'))
+                            OR rows.warnings_json @> jsonb_build_array(jsonb_build_object('code', 'characteristic.recognition_conflict'))
+                        )
+                    )
+                    OR
+                    (
+                        CAST({knowledgeStateValue} AS text) = 'RequiredMissing'
+                        AND
+                        (
+                            rows.issues_json @> jsonb_build_array(jsonb_build_object('code', 'characteristic.required'))
+                            OR rows.warnings_json @> jsonb_build_array(jsonb_build_object('code', 'characteristic.required'))
+                        )
                     )
                 )
                 """)
@@ -217,7 +347,37 @@ public sealed class CatalogImportBatchRepository
             search,
             issueCode,
             problemKind,
-            manufacturerGroupKey);
+            manufacturerGroupKey,
+            knowledgeState: null);
+
+        return await query
+            .OrderBy(row => row.RowNumber)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyCollection<CatalogImportRow>> GetRowsByKnowledgeStateAsync(
+        Guid batchId,
+        CatalogImportRowStatus? status,
+        string? search,
+        string? issueCode,
+        CatalogImportRowProblemKind? problemKind,
+        string? manufacturerGroupKey,
+        CatalogImportRowKnowledgeState knowledgeState,
+        int skip,
+        int take,
+        CancellationToken cancellationToken = default)
+    {
+        var query = BuildRowsQuery(
+            batchId,
+            status,
+            search,
+            issueCode,
+            problemKind,
+            manufacturerGroupKey,
+            knowledgeState);
 
         return await query
             .OrderBy(row => row.RowNumber)
@@ -278,7 +438,29 @@ public sealed class CatalogImportBatchRepository
             search,
             issueCode,
             problemKind,
-            manufacturerGroupKey)
+            manufacturerGroupKey,
+            knowledgeState: null)
+        .CountAsync(cancellationToken);
+    }
+
+    public Task<int> CountRowsByKnowledgeStateAsync(
+        Guid batchId,
+        CatalogImportRowStatus? status,
+        string? search,
+        string? issueCode,
+        CatalogImportRowProblemKind? problemKind,
+        string? manufacturerGroupKey,
+        CatalogImportRowKnowledgeState knowledgeState,
+        CancellationToken cancellationToken = default)
+    {
+        return BuildRowsQuery(
+            batchId,
+            status,
+            search,
+            issueCode,
+            problemKind,
+            manufacturerGroupKey,
+            knowledgeState)
         .CountAsync(cancellationToken);
     }
 
@@ -507,6 +689,61 @@ public sealed class CatalogImportBatchRepository
                 cancellationToken)
             .ConfigureAwait(false);
 
+        var strictRowsCount = await CountRowsByKnowledgeStateAsync(
+                batchId,
+                status,
+                search,
+                issueCode: null,
+                problemKind: null,
+                manufacturerGroupKey: null,
+                knowledgeState: CatalogImportRowKnowledgeState.Strict,
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        var catalogAnalogyRowsCount = await CountRowsByKnowledgeStateAsync(
+                batchId,
+                status,
+                search,
+                issueCode: null,
+                problemKind: null,
+                manufacturerGroupKey: null,
+                knowledgeState: CatalogImportRowKnowledgeState.CatalogAnalogy,
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        var awaitingConfirmationRowsCount = await CountRowsByKnowledgeStateAsync(
+                batchId,
+                status,
+                search,
+                issueCode: null,
+                problemKind: null,
+                manufacturerGroupKey: null,
+                knowledgeState: CatalogImportRowKnowledgeState.AwaitingConfirmation,
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        var conflictRowsCount = await CountRowsByKnowledgeStateAsync(
+                batchId,
+                status,
+                search,
+                issueCode: null,
+                problemKind: null,
+                manufacturerGroupKey: null,
+                knowledgeState: CatalogImportRowKnowledgeState.Conflict,
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        var requiredMissingRowsCount = await CountRowsByKnowledgeStateAsync(
+                batchId,
+                status,
+                search,
+                issueCode: null,
+                problemKind: null,
+                manufacturerGroupKey: null,
+                knowledgeState: CatalogImportRowKnowledgeState.RequiredMissing,
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
         var statusValue = status?.ToString();
 
         var rows = await _dbContext.Database
@@ -586,6 +823,11 @@ public sealed class CatalogImportBatchRepository
             totalRowsCount,
             errorRowsCount,
             warningRowsCount,
+            strictRowsCount,
+            catalogAnalogyRowsCount,
+            awaitingConfirmationRowsCount,
+            conflictRowsCount,
+            requiredMissingRowsCount,
             items);
     }
 

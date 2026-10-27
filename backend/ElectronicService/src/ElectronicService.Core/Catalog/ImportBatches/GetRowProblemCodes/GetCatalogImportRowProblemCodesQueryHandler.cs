@@ -136,6 +136,11 @@ public sealed class
             summary.TotalRowsCount,
             summary.ErrorRowsCount,
             summary.WarningRowsCount,
+            summary.StrictRowsCount,
+            summary.CatalogAnalogyRowsCount,
+            summary.AwaitingConfirmationRowsCount,
+            summary.ConflictRowsCount,
+            summary.RequiredMissingRowsCount,
             summary.Items
                 .Select(item =>
                     new CatalogImportRowProblemCodeResult(

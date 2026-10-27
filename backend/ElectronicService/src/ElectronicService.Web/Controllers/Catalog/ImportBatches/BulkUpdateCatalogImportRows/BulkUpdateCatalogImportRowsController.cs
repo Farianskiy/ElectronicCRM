@@ -1,4 +1,5 @@
 using ElectronicService.Contracts.Catalog.ImportBatches;
+using ElectronicService.Core.Catalog.ImportBatches.Analysis;
 using ElectronicService.Core.Catalog.ImportBatches.BulkUpdateCatalogImportRows;
 using ElectronicService.Domain.Common;
 using ElectronicService.Web.Auth;
@@ -73,6 +74,7 @@ public sealed class BulkUpdateCatalogImportRowsController : ControllerBase
                     row.Data.Price,
                     row.Data.StockQuantity,
                     row.Data.Characteristics,
+                    MapOrigins(row.Data.CharacteristicOrigins),
                     row.Data.ProductTypeId,
                     row.Data.ProductTypeResolutionSource,
                     row.Data.ProductTypeResolutionConfidence);
@@ -115,6 +117,27 @@ public sealed class BulkUpdateCatalogImportRowsController : ControllerBase
 
         return Ok(response);
     }
+
+    private static Dictionary<string, CatalogImportCharacteristicOriginResponse> MapOrigins(
+        IReadOnlyDictionary<string, CatalogImportCharacteristicValueOrigin>? origins) =>
+        (origins ?? new Dictionary<string, CatalogImportCharacteristicValueOrigin>(StringComparer.Ordinal))
+        .ToDictionary(
+            item => item.Key,
+            item => new CatalogImportCharacteristicOriginResponse(
+                item.Value.Source.ToString(),
+                item.Value.Confidence,
+                item.Value.RawValue,
+                item.Value.AnalogyConfigurationId,
+                item.Value.AnalogyConfigurationVersion,
+                item.Value.AnalogySupportingProductIds ?? [],
+                item.Value.AnalogyConfigurationHash,
+                item.Value.AnalogyCandidateSnapshotId,
+                item.Value.AnalogyCandidateSnapshotCreatedAtUtc,
+                item.Value.AnalogyFamilyAnchor,
+                item.Value.AnalogySupportingProductCount,
+                item.Value.TrainingExampleIds ?? [],
+                item.Value.TrainingSourceRowIds ?? []),
+            StringComparer.Ordinal);
 
     private ObjectResult ToProblem(DomainError error)
     {

@@ -17,6 +17,7 @@ export async function getCatalogImportRows(
           issueCode: params.issueCode ?? undefined,
           problemKind: params.problemKind ?? undefined,
           manufacturerGroupKey: params.manufacturerGroupKey ?? undefined,
+          knowledgeState: params.knowledgeState ?? undefined,
           page: params.page,
           pageSize: params.pageSize,
         },

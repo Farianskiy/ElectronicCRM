@@ -48,7 +48,8 @@ public sealed class CreateCatalogImportBatchController : ControllerBase
 
         if (!Enum.TryParse<CatalogImportMode>(importMode, ignoreCase: true, out var parsedImportMode)
             || parsedImportMode is not CatalogImportMode.CreateOnly
-                and not CatalogImportMode.UpdateCharacteristicsOnly)
+                and not CatalogImportMode.UpdateCharacteristicsOnly
+                and not CatalogImportMode.CreateMissingAndUpdateCharacteristics)
         {
             return this.ToCatalogImportProblem(
                 CatalogImportErrors.InvalidImportMode(importMode),

@@ -1,7 +1,6 @@
 using System.Globalization;
 using ClosedXML.Excel;
 using CSharpFunctionalExtensions;
-using ElectronicService.Core.Catalog.Characteristics.Normalization;
 using ElectronicService.Core.Catalog.Components;
 using ElectronicService.Domain.Catalog.Characteristics;
 using ElectronicService.Domain.Catalog.Components;
@@ -87,6 +86,8 @@ public sealed class CatalogComponentCompatibilityWorkbookService
         var headers = new List<string>
         {
             "Артикул комплектующего",
+            "Наименование комплектующего",
+            "Производитель комплектующего",
             "Тип основного товара",
             "Потребность",
             "Активно"
@@ -119,38 +120,50 @@ public sealed class CatalogComponentCompatibilityWorkbookService
         }
 
         worksheet.Cell(2, 1).Value = "АРТИКУЛ-001";
-        worksheet.Cell(2, 2).Value = selectedType?.Code ?? "КОНТАКТОР";
-        worksheet.Cell(2, 3).Value = string.Empty;
-        worksheet.Cell(2, 4).Value = "Да";
-        if (headers.Count > 4)
+        worksheet.Cell(2, 2).Value = "Наименование из каталога (необязательно)";
+        worksheet.Cell(2, 3).Value = "Производитель";
+        worksheet.Cell(2, 4).Value = selectedType?.Code ?? "КОНТАКТОР";
+        worksheet.Cell(2, 5).Value = string.Empty;
+        worksheet.Cell(2, 6).Value = "Да";
+        if (headers.Count > 6)
         {
-            worksheet.Cell(2, 5).Value = "значение; другое значение";
+            worksheet.Cell(2, 7).Value = "значение; другое значение";
         }
         StyleRulesWorksheet(worksheet, headers.Count);
+
+        AddProductsWorksheet(workbook);
 
         var instructions = workbook.Worksheets.Add("Инструкция");
         instructions.Cell(1, 1).Value = "Как заполнить шаблон";
         instructions.Cell(1, 1).Style.Font.Bold = true;
         instructions.Cell(3, 1).Value =
-            "1. Артикул комплектующего должен уже существовать в каталоге и иметь тип «Комплектующее».";
+            "1. Комплектующее должно уже существовать в каталоге либо быть добавлено в этом же файле на листе «Товары».";
         instructions.Cell(4, 1).Value =
-            "2. Тип основного товара можно указать кодом или названием.";
+            "2. Наименование комплектующего заполняется для удобства. Производитель вместе с артикулом однозначно определяет товар и защищает от совпадающих артикулов разных брендов.";
         instructions.Cell(5, 1).Value =
-            "3. Оставьте «Потребность» пустой для обычного совместимого аксессуара. Укажите код или название только для обязательной сборки, количества или отдельной группы выбора.";
+            "3. Тип основного товара можно указать кодом или названием.";
         instructions.Cell(6, 1).Value =
-            selectedType is null
-                ? "4. Переименуйте колонки «Характеристика 1/2» в реальные коды или названия характеристик."
-                : "4. Колонки характеристик уже взяты из схемы выбранного типа товара.";
+            "4. Оставьте «Потребность» пустой для обычного совместимого аксессуара. Укажите код или название только для обязательной сборки, количества или отдельной группы выбора.";
         instructions.Cell(7, 1).Value =
-            "5. Несколько допустимых значений одной характеристики разделяйте точкой с запятой.";
+            selectedType is null
+                ? "5. Переименуйте колонки «Характеристика 1/2» в реальные коды или названия характеристик."
+                : "5. Колонки характеристик уже взяты из схемы выбранного типа товара.";
         instructions.Cell(8, 1).Value =
-            "6. Повторите артикул, тип и ту же потребность (либо снова оставьте её пустой) в новой строке, чтобы добавить альтернативный вариант совместимости.";
+            "6. Несколько допустимых значений одной характеристики разделяйте точкой с запятой.";
         instructions.Cell(9, 1).Value =
-            "7. В одной строке разные характеристики работают одновременно (И); повторные строки работают как варианты (ИЛИ).";
+            "7. Повторите артикул, тип и ту же потребность (либо снова оставьте её пустой) в новой строке, чтобы добавить альтернативный вариант совместимости.";
         instructions.Cell(10, 1).Value =
-            "8. В колонке «Активно» укажите «Да» или «Нет». Если колонка отсутствует, правило считается активным.";
+            "8. В одной строке разные характеристики работают одновременно (И); повторные строки работают как варианты (ИЛИ).";
         instructions.Cell(11, 1).Value =
-            "9. Для числового диапазона заполните колонки «характеристика от» и «характеристика до». Границы включаются в диапазон.";
+            "9. В колонке «Активно» укажите «Да» или «Нет». Если колонка отсутствует, правило считается активным.";
+        instructions.Cell(12, 1).Value =
+            "10. Для числового диапазона заполните колонки «характеристика от» и «характеристика до». Границы включаются в диапазон.";
+        instructions.Cell(13, 1).Value =
+            "11. Если товара или комплектующего ещё нет в каталоге, сначала заполните его на листе «Товары». После применения импорта каталога этот же файл можно проверить на вкладке правил совместимости.";
+        instructions.Cell(14, 1).Value =
+            "12. На листе «Товары» один и тот же артикул разрешён у разных производителей. Пара «Производитель + Артикул» должна быть уникальной.";
+        instructions.Cell(15, 1).Value =
+            "13. Пустые условия означают совместимость со всеми товарами выбранного типа. Перед применением такого правила система потребует отдельное подтверждение.";
         instructions.Column(1).Width = 120;
         instructions.Column(1).Style.Alignment.WrapText = true;
 
@@ -169,6 +182,7 @@ public sealed class CatalogComponentCompatibilityWorkbookService
 
     public async Task<Result<byte[], DomainError>> ExportRulesAsync(
         string mainProductTypeCode,
+        IReadOnlyCollection<Guid>? componentManufacturerIds = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(mainProductTypeCode))
@@ -195,13 +209,37 @@ public sealed class CatalogComponentCompatibilityWorkbookService
             .Where(item => item.MainProductTypeId == selectedType.Id)
             .ToDictionaryAsync(item => item.Id, cancellationToken)
             .ConfigureAwait(false);
-        var offers = await _dbContext.ComponentOffers
+        var selectedManufacturerIds = (componentManufacturerIds ?? [])
+            .Where(id => id != Guid.Empty)
+            .Distinct()
+            .ToArray();
+        var offersQuery = _dbContext.ComponentOffers
             .AsNoTracking()
             .Include(item => item.ConditionGroups)
             .ThenInclude(group => group.Constraints)
-            .Where(item => item.MainProductTypeId == selectedType.Id)
+            .Where(item => item.MainProductTypeId == selectedType.Id);
+
+        if (selectedManufacturerIds.Length > 0)
+        {
+            var matchingComponentIds = _dbContext.Products
+                .AsNoTracking()
+                .Where(product => selectedManufacturerIds.Contains(
+                    product.ManufacturerId))
+                .Select(product => product.Id);
+
+            offersQuery = offersQuery.Where(offer =>
+                matchingComponentIds.Contains(offer.ComponentProductId));
+        }
+
+        var offers = await offersQuery
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
+
+        if (selectedManufacturerIds.Length > 0 && offers.Count == 0)
+        {
+            return Failure<byte[]>(
+                "Для выбранных производителей правила этого типа не найдены.");
+        }
         var componentIds = offers
             .Select(item => item.ComponentProductId)
             .Distinct()
@@ -210,6 +248,15 @@ public sealed class CatalogComponentCompatibilityWorkbookService
             .AsNoTracking()
             .Where(item => componentIds.Contains(item.Id))
             .ToDictionaryAsync(item => item.Id, cancellationToken)
+            .ConfigureAwait(false);
+        var manufacturerIdsUsedByComponents = components.Values
+            .Select(item => item.ManufacturerId)
+            .Distinct()
+            .ToArray();
+        var componentManufacturers = await _dbContext.Manufacturers
+            .AsNoTracking()
+            .Where(item => manufacturerIdsUsedByComponents.Contains(item.Id))
+            .ToDictionaryAsync(item => item.Id, item => item.Name, cancellationToken)
             .ConfigureAwait(false);
         var characteristics = await (
                 from relation in _dbContext.ProductTypeCharacteristics.AsNoTracking()
@@ -230,6 +277,8 @@ public sealed class CatalogComponentCompatibilityWorkbookService
         var headers = new List<string>
         {
             "Артикул комплектующего",
+            "Наименование комплектующего",
+            "Производитель комплектующего",
             "Тип основного товара",
             "Потребность",
             "Активно"
@@ -273,11 +322,16 @@ public sealed class CatalogComponentCompatibilityWorkbookService
             {
                 worksheet.Cell(rowNumber, 1).Value =
                     components[offer.ComponentProductId].Article.Value;
-                worksheet.Cell(rowNumber, 2).Value = selectedType.Code;
-                worksheet.Cell(rowNumber, 3).Value = offer.NeedDefinitionId.HasValue
+                worksheet.Cell(rowNumber, 2).Value =
+                    components[offer.ComponentProductId].Name.Value;
+                worksheet.Cell(rowNumber, 3).Value = componentManufacturers.GetValueOrDefault(
+                    components[offer.ComponentProductId].ManufacturerId,
+                    string.Empty);
+                worksheet.Cell(rowNumber, 4).Value = selectedType.Code;
+                worksheet.Cell(rowNumber, 5).Value = offer.NeedDefinitionId.HasValue
                     ? needs[offer.NeedDefinitionId.Value].Name
                     : string.Empty;
-                worksheet.Cell(rowNumber, 4).Value = offer.IsActive ? "Да" : "Нет";
+                worksheet.Cell(rowNumber, 6).Value = offer.IsActive ? "Да" : "Нет";
 
                 if (group is not null)
                 {
@@ -304,10 +358,13 @@ public sealed class CatalogComponentCompatibilityWorkbookService
                             continue;
                         }
 
-                        worksheet.Cell(rowNumber, index + 5).Value = string.Join(
+                        worksheet.Cell(rowNumber, index + 7).Value = string.Join(
                             ";",
-                            matchingConstraints.Select(item => FormatExcelValue(
-                                item.ExpectedValue)));
+                            matchingConstraints.Select(item =>
+                                ComponentCompatibilityCharacteristicValueConverter
+                                    .FormatForExcel(
+                                        column.Characteristic.Code,
+                                        item.ExpectedValue)));
                     }
                 }
 
@@ -333,12 +390,12 @@ public sealed class CatalogComponentCompatibilityWorkbookService
         try
         {
             using var workbook = new XLWorkbook(workbookStream);
-            var worksheet = workbook.Worksheets.FirstOrDefault();
+            var worksheet = FindRulesWorksheet(workbook);
 
             if (worksheet is null)
             {
                 return Failure<ComponentCompatibilityImportPreview>(
-                    "Файл не содержит листов Excel.");
+                    "В файле не найден лист «Совместимость». Добавьте его или скачайте объединённый шаблон.");
             }
 
             var headers = ReadHeaders(worksheet);
@@ -347,6 +404,11 @@ public sealed class CatalogComponentCompatibilityWorkbookService
                 headers,
                 "АРТИКУЛ КОМПЛЕКТУЮЩЕГО",
                 "АРТИКУЛ");
+            var manufacturerColumn = FindColumn(
+                headers,
+                "ПРОИЗВОДИТЕЛЬ КОМПЛЕКТУЮЩЕГО",
+                "ПРОИЗВОДИТЕЛЬ",
+                "БРЕНД");
             var mainTypeColumn = FindColumn(headers, "ТИП ОСНОВНОГО ТОВАРА");
             var needColumn = FindColumn(headers, "ПОТРЕБНОСТЬ");
             var activeColumn = FindColumn(headers, "АКТИВНО", "СОСТОЯНИЕ");
@@ -378,6 +440,9 @@ public sealed class CatalogComponentCompatibilityWorkbookService
 
                 var row = worksheet.Row(rowNumber);
                 var article = ReadCell(row, articleColumn.Value);
+                var manufacturer = manufacturerColumn.HasValue
+                    ? ReadCell(row, manufacturerColumn.Value)
+                    : string.Empty;
                 var mainTypeValue = ReadCell(row, mainTypeColumn.Value);
                 var needValue = ReadCell(row, needColumn.Value);
                 var activeResult = ParseActiveValue(
@@ -408,7 +473,12 @@ public sealed class CatalogComponentCompatibilityWorkbookService
                     .Where(item => string.Equals(
                         Normalize(item.Article),
                         Normalize(article),
-                        StringComparison.Ordinal))
+                        StringComparison.Ordinal)
+                        && (manufacturer.Length == 0
+                            || string.Equals(
+                                Normalize(item.ManufacturerName),
+                                Normalize(manufacturer),
+                                StringComparison.Ordinal)))
                     .ToArray();
 
                 if (componentCandidates.Length != 1)
@@ -562,8 +632,84 @@ public sealed class CatalogComponentCompatibilityWorkbookService
         }
     }
 
+    private static IXLWorksheet? FindRulesWorksheet(XLWorkbook workbook)
+    {
+        var preferredNames = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "СОВМЕСТИМОСТЬ",
+            "ПРАВИЛА СОВМЕСТИМОСТИ"
+        };
+
+        var rulesWorksheet = workbook.Worksheets
+            .FirstOrDefault(sheet =>
+                preferredNames.Contains(Normalize(sheet.Name))
+                && sheet.LastCellUsed() is not null);
+
+        if (rulesWorksheet is not null)
+        {
+            return rulesWorksheet;
+        }
+
+        var isUnifiedWorkbook = workbook.Worksheets.Any(sheet =>
+            string.Equals(
+                Normalize(sheet.Name),
+                "ТОВАРЫ",
+                StringComparison.Ordinal));
+
+        return isUnifiedWorkbook
+            ? null
+            : workbook.Worksheets.FirstOrDefault(sheet =>
+                sheet.LastCellUsed() is not null);
+    }
+
+    private static void AddProductsWorksheet(XLWorkbook workbook)
+    {
+        var worksheet = workbook.Worksheets.Add("Товары");
+        worksheet.Position = 1;
+        string[] headers =
+        [
+            "Производитель",
+            "Артикул",
+            "Наименование",
+            "Назначение товара",
+            "Тип товара",
+            "Цена",
+            "Остаток"
+        ];
+
+        for (var index = 0; index < headers.Length; index++)
+        {
+            worksheet.Cell(1, index + 1).Value = headers[index];
+        }
+
+        worksheet.Cell(2, 1).Value = "Производитель";
+        worksheet.Cell(2, 2).Value = "АРТИКУЛ-001";
+        worksheet.Cell(2, 3).Value = "Наименование товара";
+        worksheet.Cell(2, 4).Value = "Комплектующее";
+        worksheet.Cell(2, 5).Value = "Комплектующие";
+        worksheet.Cell(2, 6).Value = 0;
+        worksheet.Cell(2, 7).Value = 0;
+
+        var headerRange = worksheet.Range(1, 1, 1, headers.Length);
+        headerRange.Style.Font.Bold = true;
+        headerRange.Style.Fill.BackgroundColor = XLColor.FromHtml("#0F766E");
+        headerRange.Style.Font.FontColor = XLColor.White;
+        worksheet.SheetView.FreezeRows(1);
+        worksheet.Column(1).Width = 24;
+        worksheet.Column(2).Width = 24;
+        worksheet.Column(3).Width = 52;
+        worksheet.Column(4).Width = 22;
+        worksheet.Column(5).Width = 28;
+        worksheet.Column(6).Width = 16;
+        worksheet.Column(7).Width = 16;
+        worksheet.Range(2, 4, 5000, 4).CreateDataValidation()
+            .List("\"Основной товар,Комплектующее\"", true);
+        worksheet.RangeUsed()?.Style.Alignment.SetVertical(XLAlignmentVerticalValues.Top);
+    }
+
     public async Task<Result<int, DomainError>> ApplyAsync(
         IReadOnlyList<ApplyComponentCompatibilityImportRow> rows,
+        bool allowRulesWithoutConditions = false,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(rows);
@@ -588,6 +734,13 @@ public sealed class CatalogComponentCompatibilityWorkbookService
                 row.NeedDefinitionId))
             .ToArray();
         var requestedKeys = groupedRows.Select(group => group.Key).ToHashSet();
+
+        if (!allowRulesWithoutConditions
+            && groupedRows.Any(group => group.Any(row => row.Constraints.Count == 0)))
+        {
+            return Failure<int>(
+                "В файле есть правило без условий. Оно подойдёт всем товарам выбранного типа. Подтвердите создание широкого правила отдельно.");
+        }
 
         if (groupedRows.Any(group =>
                 group.Count() > 1
@@ -714,7 +867,10 @@ public sealed class CatalogComponentCompatibilityWorkbookService
                             "Характеристика больше не разрешена для типа товара.");
                     }
 
-                    var valueResult = ParseValue(definition, constraint.Value);
+                    var valueResult =
+                        ComponentCompatibilityCharacteristicValueConverter.Parse(
+                            definition,
+                            constraint.Value);
 
                     if (valueResult.IsFailure)
                     {
@@ -829,8 +985,13 @@ public sealed class CatalogComponentCompatibilityWorkbookService
                 from product in _dbContext.Products.AsNoTracking()
                 join productType in _dbContext.ProductTypes.AsNoTracking()
                     on product.ProductTypeId equals productType.Id
+                join manufacturer in _dbContext.Manufacturers.AsNoTracking()
+                    on product.ManufacturerId equals manufacturer.Id
                 where productType.Kind == ProductTypeKind.Component
-                select new ProductReference(product.Id, product.Article.Value))
+                select new ProductReference(
+                    product.Id,
+                    product.Article.Value,
+                    manufacturer.Name))
             .ToArrayAsync(cancellationToken)
             .ConfigureAwait(false);
         var mainProductTypes = await _dbContext.ProductTypes
@@ -893,7 +1054,8 @@ public sealed class CatalogComponentCompatibilityWorkbookService
                                 new ComponentCompatibilityImportConstraint(
                                     constraint.CharacteristicDefinitionId,
                                     string.Empty,
-                                    FormatExcelValue(constraint.ExpectedValue),
+                                    ComponentCompatibilityCharacteristicValueConverter
+                                        .FormatCanonical(constraint.ExpectedValue),
                                     constraint.ComparisonOperator))
                                 .ToArray()))
                         .ToHashSet(StringComparer.Ordinal))));
@@ -988,7 +1150,10 @@ public sealed class CatalogComponentCompatibilityWorkbookService
                         $"Границы «от/до» доступны только для числовых характеристик. Колонка: «{header.Value}».");
                 }
 
-                var valueResult = ParseValue(definition, value);
+                var valueResult =
+                    ComponentCompatibilityCharacteristicValueConverter.Parse(
+                        definition,
+                        value);
 
                 if (valueResult.IsFailure)
                 {
@@ -999,7 +1164,8 @@ public sealed class CatalogComponentCompatibilityWorkbookService
                 result.Add(new ComponentCompatibilityImportConstraint(
                     candidates[0].DefinitionId,
                     candidates[0].Name,
-                    FormatExcelValue(valueResult.Value),
+                    ComponentCompatibilityCharacteristicValueConverter
+                        .FormatCanonical(valueResult.Value),
                     comparisonOperator));
             }
         }
@@ -1012,41 +1178,6 @@ public sealed class CatalogComponentCompatibilityWorkbookService
         }
 
         return result;
-    }
-
-    private static Result<CharacteristicValue, DomainError> ParseValue(
-        CharacteristicDefinition definition,
-        string rawValue)
-    {
-        Result<CharacteristicValue, DomainError> result = definition.DataType switch
-        {
-            CharacteristicDataType.Text => CharacteristicValue.CreateText(rawValue),
-            CharacteristicDataType.Number when decimal.TryParse(
-                rawValue.Replace(',', '.'),
-                NumberStyles.Number,
-                CultureInfo.InvariantCulture,
-                out var number) => CharacteristicValue.CreateNumber(number),
-            CharacteristicDataType.Boolean
-                when CatalogCharacteristicBooleanValueNormalizer.TryNormalize(
-                    definition.Code,
-                    rawValue,
-                    out var boolean) => CharacteristicValue.CreateBoolean(boolean),
-            _ => Failure<CharacteristicValue>(
-                $"Некорректное значение «{rawValue}» характеристики "
-                + $"«{definition.Name}».")
-        };
-
-        if (result.IsFailure)
-        {
-            return result;
-        }
-
-        var validationResult = definition.ValidateValue(result.Value);
-
-        return validationResult.IsSuccess
-            ? result
-            : Result.Failure<CharacteristicValue, DomainError>(
-                validationResult.Error);
     }
 
     private static Result<bool, DomainError> ParseActiveValue(string rawValue)
@@ -1133,8 +1264,11 @@ public sealed class CatalogComponentCompatibilityWorkbookService
 
     private static bool IsIgnoredStandardHeader(string header)
     {
-        return Normalize(header) is "НАИМЕНОВАНИЕ"
+        return Normalize(header) is "НАИМЕНОВАНИЕ КОМПЛЕКТУЮЩЕГО"
+            or "НАИМЕНОВАНИЕ"
+            or "ПРОИЗВОДИТЕЛЬ КОМПЛЕКТУЮЩЕГО"
             or "ПРОИЗВОДИТЕЛЬ"
+            or "БРЕНД"
             or "ТИП ТОВАРА";
     }
 
@@ -1255,6 +1389,15 @@ public sealed class CatalogComponentCompatibilityWorkbookService
                 message = "Существующее правило будет обновлено вариантами из файла.";
             }
 
+            if (status is ComponentCompatibilityImportRowStatus.WillCreate
+                    or ComponentCompatibilityImportRowStatus.WillUpdate
+                && ruleRows.Any(item => item.Row.Constraints.Count == 0))
+            {
+                status = ComponentCompatibilityImportRowStatus.RequiresConfirmation;
+                message =
+                    "Правило не содержит условий и будет подходить всем товарам выбранного типа. Требуется отдельное подтверждение.";
+            }
+
             foreach (var item in ruleRows)
             {
                 result[item.Index] = item.Row with { Status = status, Message = message };
@@ -1274,10 +1417,12 @@ public sealed class CatalogComponentCompatibilityWorkbookService
         worksheet.SheetView.FreezeRows(1);
         worksheet.Columns().AdjustToContents();
         worksheet.Column(1).Width = Math.Max(worksheet.Column(1).Width, 28);
-        worksheet.Column(2).Width = Math.Max(worksheet.Column(2).Width, 28);
+        worksheet.Column(2).Width = Math.Max(worksheet.Column(2).Width, 42);
         worksheet.Column(3).Width = Math.Max(worksheet.Column(3).Width, 28);
-        worksheet.Column(4).Width = Math.Max(worksheet.Column(4).Width, 14);
-        worksheet.Range(2, 4, Math.Max(2, worksheet.LastRowUsed()?.RowNumber() ?? 2), 4)
+        worksheet.Column(4).Width = Math.Max(worksheet.Column(4).Width, 28);
+        worksheet.Column(5).Width = Math.Max(worksheet.Column(5).Width, 28);
+        worksheet.Column(6).Width = Math.Max(worksheet.Column(6).Width, 14);
+        worksheet.Range(2, 6, Math.Max(2, worksheet.LastRowUsed()?.RowNumber() ?? 2), 6)
             .CreateDataValidation()
             .List("\"Да,Нет\"", true);
     }
@@ -1306,18 +1451,6 @@ public sealed class CatalogComponentCompatibilityWorkbookService
         }
 
         metadata.Visibility = XLWorksheetVisibility.VeryHidden;
-    }
-
-    private static string FormatExcelValue(CharacteristicValue value)
-    {
-        return value.DataType switch
-        {
-            CharacteristicDataType.Boolean => value.BooleanValue == true ? "Да" : "Нет",
-            CharacteristicDataType.Number => value.NumberValue?.ToString(
-                "0.############################",
-                CultureInfo.InvariantCulture) ?? string.Empty,
-            _ => value.TextValue ?? string.Empty
-        };
     }
 
     private static List<CharacteristicColumnReference>
@@ -1437,7 +1570,10 @@ public sealed class CatalogComponentCompatibilityWorkbookService
             new DomainError("catalog.component_import.invalid", message));
     }
 
-    private sealed record ProductReference(Guid Id, string Article);
+    private sealed record ProductReference(
+        Guid Id,
+        string Article,
+        string ManufacturerName);
 
     private sealed record ProductTypeReference(Guid Id, string Code, string Name);
 

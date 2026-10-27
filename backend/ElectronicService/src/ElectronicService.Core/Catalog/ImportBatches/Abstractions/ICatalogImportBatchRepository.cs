@@ -1,4 +1,5 @@
 using ElectronicService.Domain.Catalog.ImportBatches;
+using ElectronicService.Core.Catalog.ImportBatches.Analysis;
 
 namespace ElectronicService.Core.Catalog.ImportBatches.Abstractions;
 
@@ -22,7 +23,11 @@ public interface ICatalogImportBatchRepository
 
     Task<IReadOnlyCollection<CatalogImportRow>> GetRowsAsync(Guid batchId, CatalogImportRowStatus? status, string? search, string? issueCode, CatalogImportRowProblemKind? problemKind, string? manufacturerGroupKey, int skip, int take, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyCollection<CatalogImportRow>> GetRowsByKnowledgeStateAsync(Guid batchId, CatalogImportRowStatus? status, string? search, string? issueCode, CatalogImportRowProblemKind? problemKind, string? manufacturerGroupKey, CatalogImportRowKnowledgeState knowledgeState, int skip, int take, CancellationToken cancellationToken = default);
+
     Task<int> CountRowsAsync(Guid batchId, CatalogImportRowStatus? status, string? search, string? issueCode, CatalogImportRowProblemKind? problemKind, string? manufacturerGroupKey, CancellationToken cancellationToken = default);
+
+    Task<int> CountRowsByKnowledgeStateAsync(Guid batchId, CatalogImportRowStatus? status, string? search, string? issueCode, CatalogImportRowProblemKind? problemKind, string? manufacturerGroupKey, CatalogImportRowKnowledgeState knowledgeState, CancellationToken cancellationToken = default);
 
     Task<CatalogImportRowProblemsSummary> GetRowProblemCodesAsync(Guid batchId, CatalogImportRowStatus? status, string? search, CancellationToken cancellationToken = default);
 
@@ -44,12 +49,25 @@ public interface ICatalogImportBatchRepository
 
     Task<uint?> GetVersionAsync(Guid batchId, CancellationToken cancellationToken = default);
 
+    Task<CatalogImportApplicationPlan> GetApplicationPlanAsync(
+        Guid batchId,
+        CancellationToken cancellationToken = default);
+
 }
+
+public sealed record CatalogImportApplicationPlan(
+    int CreateProductsCount,
+    int UpdateProductsCount);
 
 public sealed record CatalogImportRowProblemsSummary(
     int TotalRowsCount,
     int ErrorRowsCount,
     int WarningRowsCount,
+    int StrictRowsCount,
+    int CatalogAnalogyRowsCount,
+    int AwaitingConfirmationRowsCount,
+    int ConflictRowsCount,
+    int RequiredMissingRowsCount,
     IReadOnlyCollection<CatalogImportRowProblemCodeSummary> Items);
 
 public sealed record CatalogImportRowProblemCodeSummary(

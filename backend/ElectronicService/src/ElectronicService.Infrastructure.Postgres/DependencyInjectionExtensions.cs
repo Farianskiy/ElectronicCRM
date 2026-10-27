@@ -18,6 +18,7 @@ using ElectronicService.Core.Catalog.PriceCalculations.Import;
 using ElectronicService.Core.Catalog.PriceLists.Abstractions;
 using ElectronicService.Core.Catalog.PriceLists.Import;
 using ElectronicService.Core.Catalog.Products.Abstractions;
+using ElectronicService.Core.Catalog.Products.Analogies;
 using ElectronicService.Core.Catalog.Products.ExportProducts;
 using ElectronicService.Core.Catalog.Products.Audit;
 using ElectronicService.Core.Catalog.Products.GetAuditHistory;
@@ -57,6 +58,7 @@ public static class DependencyInjectionExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        services.AddMemoryCache();
         services.AddScoped<ElectronicService.Core.Catalog.Recognition.Training.ICatalogTrainingExampleManagement, CatalogTrainingExampleManagement>();
         services.AddScoped<ElectronicService.Core.Catalog.Recognition.Training.ILearningProvenance, LearningProvenanceService>();
         services.AddScoped<ElectronicService.Core.Catalog.Recognition.Abstractions.IRecognitionMutationGate, ElectronicService.Infrastructure.Postgres.Catalog.Recognition.Learning.RecognitionMutationGate>();
@@ -118,6 +120,8 @@ public static class DependencyInjectionExtensions
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<CatalogDataSeeder>();
         services.AddScoped<ICatalogProductsReader, CatalogProductsReader>();
+        services.AddScoped<ICatalogProductAnalogyReader, CatalogProductAnalogyReader>();
+        services.AddScoped<ICatalogProductAnalogyConfigurationRepository, CatalogProductAnalogyConfigurationRepository>();
         services.AddScoped<ICatalogProductsWorkbookExporter, CatalogProductsWorkbookExporter>();
         services.AddScoped<ICatalogProductReplacementsReader, CatalogProductReplacementsReader>();
         services.AddScoped<IProductRepository, ProductRepository>();
@@ -164,6 +168,7 @@ public static class DependencyInjectionExtensions
         services.AddScoped<ICatalogCharacteristicRecognitionProfileRepository, CatalogCharacteristicRecognitionProfileRepository>();
         services.AddScoped<ICatalogRecognitionFeedbackRepository, CatalogRecognitionFeedbackRepository>();
         services.AddScoped<ICatalogRecognitionTrainingExampleRepository, CatalogRecognitionTrainingExampleRepository>();
+        services.AddScoped<ICatalogImportExampleFillReader, CatalogImportExampleFillReader>();
         services.AddScoped<ICatalogRecognitionTrainingSampleReader, CatalogRecognitionTrainingSampleReader>();
         services.AddScoped<ICatalogRecognitionLiteralDraftRepository, CatalogRecognitionLiteralDraftRepository>();
         services.AddScoped<ICatalogRecognitionIntegerDraftRepository, CatalogRecognitionIntegerDraftRepository>();

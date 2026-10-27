@@ -48,7 +48,9 @@ public sealed class CatalogImportWorkbookAnalyzer
 
     private static readonly HashSet<string> IgnoredHeaderMappings = new(StringComparer.Ordinal)
     {
-        "ТИП ОБОРУДОВАНИЯ"
+        "ТИП ОБОРУДОВАНИЯ",
+        "ТИП ТОВАРА",
+        "НАЗНАЧЕНИЕ ТОВАРА"
     };
 
     private static readonly Dictionary<string, string> CharacteristicHeaderAliases = new(StringComparer.Ordinal)
@@ -110,11 +112,7 @@ public sealed class CatalogImportWorkbookAnalyzer
             using var workbook =
                 new XLWorkbook(stream);
 
-            var worksheet =
-                workbook.Worksheets
-                    .FirstOrDefault(sheet =>
-                        sheet.LastCellUsed()
-                            is not null);
+            var worksheet = FindProductsWorksheet(workbook);
 
             if (worksheet is null)
             {
@@ -356,6 +354,21 @@ public sealed class CatalogImportWorkbookAnalyzer
                     CatalogImportErrors
                         .InvalidWorkbook());
         }
+    }
+
+    private static IXLWorksheet? FindProductsWorksheet(XLWorkbook workbook)
+    {
+        var productsWorksheet = workbook.Worksheets
+            .FirstOrDefault(sheet =>
+                string.Equals(
+                    NormalizeHeader(sheet.Name),
+                    "ТОВАРЫ",
+                    StringComparison.Ordinal)
+                && sheet.LastCellUsed() is not null);
+
+        return productsWorksheet
+            ?? workbook.Worksheets.FirstOrDefault(sheet =>
+                sheet.LastCellUsed() is not null);
     }
 
     private static int? FindHeaderRowNumber(
@@ -1066,6 +1079,21 @@ public sealed class CatalogImportWorkbookAnalyzer
                 rawValues,
                 candidates);
 
+        var productRole = GetSourceValueByHeader(
+            "НАЗНАЧЕНИЕ ТОВАРА",
+            rawValues,
+            candidates);
+        var requestedProductType = GetSourceValueByHeader(
+            "ТИП ТОВАРА",
+            rawValues,
+            candidates);
+
+        if (string.IsNullOrWhiteSpace(requestedProductType)
+            && IsComponentRole(productRole))
+        {
+            requestedProductType = "Комплектующие";
+        }
+
         var manufacturer =
             GetStandardValue(
                 CatalogImportColumnTargetKind
@@ -1370,7 +1398,9 @@ public sealed class CatalogImportWorkbookAnalyzer
                 manufacturerId,
                 manufacturerResolutionSource,
                 manufacturerAliasId,
-                characteristicOrigins),
+                characteristicOrigins,
+                RequestedProductType: NormalizeNullable(requestedProductType),
+                ProductRole: NormalizeNullable(productRole)),
             issues,
             warnings,
             manufacturerResolution);
@@ -1447,6 +1477,32 @@ public sealed class CatalogImportWorkbookAnalyzer
             out var value)
                 ? value
                 : null;
+    }
+
+    private static string? GetSourceValueByHeader(
+        string normalizedHeader,
+        Dictionary<int, string> rawValues,
+        IReadOnlyCollection<ColumnCandidate> candidates)
+    {
+        var candidate = candidates.FirstOrDefault(item =>
+            string.Equals(
+                item.NormalizedSourceHeader,
+                normalizedHeader,
+                StringComparison.Ordinal));
+
+        if (candidate is null
+            || !rawValues.TryGetValue(candidate.SourceColumnNumber, out var value))
+        {
+            return null;
+        }
+
+        return NormalizeNullable(value);
+    }
+
+    private static bool IsComponentRole(string? value)
+    {
+        var normalized = NormalizeHeader(value ?? string.Empty);
+        return normalized is "КОМПЛЕКТУЮЩЕЕ" or "КОМПЛЕКТУЮЩИЕ" or "АКСЕССУАР";
     }
 
     private static int? FindColumnNumber(

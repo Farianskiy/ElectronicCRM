@@ -1,6 +1,7 @@
 using System.Data;
 using CSharpFunctionalExtensions;
 using ElectronicService.Domain.Catalog.Dictionaries;
+using ElectronicService.Domain.Catalog.Recognition;
 using ElectronicService.Domain.Common;
 using ElectronicService.Infrastructure.Postgres.Catalog.Queries;
 using ElectronicService.Infrastructure.Postgres.Data;
@@ -46,6 +47,99 @@ public sealed class LearningWorkspaceReader(ElectronicDbContext db, RecognitionE
                 literalDrafts = await literals.CountAsync(ct), integerDrafts = await integers.CountAsync(ct), multiIntegerDrafts = await multis.CountAsync(ct),
                 versions = await versions.CountAsync(ct), pendingSuggestions = await suggestions.CountAsync(x => x.Status == CatalogAssistantDictionarySuggestionStatus.Pending, ct),
                 approvedSuggestions = await suggestions.CountAsync(x => x.Status == CatalogAssistantDictionarySuggestionStatus.Approved, ct) };
+        }
+        if (string.Equals(section, "analogyMetrics", StringComparison.Ordinal))
+        {
+            var decisions = db.CatalogRecognitionFeedbackEntries
+                .AsNoTracking()
+                .Where(x => x.ManufacturerId == manufacturerId
+                    && x.ProductTypeId == productTypeId
+                    && x.SuggestedSource == "CatalogAnalogy");
+
+            var totals = await decisions
+                .GroupBy(_ => 1)
+                .Select(group => new
+                {
+                    shown = group.Sum(x => x.AnalogyDisplayCount),
+                    stale = group.Sum(x => x.AnalogyStaleCount),
+                    awaitingDecision = group.Count(x =>
+                        x.FeedbackType == CatalogRecognitionFeedbackType.Shown),
+                    decisions = group.Count(x =>
+                        x.FeedbackType == CatalogRecognitionFeedbackType.Accepted
+                        || x.FeedbackType == CatalogRecognitionFeedbackType.Corrected
+                        || x.FeedbackType == CatalogRecognitionFeedbackType.Rejected),
+                    accepted = group.Count(x =>
+                        x.FeedbackType == CatalogRecognitionFeedbackType.Accepted),
+                    corrected = group.Count(x =>
+                        x.FeedbackType == CatalogRecognitionFeedbackType.Corrected),
+                    rejected = group.Count(x =>
+                        x.FeedbackType == CatalogRecognitionFeedbackType.Rejected),
+                    averageSupport = group.Average(x => x.SuggestedConfidence)
+                })
+                .SingleOrDefaultAsync(ct)
+                .ConfigureAwait(false);
+
+            var characteristics = await decisions
+                .GroupBy(x => new
+                {
+                    x.CharacteristicDefinitionId,
+                    x.CharacteristicCodeSnapshot
+                })
+                .Select(group => new
+                {
+                    characteristicDefinitionId = group.Key.CharacteristicDefinitionId,
+                    characteristicCode = group.Key.CharacteristicCodeSnapshot,
+                    shown = group.Sum(x => x.AnalogyDisplayCount),
+                    stale = group.Sum(x => x.AnalogyStaleCount),
+                    awaitingDecision = group.Count(x =>
+                        x.FeedbackType == CatalogRecognitionFeedbackType.Shown),
+                    decisions = group.Count(x =>
+                        x.FeedbackType == CatalogRecognitionFeedbackType.Accepted
+                        || x.FeedbackType == CatalogRecognitionFeedbackType.Corrected
+                        || x.FeedbackType == CatalogRecognitionFeedbackType.Rejected),
+                    accepted = group.Count(x =>
+                        x.FeedbackType == CatalogRecognitionFeedbackType.Accepted),
+                    corrected = group.Count(x =>
+                        x.FeedbackType == CatalogRecognitionFeedbackType.Corrected),
+                    rejected = group.Count(x =>
+                        x.FeedbackType == CatalogRecognitionFeedbackType.Rejected),
+                    averageSupport = group.Average(x => x.SuggestedConfidence)
+                })
+                .OrderByDescending(x => x.decisions)
+                .ThenBy(x => x.characteristicCode)
+                .ToArrayAsync(ct)
+                .ConfigureAwait(false);
+
+            var modelVersions = await decisions
+                .GroupBy(x => x.ModelVersion ?? "без версии")
+                .Select(group => new
+                {
+                    modelVersion = group.Key,
+                    shown = group.Sum(x => x.AnalogyDisplayCount),
+                    decisions = group.Count(x =>
+                        x.FeedbackType == CatalogRecognitionFeedbackType.Accepted
+                        || x.FeedbackType == CatalogRecognitionFeedbackType.Corrected
+                        || x.FeedbackType == CatalogRecognitionFeedbackType.Rejected),
+                    lastDecisionAtUtc = group.Max(x => x.CreatedAtUtc)
+                })
+                .OrderByDescending(x => x.lastDecisionAtUtc)
+                .ToArrayAsync(ct)
+                .ConfigureAwait(false);
+
+            return new
+            {
+                asOfUtc,
+                shown = totals?.shown ?? 0,
+                stale = totals?.stale ?? 0,
+                awaitingDecision = totals?.awaitingDecision ?? 0,
+                decisions = totals?.decisions ?? 0,
+                accepted = totals?.accepted ?? 0,
+                corrected = totals?.corrected ?? 0,
+                rejected = totals?.rejected ?? 0,
+                averageSupport = totals?.averageSupport,
+                characteristics,
+                modelVersions
+            };
         }
         if (string.Equals(section, "suggestions", StringComparison.Ordinal))
         {

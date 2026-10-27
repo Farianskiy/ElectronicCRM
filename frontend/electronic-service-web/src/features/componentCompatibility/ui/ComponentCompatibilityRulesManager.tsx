@@ -32,6 +32,11 @@ interface EditableGroup {
   constraints: EditableConstraint[];
 }
 
+interface ManufacturerSelection {
+  productTypeCode: string;
+  ids: string[] | null;
+}
+
 function toEditableGroups(rule: ComponentCompatibilityRule): EditableGroup[] {
   return rule.conditionGroups.map((group) => ({
     key: group.id,
@@ -139,6 +144,16 @@ export function ComponentCompatibilityRulesManager({
   const [activityFilter, setActivityFilter] = useState<
     "all" | "active" | "inactive"
   >("all");
+  const [manufacturerSearch, setManufacturerSearch] = useState("");
+  const [manufacturerSelection, setManufacturerSelection] =
+    useState<ManufacturerSelection>({
+      productTypeCode,
+      ids: null,
+    });
+  const selectedManufacturerIds =
+    manufacturerSelection.productTypeCode === productTypeCode
+      ? manufacturerSelection.ids
+      : null;
 
   const rulesQuery = useQuery({
     queryKey: ["component-compatibility-rules", productTypeCode],
@@ -179,7 +194,10 @@ export function ComponentCompatibilityRulesManager({
   });
   const exportMutation = useMutation({
     mutationFn: () =>
-      downloadCurrentComponentCompatibilityRules(productTypeCode),
+      downloadCurrentComponentCompatibilityRules(
+        productTypeCode,
+        selectedManufacturerIds ?? undefined,
+      ),
   });
 
   const characteristicOptions = useMemo(
@@ -192,6 +210,49 @@ export function ComponentCompatibilityRulesManager({
         characteristicOptions.map((item) => [item.definitionId, item.dataType]),
       ),
     [characteristicOptions],
+  );
+  const rules = useMemo(() => rulesQuery.data ?? [], [rulesQuery.data]);
+  const manufacturerOptions = useMemo(() => {
+    const manufacturers = new Map<
+      string,
+      { id: string; name: string; rulesCount: number }
+    >();
+
+    for (const rule of rules) {
+      const current = manufacturers.get(rule.componentManufacturerId);
+      manufacturers.set(rule.componentManufacturerId, {
+        id: rule.componentManufacturerId,
+        name: rule.componentManufacturerName,
+        rulesCount: (current?.rulesCount ?? 0) + 1,
+      });
+    }
+
+    return Array.from(manufacturers.values()).sort((left, right) =>
+      left.name.localeCompare(right.name, "ru"),
+    );
+  }, [rules]);
+  const selectedManufacturerSet = useMemo(
+    () =>
+      selectedManufacturerIds === null
+        ? null
+        : new Set(selectedManufacturerIds),
+    [selectedManufacturerIds],
+  );
+  const selectedRulesCount =
+    selectedManufacturerSet === null
+      ? rules.length
+      : rules.filter((rule) =>
+          selectedManufacturerSet.has(rule.componentManufacturerId),
+        ).length;
+  const normalizedManufacturerSearch = manufacturerSearch
+    .trim()
+    .toLocaleLowerCase("ru");
+  const visibleManufacturerOptions = manufacturerOptions.filter(
+    (manufacturer) =>
+      normalizedManufacturerSearch.length === 0 ||
+      manufacturer.name
+        .toLocaleLowerCase("ru")
+        .includes(normalizedManufacturerSearch),
   );
 
   if (rulesQuery.isLoading || schemaQuery.isLoading) {
@@ -209,13 +270,15 @@ export function ComponentCompatibilityRulesManager({
     );
   }
 
-  const rules = rulesQuery.data ?? [];
   const normalizedSearch = ruleSearch.trim().toLocaleLowerCase("ru");
   const visibleRules = rules.filter((rule) => {
     const matchesSearch =
       normalizedSearch.length === 0 ||
       rule.componentArticle.toLocaleLowerCase("ru").includes(normalizedSearch) ||
       rule.componentName.toLocaleLowerCase("ru").includes(normalizedSearch) ||
+      rule.componentManufacturerName
+        .toLocaleLowerCase("ru")
+        .includes(normalizedSearch) ||
       (rule.needName ?? "совместимые аксессуары")
         .toLocaleLowerCase("ru")
         .includes(normalizedSearch);
@@ -223,8 +286,36 @@ export function ComponentCompatibilityRulesManager({
       activityFilter === "all" ||
       (activityFilter === "active" && rule.isActive) ||
       (activityFilter === "inactive" && !rule.isActive);
-    return matchesSearch && matchesActivity;
+    const matchesManufacturer =
+      selectedManufacturerSet === null ||
+      selectedManufacturerSet.has(rule.componentManufacturerId);
+    return matchesSearch && matchesActivity && matchesManufacturer;
   });
+
+  function toggleManufacturer(manufacturerId: string): void {
+    setManufacturerSelection((currentSelection) => {
+      const allManufacturerIds = manufacturerOptions.map((item) => item.id);
+      const current =
+        currentSelection.productTypeCode === productTypeCode
+          ? currentSelection.ids
+          : null;
+      const selected = new Set(current ?? allManufacturerIds);
+
+      if (selected.has(manufacturerId)) {
+        selected.delete(manufacturerId);
+      } else {
+        selected.add(manufacturerId);
+      }
+
+      return {
+        productTypeCode,
+        ids:
+          selected.size === allManufacturerIds.length
+            ? null
+            : allManufacturerIds.filter((id) => selected.has(id)),
+      };
+    });
+  }
 
   return (
     <section className="grid gap-4">
@@ -235,20 +326,123 @@ export function ComponentCompatibilityRulesManager({
         характеристики и несколько групп — альтернативы.
       </div>
 
-      <div className="flex flex-col gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-[var(--app-muted)]">
-          Выгрузите все текущие правила этого типа, измените Excel и загрузите
-          его во вкладке «Excel». Правила, которых нет в файле, не удаляются.
-        </p>
-        <AppButton
-          type="button"
-          variant="secondary"
-          loading={exportMutation.isPending}
-          disabled={rules.length === 0}
-          onClick={() => exportMutation.mutate()}
-        >
-          Скачать текущие правила
-        </AppButton>
+      <div className="grid gap-4 rounded-2xl border border-[var(--app-accent)]/45 bg-[var(--app-accent-soft)] p-5 lg:grid-cols-[minmax(0,1fr)_minmax(300px,420px)] lg:items-end">
+        <div>
+          <p className="font-semibold text-[var(--app-text)]">
+            Выгрузка правил в Excel
+          </p>
+          <p className="mt-1 text-sm leading-6 text-[var(--app-muted)]">
+            Выберите производителей комплектующих. Фильтр применяется и к
+            списку ниже, и к скачиваемому файлу. Правила, которых нет в файле,
+            при обратной загрузке не удаляются.
+          </p>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <details className="group relative">
+            <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-panel)] px-4 text-sm font-semibold text-[var(--app-text)] transition-colors hover:bg-[var(--app-surface-hover)]">
+              <span className="min-w-0 truncate">
+                {selectedManufacturerIds === null
+                  ? `Все производители (${rules.length})`
+                  : selectedManufacturerIds.length === 0
+                    ? "Производители не выбраны"
+                    : `Выбрано: ${selectedManufacturerIds.length} · правил: ${selectedRulesCount}`}
+              </span>
+              <span
+                aria-hidden="true"
+                className="text-[var(--app-muted)] transition-transform group-open:rotate-180"
+              >
+                ▾
+              </span>
+            </summary>
+
+            <div className="absolute right-0 z-20 mt-2 max-h-80 w-full min-w-72 overflow-y-auto rounded-2xl border border-[var(--app-border-strong)] bg-[var(--app-panel)] p-3 shadow-2xl">
+              <div className="mb-2 flex items-center justify-between gap-2 border-b border-[var(--app-border)] pb-2">
+                <button
+                  type="button"
+                  className="rounded-lg px-2 py-1 text-xs font-semibold text-[var(--app-accent)] hover:bg-[var(--app-accent-soft)]"
+                  onClick={() =>
+                    setManufacturerSelection({ productTypeCode, ids: null })
+                  }
+                >
+                  Выбрать всех
+                </button>
+                <button
+                  type="button"
+                  className="rounded-lg px-2 py-1 text-xs font-semibold text-[var(--app-muted)] hover:bg-[var(--app-surface-hover)] hover:text-[var(--app-text)]"
+                  onClick={() =>
+                    setManufacturerSelection({ productTypeCode, ids: [] })
+                  }
+                >
+                  Снять выбор
+                </button>
+              </div>
+
+              <input
+                value={manufacturerSearch}
+                onChange={(event) => setManufacturerSearch(event.target.value)}
+                placeholder="Найти производителя"
+                aria-label="Найти производителя комплектующего"
+                className="mb-2 min-h-10 w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] px-3 text-sm text-[var(--app-text)]"
+              />
+
+              <div className="grid gap-1">
+                {visibleManufacturerOptions.map((manufacturer) => (
+                  <label
+                    key={manufacturer.id}
+                    className="flex cursor-pointer items-center gap-3 rounded-xl px-2 py-2 text-sm text-[var(--app-text)] hover:bg-[var(--app-surface-hover)]"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={
+                        selectedManufacturerSet === null ||
+                        selectedManufacturerSet.has(manufacturer.id)
+                      }
+                      onChange={() => toggleManufacturer(manufacturer.id)}
+                      className="h-4 w-4 accent-[var(--app-accent)]"
+                    />
+                    <span className="min-w-0 flex-1 truncate">
+                      {manufacturer.name}
+                    </span>
+                    <span className="rounded-full bg-[var(--app-surface)] px-2 py-0.5 text-xs text-[var(--app-muted)]">
+                      {manufacturer.rulesCount}
+                    </span>
+                  </label>
+                ))}
+                {visibleManufacturerOptions.length === 0 && (
+                  <p className="px-2 py-3 text-center text-sm text-[var(--app-muted)]">
+                    Производители не найдены.
+                  </p>
+                )}
+              </div>
+            </div>
+          </details>
+
+          <AppButton
+            type="button"
+            variant="primary"
+            loading={exportMutation.isPending}
+            disabled={selectedRulesCount === 0}
+            className="min-h-12 px-6 shadow-lg shadow-black/20"
+            onClick={() => exportMutation.mutate()}
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              className="h-5 w-5"
+            >
+              <path
+                d="M12 3v12m0 0 4-4m-4 4-4-4M5 17v3h14v-3"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            Скачать {selectedRulesCount} правил
+          </AppButton>
+        </div>
       </div>
 
       {exportMutation.isError && (
@@ -260,12 +454,18 @@ export function ComponentCompatibilityRulesManager({
         </div>
       )}
 
+      {exportMutation.isSuccess && (
+        <div className="rounded-2xl border border-[var(--app-success-border)] bg-[var(--app-success-soft)] p-4 text-sm text-[var(--app-success)]">
+          Файл «{exportMutation.data}» скачан.
+        </div>
+      )}
+
       {rules.length > 0 && (
         <div className="grid gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4 md:grid-cols-[minmax(240px,1fr)_220px]">
           <input
             value={ruleSearch}
             onChange={(event) => setRuleSearch(event.target.value)}
-            placeholder="Найти по артикулу, названию или потребности"
+            placeholder="Найти по артикулу, названию, производителю или потребности"
             className="min-h-11 rounded-xl border border-[var(--app-border)] bg-[var(--app-panel)] px-3 text-sm text-[var(--app-text)]"
           />
           <select
@@ -323,6 +523,9 @@ export function ComponentCompatibilityRulesManager({
                   </span>
                 </div>
                 <p className="mt-2 text-sm text-[var(--app-muted)]">
+                  Производитель комплектующего: {rule.componentManufacturerName}
+                </p>
+                <p className="mt-1 text-sm text-[var(--app-muted)]">
                   {rule.needName
                     ? `Потребность: ${rule.needName}`
                     : "Совместимый аксессуар без потребности"}

@@ -1,6 +1,8 @@
 using ElectronicService.Contracts.Catalog.Components;
 using ElectronicService.Core.Catalog.Components;
+using ElectronicService.Core.Catalog.ImportBatches.Abstractions;
 using ElectronicService.Domain.Catalog.Components;
+using ElectronicService.Domain.Catalog.ImportBatches;
 using ElectronicService.Domain.Users.Enums;
 using ElectronicService.Web.Auth;
 using Microsoft.AspNetCore.Mvc;
@@ -15,11 +17,14 @@ public sealed class CatalogComponentCompatibilityImportController
 {
     private const long MaximumFileSizeBytes = 10 * 1024 * 1024;
     private readonly ICatalogComponentCompatibilityWorkbookService _service;
+    private readonly ICatalogImportBatchRepository _importBatchRepository;
 
     public CatalogComponentCompatibilityImportController(
-        ICatalogComponentCompatibilityWorkbookService service)
+        ICatalogComponentCompatibilityWorkbookService service,
+        ICatalogImportBatchRepository importBatchRepository)
     {
         _service = service;
+        _importBatchRepository = importBatchRepository;
     }
 
     [HttpGet("template")]
@@ -49,10 +54,12 @@ public sealed class CatalogComponentCompatibilityImportController
     [HttpGet("export")]
     public async Task<IActionResult> ExportRules(
         [FromQuery] string mainProductTypeCode,
+        [FromQuery] Guid[]? componentManufacturerIds,
         CancellationToken cancellationToken = default)
     {
         var result = await _service.ExportRulesAsync(
             mainProductTypeCode,
+            componentManufacturerIds,
             cancellationToken).ConfigureAwait(false);
 
         if (result.IsFailure)
@@ -64,10 +71,14 @@ public sealed class CatalogComponentCompatibilityImportController
             .Where(character => char.IsLetterOrDigit(character)
                 || character is '-' or '_'));
 
+        var scopeSuffix = componentManufacturerIds is { Length: > 0 }
+            ? "-selected-manufacturers"
+            : string.Empty;
+
         return File(
             result.Value,
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            $"component-compatibility-{safeCode}.xlsx");
+            $"component-compatibility-{safeCode}{scopeSuffix}.xlsx");
     }
 
     [HttpPost("preview")]
@@ -100,28 +111,39 @@ public sealed class CatalogComponentCompatibilityImportController
             return BadRequest(result.Error.Message);
         }
 
-        return Ok(new PreviewComponentCompatibilityImportResponse(
-            result.Value.ReadRowsCount,
-            result.Value.ReadyRowsCount,
-            result.Value.SkippedRowsCount,
-            result.Value.Rows.Select(row =>
-                new ComponentCompatibilityImportPreviewRowResponse(
-                    row.RowNumber,
-                    row.ComponentArticle,
-                    row.MainProductType,
-                    row.Need,
-                    row.ComponentProductId,
-                    row.MainProductTypeId,
-                    row.NeedDefinitionId,
-                    row.IsActive,
-                    row.Status.ToString(),
-                    row.Message,
-                    row.Constraints.Select(constraint =>
-                        new ComponentCompatibilityImportConstraintResponse(
-                            constraint.CharacteristicDefinitionId,
-                            constraint.CharacteristicName,
-                            constraint.Value,
-                            constraint.ComparisonOperator.ToString())).ToArray())).ToArray()));
+        return Ok(ToPreviewResponse(result.Value));
+    }
+
+    [HttpPost("batches/{batchId:guid}/preview")]
+    public async Task<IActionResult> PreviewFromImportBatch(
+        Guid batchId,
+        CancellationToken cancellationToken = default)
+    {
+        var batch = await _importBatchRepository
+            .GetByIdWithFileAsync(batchId, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (batch is null)
+        {
+            return NotFound("Пакет импорта не найден.");
+        }
+
+        if (batch.Status != CatalogImportBatchStatus.Applied)
+        {
+            return BadRequest(
+                "Сначала завершите импорт товаров, затем проверяйте правила совместимости.");
+        }
+
+        await using var stream = new MemoryStream(
+            batch.File.Content.ToArray(),
+            writable: false);
+        var result = await _service
+            .PreviewAsync(stream, cancellationToken)
+            .ConfigureAwait(false);
+
+        return result.IsSuccess
+            ? Ok(ToPreviewResponse(result.Value))
+            : BadRequest(result.Error.Message);
     }
 
     [HttpPost("apply")]
@@ -163,11 +185,42 @@ public sealed class CatalogComponentCompatibilityImportController
                     .ToArray()))
             .ToArray();
         var result = await _service
-            .ApplyAsync(rows, cancellationToken)
+            .ApplyAsync(
+                rows,
+                request.AllowRulesWithoutConditions,
+                cancellationToken)
             .ConfigureAwait(false);
 
         return result.IsSuccess
             ? Ok(new ApplyComponentCompatibilityImportResponse(result.Value))
             : BadRequest(result.Error.Message);
+    }
+
+    private static PreviewComponentCompatibilityImportResponse ToPreviewResponse(
+        ComponentCompatibilityImportPreview preview)
+    {
+        return new PreviewComponentCompatibilityImportResponse(
+            preview.ReadRowsCount,
+            preview.ReadyRowsCount,
+            preview.SkippedRowsCount,
+            preview.Rows.Select(row =>
+                new ComponentCompatibilityImportPreviewRowResponse(
+                    row.RowNumber,
+                    row.ComponentArticle,
+                    row.MainProductType,
+                    row.Need,
+                    row.ComponentProductId,
+                    row.MainProductTypeId,
+                    row.NeedDefinitionId,
+                    row.IsActive,
+                    row.Status.ToString(),
+                    row.Message,
+                    row.Constraints.Select(constraint =>
+                        new ComponentCompatibilityImportConstraintResponse(
+                            constraint.CharacteristicDefinitionId,
+                            constraint.CharacteristicName,
+                            constraint.Value,
+                            constraint.ComparisonOperator.ToString())).ToArray()))
+                .ToArray());
     }
 }

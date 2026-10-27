@@ -1,4 +1,3 @@
-using System.Globalization;
 using CSharpFunctionalExtensions;
 using ElectronicService.Core.Catalog.Components;
 using ElectronicService.Domain.Catalog.Characteristics;
@@ -322,7 +321,10 @@ public sealed class CatalogComponentCompatibilityService
                     input.CharacteristicDefinitionId);
             }
 
-            var valueResult = ParseValue(definition.DataType, input.Value);
+            var valueResult =
+                ComponentCompatibilityCharacteristicValueConverter.Parse(
+                    definition,
+                    input.Value);
 
             if (valueResult.IsFailure)
             {
@@ -508,7 +510,10 @@ public sealed class CatalogComponentCompatibilityService
                         input.CharacteristicDefinitionId);
                 }
 
-                var valueResult = ParseValue(definition.DataType, input.Value);
+                var valueResult =
+                    ComponentCompatibilityCharacteristicValueConverter.Parse(
+                        definition,
+                        input.Value);
 
                 if (valueResult.IsFailure)
                 {
@@ -1147,6 +1152,15 @@ public sealed class CatalogComponentCompatibilityService
             .Where(product => componentIds.Contains(product.Id))
             .ToDictionaryAsync(product => product.Id, cancellationToken)
             .ConfigureAwait(false);
+        var manufacturerIds = components.Values
+            .Select(component => component.ManufacturerId)
+            .Distinct()
+            .ToArray();
+        var manufacturers = await _dbContext.Manufacturers
+            .AsNoTracking()
+            .Where(manufacturer => manufacturerIds.Contains(manufacturer.Id))
+            .ToDictionaryAsync(manufacturer => manufacturer.Id, cancellationToken)
+            .ConfigureAwait(false);
         var needs = await _dbContext.ComponentNeedDefinitions
             .AsNoTracking()
             .Where(need => needIds.Contains(need.Id))
@@ -1169,10 +1183,13 @@ public sealed class CatalogComponentCompatibilityService
 
         return offers
             .Where(offer => components.ContainsKey(offer.ComponentProductId)
-                && productTypes.ContainsKey(offer.MainProductTypeId))
+                && productTypes.ContainsKey(offer.MainProductTypeId)
+                && manufacturers.ContainsKey(
+                    components[offer.ComponentProductId].ManufacturerId))
             .Select(offer =>
             {
                 var component = components[offer.ComponentProductId];
+                var manufacturer = manufacturers[component.ManufacturerId];
                 var need = offer.NeedDefinitionId.HasValue
                     ? needs.GetValueOrDefault(offer.NeedDefinitionId.Value)
                     : null;
@@ -1183,6 +1200,8 @@ public sealed class CatalogComponentCompatibilityService
                     component.Id,
                     component.Article.Value,
                     component.Name.Value,
+                    manufacturer.Id,
+                    manufacturer.Name,
                     offer.MainProductTypeId,
                     offer.NeedDefinitionId,
                     need?.Code,
@@ -1219,6 +1238,8 @@ public sealed class CatalogComponentCompatibilityService
                 StringComparer.OrdinalIgnoreCase)
             .ThenBy(rule => rule.NeedName ?? "Совместимые аксессуары",
                 StringComparer.OrdinalIgnoreCase)
+            .ThenBy(rule => rule.ComponentManufacturerName,
+                StringComparer.OrdinalIgnoreCase)
             .ThenBy(rule => rule.ComponentName, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
@@ -1237,26 +1258,6 @@ public sealed class CatalogComponentCompatibilityService
             component.Price.Amount,
             component.Price.Currency,
             component.Price.Amount * selection.Quantity);
-    }
-
-    private static Result<CharacteristicValue, DomainError> ParseValue(
-        CharacteristicDataType dataType,
-        string rawValue)
-    {
-        return dataType switch
-        {
-            CharacteristicDataType.Text => CharacteristicValue.CreateText(rawValue),
-            CharacteristicDataType.Number when decimal.TryParse(
-                rawValue,
-                NumberStyles.Number,
-                CultureInfo.InvariantCulture,
-                out var number) => CharacteristicValue.CreateNumber(number),
-            CharacteristicDataType.Boolean when bool.TryParse(
-                rawValue,
-                out var boolean) => CharacteristicValue.CreateBoolean(boolean),
-            _ => Result.Failure<CharacteristicValue, DomainError>(
-                GeneralErrors.ValueIsInvalid(nameof(rawValue)))
-        };
     }
 
     private static string FormatConstraintValue(

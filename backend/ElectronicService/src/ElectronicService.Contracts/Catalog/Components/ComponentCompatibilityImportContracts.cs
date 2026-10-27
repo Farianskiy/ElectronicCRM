@@ -26,7 +26,8 @@ public sealed record ComponentCompatibilityImportConstraintResponse(
     string ComparisonOperator);
 
 public sealed record ApplyComponentCompatibilityImportRequest(
-    IReadOnlyList<ApplyComponentCompatibilityImportRowRequest>? Rows);
+    IReadOnlyList<ApplyComponentCompatibilityImportRowRequest>? Rows,
+    bool AllowRulesWithoutConditions = false);
 
 public sealed record ApplyComponentCompatibilityImportRowRequest(
     Guid ComponentProductId,

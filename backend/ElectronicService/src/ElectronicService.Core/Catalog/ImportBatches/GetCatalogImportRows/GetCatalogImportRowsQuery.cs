@@ -1,4 +1,5 @@
 using ElectronicService.Domain.Catalog.ImportBatches;
+using ElectronicService.Core.Catalog.ImportBatches.Analysis;
 
 namespace ElectronicService.Core.Catalog.ImportBatches.GetCatalogImportRows;
 
@@ -10,5 +11,6 @@ public sealed record GetCatalogImportRowsQuery(
     string? IssueCode,
     CatalogImportRowProblemKind? ProblemKind,
     string? ManufacturerGroupKey,
+    CatalogImportRowKnowledgeState? KnowledgeState,
     int Page,
     int PageSize);

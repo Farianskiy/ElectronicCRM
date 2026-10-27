@@ -18,6 +18,7 @@ using ElectronicService.Core.Catalog.Dictionaries.SetTermActive;
 using ElectronicService.Core.Catalog.ImportBatches.Analysis;
 using ElectronicService.Core.Catalog.ImportBatches.AnalyzeCatalogImportBatch;
 using ElectronicService.Core.Catalog.ImportBatches.ApplyCatalogImportBatch;
+using ElectronicService.Core.Catalog.ImportBatches.ApplyExampleFill;
 using ElectronicService.Core.Catalog.ImportBatches.BulkUpdateCatalogImportRows;
 using ElectronicService.Core.Catalog.ImportBatches.CreateCatalogImportBatch;
 using ElectronicService.Core.Catalog.ImportBatches.DeleteCatalogImportBatch;
@@ -38,6 +39,7 @@ using ElectronicService.Core.Catalog.ImportBatches.StartCatalogImportReview;
 using ElectronicService.Core.Catalog.ImportBatches.SubmitCatalogImportBatch;
 using ElectronicService.Core.Catalog.ImportBatches.UpdateCatalogImportMapping;
 using ElectronicService.Core.Catalog.ImportBatches.UpdateCatalogImportRow;
+using ElectronicService.Core.Catalog.Products.Analogies;
 using ElectronicService.Core.Catalog.Manufacturers.CreateApprovedAlias;
 using ElectronicService.Core.Catalog.Manufacturers.CreateFromUnresolvedPhrase;
 using ElectronicService.Core.Catalog.Manufacturers.Management;
@@ -179,6 +181,8 @@ public static class DependencyInjectionExtensions
         services.AddScoped<ICatalogImportRecognitionShadowService, CatalogImportRecognitionShadowService>();
         services.AddScoped<ICatalogImportRecognitionEnrichmentService, CatalogImportRecognitionEnrichmentService>();
         services.AddScoped<ICatalogImportRecognitionFeedbackCollector, CatalogImportRecognitionFeedbackCollector>();
+        services.AddScoped<CatalogImportAnalogyDecisionService>();
+        services.AddScoped<CatalogImportAnalogyObservationService>();
         services.AddScoped<ICatalogImportRecognitionFeedbackFinalizer, CatalogImportRecognitionFeedbackFinalizer>();
         services.AddScoped<ICatalogRecognitionCandidateAggregator, CatalogRecognitionCandidateAggregator>();
         services.AddScoped<ICatalogRecognitionCandidateSuggestionPromoter, CatalogRecognitionCandidateSuggestionPromoter>();
@@ -255,6 +259,8 @@ public static class DependencyInjectionExtensions
         services.AddScoped<AnalyzeCatalogImportBatchCommandHandler>();
         services.AddScoped<GetCatalogImportBatchQueryHandler>();
         services.AddScoped<GetCatalogImportRowsQueryHandler>();
+        services.AddScoped<ElectronicService.Core.Catalog.ImportBatches.PreviewExampleFill.PreviewCatalogImportExampleFillQueryHandler>();
+        services.AddScoped<ApplyCatalogImportExampleFillCommandHandler>();
         services.AddScoped<GetCatalogImportRowProblemCodesQueryHandler>();
         services.AddScoped<GetCatalogImportManufacturerGroupsQueryHandler>();
         services.AddScoped<ElectronicService.Core.Catalog.ImportBatches.GetRowExplanations.GetCatalogImportRowExplanationsQueryHandler>();
@@ -307,6 +313,10 @@ public static class DependencyInjectionExtensions
         services.AddScoped<PreviewManufacturerNameRecognitionQueryHandler>();
         services.AddScoped<ICatalogProductTypeSuggestionService, CatalogProductTypeSuggestionService>();
         services.AddScoped<PreviewCatalogProductTypeSuggestionQueryHandler>();
+        services.AddScoped<PreviewCatalogProductAnalogiesQueryHandler>();
+        services.AddScoped<CatalogProductAnalogyConfigurationResolver>();
+        services.AddScoped<CatalogProductAnalogyConfigurationService>();
+        services.AddScoped<CatalogProductAnalogyEvaluationService>();
 
 
         return services;

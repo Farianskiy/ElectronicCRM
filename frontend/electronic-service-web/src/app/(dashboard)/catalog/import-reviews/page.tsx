@@ -7,6 +7,7 @@ import { useState } from "react";
 import { getCatalogImportReviewQueue } from "@/features/catalogImports/api/getCatalogImportReviewQueue";
 import { startCatalogImportReview } from "@/features/catalogImports/api/startCatalogImportReview";
 import { getCatalogImportStatusLabel } from "@/features/catalogImports/model/catalogImportStatus";
+import { getCatalogImportModeLabel } from "@/features/catalogImports/model/catalogImportMode";
 import {
   catalogImportReviewQueueStatuses,
   type CatalogImportReviewQueueItem,
@@ -258,9 +259,7 @@ export default function CatalogImportReviewsPage() {
                         </p>
 
                         <p className="mt-1 text-xs font-medium text-teal-300">
-                          {item.importMode === "CreateOnly"
-                            ? "Добавление новых"
-                            : "Обновление характеристик"}
+                          {getCatalogImportModeLabel(item.importMode)}
                         </p>
                       </td>
 

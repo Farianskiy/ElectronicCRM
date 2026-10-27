@@ -1,4 +1,5 @@
 using ElectronicService.Contracts.Catalog.ImportBatches;
+using ElectronicService.Core.Catalog.ImportBatches.Analysis;
 using ElectronicService.Core.Catalog.ImportBatches.GetCatalogImportRows;
 using ElectronicService.Domain.Catalog.ImportBatches;
 using ElectronicService.Web.Auth;
@@ -33,6 +34,7 @@ public sealed class
     [FromQuery] string? search = null,
     [FromQuery] string? issueCode = null,
     [FromQuery] string? manufacturerGroupKey = null,
+    [FromQuery] CatalogImportRowKnowledgeState? knowledgeState = null,
     [FromQuery] int page = 1,
     [FromQuery] int pageSize = 50)
     {
@@ -49,6 +51,7 @@ public sealed class
             issueCode,
             problemKind,
             manufacturerGroupKey,
+            knowledgeState,
             page,
             pageSize);
 
@@ -76,6 +79,7 @@ public sealed class
                         item.Data.Price,
                         item.Data.StockQuantity,
                         item.Data.Characteristics,
+                        MapOrigins(item.Data.CharacteristicOrigins),
                         item.Data.ProductTypeId,
                         item.Data.ProductTypeResolutionSource,
                         item.Data.ProductTypeResolutionConfidence),
@@ -106,4 +110,25 @@ public sealed class
 
         return Ok(response);
     }
+
+    private static Dictionary<string, CatalogImportCharacteristicOriginResponse> MapOrigins(
+        IReadOnlyDictionary<string, CatalogImportCharacteristicValueOrigin>? origins) =>
+        (origins ?? new Dictionary<string, CatalogImportCharacteristicValueOrigin>(StringComparer.Ordinal))
+        .ToDictionary(
+            item => item.Key,
+            item => new CatalogImportCharacteristicOriginResponse(
+                item.Value.Source.ToString(),
+                item.Value.Confidence,
+                item.Value.RawValue,
+                item.Value.AnalogyConfigurationId,
+                item.Value.AnalogyConfigurationVersion,
+                item.Value.AnalogySupportingProductIds ?? [],
+                item.Value.AnalogyConfigurationHash,
+                item.Value.AnalogyCandidateSnapshotId,
+                item.Value.AnalogyCandidateSnapshotCreatedAtUtc,
+                item.Value.AnalogyFamilyAnchor,
+                item.Value.AnalogySupportingProductCount,
+                item.Value.TrainingExampleIds ?? [],
+                item.Value.TrainingSourceRowIds ?? []),
+            StringComparer.Ordinal);
 }

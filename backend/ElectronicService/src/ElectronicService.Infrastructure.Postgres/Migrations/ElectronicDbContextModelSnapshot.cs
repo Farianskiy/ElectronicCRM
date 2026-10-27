@@ -2074,6 +2074,189 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         });
                 });
 
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Products.CatalogProductAnalogyConfiguration", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("ActivatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("activated_at_utc");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTime?>("EvaluatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("evaluated_at_utc");
+
+                    b.Property<Guid>("ManufacturerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("manufacturer_id");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("ProductTypeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_type_id");
+
+                    b.Property<string>("SettingsHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("settings_hash");
+
+                    b.Property<string>("SettingsJson")
+                        .IsRequired()
+                        .HasMaxLength(32000)
+                        .HasColumnType("character varying(32000)")
+                        .HasColumnName("settings_json");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTime?>("SupersededAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("superseded_at_utc");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<int>("VersionNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("version_number");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("ProductTypeId");
+
+                    b.HasIndex("ManufacturerId", "ProductTypeId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_catalog_product_analogy_configuration_active_scope")
+                        .HasFilter("\"status\" = 'Active'");
+
+                    b.HasIndex("ManufacturerId", "ProductTypeId", "VersionNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ux_catalog_product_analogy_configuration_scope_version");
+
+                    b.ToTable("catalog_product_analogy_configurations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_catalog_product_analogy_configuration_version", "\"version_number\" > 0");
+                        });
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Products.CatalogProductAnalogyEvaluationReport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("BaselineConfigurationHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("baseline_configuration_hash");
+
+                    b.Property<Guid?>("BaselineConfigurationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("baseline_configuration_id");
+
+                    b.Property<int>("CandidateCorrect")
+                        .HasColumnType("integer")
+                        .HasColumnName("candidate_correct");
+
+                    b.Property<int>("CandidateIncorrect")
+                        .HasColumnType("integer")
+                        .HasColumnName("candidate_incorrect");
+
+                    b.Property<string>("CandidateSnapshotId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("candidate_snapshot_id");
+
+                    b.Property<string>("ConfigurationHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("configuration_hash");
+
+                    b.Property<Guid>("ConfigurationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("configuration_id");
+
+                    b.Property<int>("ControlProducts")
+                        .HasColumnType("integer")
+                        .HasColumnName("control_products");
+
+                    b.Property<int>("ControlValues")
+                        .HasColumnType("integer")
+                        .HasColumnName("control_values");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<string>("EvaluatorVersion")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("evaluator_version");
+
+                    b.Property<int>("Improvements")
+                        .HasColumnType("integer")
+                        .HasColumnName("improvements");
+
+                    b.Property<bool>("IsReady")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_ready");
+
+                    b.Property<int>("Regressions")
+                        .HasColumnType("integer")
+                        .HasColumnName("regressions");
+
+                    b.Property<string>("SnapshotJson")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("snapshot_json");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BaselineConfigurationId");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("ConfigurationId", "CreatedAtUtc");
+
+                    b.ToTable("catalog_product_analogy_evaluation_reports", (string)null);
+                });
+
             modelBuilder.Entity("ElectronicService.Domain.Catalog.Products.Product", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2456,6 +2639,27 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<DateTime?>("AnalogyDecisionRecordedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("analogy_decision_recorded_at_utc");
+
+                    b.Property<int>("AnalogyDisplayCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("analogy_display_count");
+
+                    b.Property<DateTime?>("AnalogyLastShownAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("analogy_last_shown_at_utc");
+
+                    b.Property<string>("AnalogyLastStaleReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("analogy_last_stale_reason");
+
+                    b.Property<int>("AnalogyStaleCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("analogy_stale_count");
+
                     b.Property<string>("CharacteristicCodeSnapshot")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -2486,6 +2690,11 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                     b.Property<Guid?>("DictionaryTermId")
                         .HasColumnType("uuid")
                         .HasColumnName("dictionary_term_id");
+
+                    b.Property<string>("EvidenceSnapshotJson")
+                        .HasMaxLength(32000)
+                        .HasColumnType("character varying(32000)")
+                        .HasColumnName("evidence_snapshot_json");
 
                     b.Property<DateTime?>("ExcludedAtUtc")
                         .HasColumnType("timestamp with time zone")
@@ -3888,6 +4097,48 @@ namespace ElectronicService.Infrastructure.Postgres.Migrations
                         .WithMany("Characteristics")
                         .HasForeignKey("ProductTypeId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Products.CatalogProductAnalogyConfiguration", b =>
+                {
+                    b.HasOne("ElectronicService.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ElectronicService.Domain.Catalog.Manufacturers.Manufacturer", null)
+                        .WithMany()
+                        .HasForeignKey("ManufacturerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ElectronicService.Domain.Catalog.ProductTypes.ProductType", null)
+                        .WithMany()
+                        .HasForeignKey("ProductTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ElectronicService.Domain.Catalog.Products.CatalogProductAnalogyEvaluationReport", b =>
+                {
+                    b.HasOne("ElectronicService.Domain.Catalog.Products.CatalogProductAnalogyConfiguration", null)
+                        .WithMany()
+                        .HasForeignKey("BaselineConfigurationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ElectronicService.Domain.Catalog.Products.CatalogProductAnalogyConfiguration", null)
+                        .WithMany()
+                        .HasForeignKey("ConfigurationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_catalog_product_analogy_evaluation_reports_catalog_product~1");
+
+                    b.HasOne("ElectronicService.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

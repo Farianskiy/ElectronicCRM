@@ -412,6 +412,8 @@ public sealed class CatalogComponentCompatibilityController : ControllerBase
             rule.ComponentProductId,
             rule.ComponentArticle,
             rule.ComponentName,
+            rule.ComponentManufacturerId,
+            rule.ComponentManufacturerName,
             rule.MainProductTypeId,
             rule.NeedDefinitionId,
             rule.NeedCode,

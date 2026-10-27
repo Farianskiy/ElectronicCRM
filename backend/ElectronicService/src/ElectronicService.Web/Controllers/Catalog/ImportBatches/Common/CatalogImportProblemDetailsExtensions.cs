@@ -79,6 +79,7 @@ public static class CatalogImportProblemDetailsExtensions
                 or "catalog.import.apply.concurrency_conflict"
                 or "catalog.import.applied_products.unavailable"
                 or "catalog.import.error_report.unavailable"
+                or "catalog.import.example_fill.row_not_ready"
                 => StatusCodes.Status409Conflict,
 
             "catalog.import.file.too_large"

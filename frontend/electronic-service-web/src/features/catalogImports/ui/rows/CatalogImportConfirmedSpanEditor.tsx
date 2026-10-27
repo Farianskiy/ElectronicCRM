@@ -42,6 +42,9 @@ export function CatalogImportConfirmedSpanEditor({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [characteristicId, setCharacteristicId] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [isTrainingDetailsOpen, setIsTrainingDetailsOpen] = useState(
+    Object.keys(drafts).length > 0,
+  );
 
   const query = useQuery({
     queryKey: catalogImportConfirmedSpansQueryKey(batchId, rowId),
@@ -120,21 +123,31 @@ export function CatalogImportConfirmedSpanEditor({
   }
 
   return (
-    <section className="grid gap-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-panel-strong)] p-5">
-      <div>
-        <h3 className="font-semibold text-[var(--app-text)]">
-          Разметка учебного примера
-        </h3>
-        <p className="mt-1 text-sm text-[var(--app-muted)]">
-          Чтобы добавить учебный пример, заполните правильное значение, выберите
-          характеристику и выделите соответствующий фрагмент названия.
+    <details
+      open={isTrainingDetailsOpen}
+      onToggle={(event) => setIsTrainingDetailsOpen(event.currentTarget.open)}
+      className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-panel-strong)]"
+    >
+      <summary className="cursor-pointer list-none px-5 py-4 marker:hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="font-semibold text-[var(--app-text)]">
+              Использовать исправления для обучения
+            </h3>
+            <p className="mt-1 text-sm text-[var(--app-muted)]">
+              Необязательно. Откройте, если исправленная характеристика должна стать учебным примером.
+            </p>
+          </div>
+          <span className="rounded-full bg-[var(--app-surface)] px-2.5 py-1 text-xs text-[var(--app-muted)]">
+            Размечено: {Object.keys(drafts).length}
+          </span>
+        </div>
+      </summary>
+
+      <div className="grid gap-4 border-t border-[var(--app-border)] p-5">
+        <p className="text-sm text-[var(--app-muted)]">
+          Выберите характеристику и выделите в наименовании фрагмент, который подтверждает правильное значение. Для значений по аналогам отдельная разметка не создаётся автоматически.
         </p>
-        <p className="mt-2 text-sm text-[var(--app-muted)]">
-          Кнопка «Сохранить и подтвердить для обучения» сохранит строку и сразу
-          создаст проверенный учебный пример. Обычное сохранение оставит разметку
-          неподтверждённой.
-        </p>
-      </div>
 
       {query.isPending && (
         <p role="status">Загружаем сохранённую разметку...</p>
@@ -328,11 +341,9 @@ export function CatalogImportConfirmedSpanEditor({
       </section>
 
       <p className="text-xs text-[var(--app-muted)]">
-        «Сохранить строку» сохраняет значения товара и разметку фрагмента без
-        обучения. «Сохранить и подтвердить для обучения» сразу создаёт
-        проверенный учебный пример. Подготовка и включение правила по-прежнему
-        выполняются только после отдельной проверки.
+        При сохранении строки включите флажок «Использовать размеченные исправления для обучения», чтобы сразу создать проверенные учебные примеры. Подготовка и включение постоянного правила выполняются отдельно.
       </p>
-    </section>
+      </div>
+    </details>
   );
 }

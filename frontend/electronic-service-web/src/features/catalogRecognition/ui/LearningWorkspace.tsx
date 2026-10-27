@@ -69,6 +69,118 @@ type Overview = {
   pendingSuggestions: number;
   approvedSuggestions: number;
 };
+type AnalogyMetric = {
+  characteristicDefinitionId: string;
+  characteristicCode: string;
+  shown: number;
+  stale: number;
+  awaitingDecision: number;
+  decisions: number;
+  accepted: number;
+  corrected: number;
+  rejected: number;
+  averageSupport: number | null;
+};
+type AnalogyMetrics = {
+  asOfUtc: string;
+  shown: number;
+  stale: number;
+  awaitingDecision: number;
+  decisions: number;
+  accepted: number;
+  corrected: number;
+  rejected: number;
+  averageSupport: number | null;
+  characteristics: AnalogyMetric[];
+  modelVersions: Array<{
+    modelVersion: string;
+    shown: number;
+    decisions: number;
+    lastDecisionAtUtc: string;
+  }>;
+};
+type AnalogyMode = "Off" | "Shadow" | "Suggest" | "AutoFill";
+
+const variantAnalogyCharacteristicCodes = new Set([
+  "RATEDCURRENT",
+  "RATED_CURRENT",
+  "NOMINALCURRENT",
+  "NOMINAL_CURRENT",
+  "DIAPASONSRABATVANIA",
+  "DIAPASON_SRABATVANIA",
+  "TRIPRANGE",
+  "POLES",
+  "POLECOUNT",
+  "POLE_COUNT",
+  "LEAKAGECURRENT",
+  "LEAKAGE_CURRENT",
+  "RESIDUALCURRENT",
+  "RESIDUAL_CURRENT",
+  "BREAKINGCAPACITY",
+  "BREAKING_CAPACITY",
+]);
+
+function isVariantAnalogyCharacteristic(code: string): boolean {
+  const normalized = Array.from(code.trim().toUpperCase())
+    .filter((character) => /[\p{L}\p{N}_]/u.test(character))
+    .join("");
+  return variantAnalogyCharacteristicCodes.has(normalized);
+}
+type AnalogySettings = {
+  minimumSupportingProducts: number;
+  minimumProductsWithCharacteristic: number;
+  minimumSupportRatio: number;
+  maximumAlternativeValues: number;
+  maximumCandidatePoolSize: number;
+  characteristics: Record<string, {
+    mode: AnalogyMode;
+    minimumSupportingProducts: number | null;
+    minimumSupportRatio: number | null;
+  }>;
+};
+type AnalogyConfiguration = {
+  id: string | null;
+  versionNumber: number | null;
+  name: string;
+  status: string;
+  settingsHash: string;
+  isSystem: boolean;
+  settings: AnalogySettings;
+  createdAtUtc: string | null;
+  updatedAtUtc: string | null;
+  version: number | null;
+};
+type AnalogyConfigurationWorkspace = {
+  active: AnalogyConfiguration;
+  versions: AnalogyConfiguration[];
+};
+type AnalogyEvaluationReport = {
+  id: string;
+  configurationId: string;
+  createdAtUtc: string;
+  controlProducts: number;
+  controlValues: number;
+  improvements: number;
+  regressions: number;
+  candidateCorrect: number;
+  candidateIncorrect: number;
+  isReady: boolean;
+  isCurrent: boolean;
+  blockingReasons: string[];
+};
+type AnalogyEvaluationReportDetail = {
+  report: AnalogyEvaluationReport;
+  rows: Array<{
+    productId: string;
+    productName: string;
+    characteristicCode: string;
+    expectedValue: string;
+    baselineValue: string | null;
+    candidateValue: string | null;
+    baselineCorrect: boolean;
+    candidateCorrect: boolean;
+  }>;
+};
 type Navigate = (values: Record<string, string | undefined>) => void;
 
 function useWorkspace<T>(
@@ -393,6 +505,7 @@ function ScopedWorkspace({
     ["examples", "Мои подтверждения"],
     ["rules", "Правила"],
     ["dictionary", "Словарь"],
+    ["analogies", "Аналогии"],
     ["reports", "Мои отчёты"],
     ["current", "Действует сейчас"],
   ];
@@ -554,6 +667,12 @@ function ScopedWorkspace({
               {branch === "dictionary" && (
                 <Dictionary scope={scope} navigate={navigate} />
               )}
+              {branch === "analogies" && (
+                <AnalogyMetricsPanel
+                  scope={scope}
+                  productTypeCode={overview.data.productTypeCode}
+                />
+              )}
               {branch === "reports" && (
                 <Reports scope={scope} navigate={navigate} />
               )}
@@ -573,6 +692,505 @@ function ScopedWorkspace({
         </>
       )}
     </>
+  );
+}
+
+function AnalogyMetricsPanel({
+  scope,
+  productTypeCode,
+}: {
+  scope: Scope;
+  productTypeCode: string;
+}) {
+  const metrics = useWorkspace<AnalogyMetrics>(scope, "analogyMetrics");
+
+  if (metrics.isPending) {
+    return <p role="status">Собираем метрики решений по аналогам…</p>;
+  }
+
+  if (metrics.isError || !metrics.data) {
+    return <ErrorNotice error={metrics.error} />;
+  }
+
+  const data = metrics.data;
+  const exactAcceptance = data.decisions
+    ? Math.round((data.accepted / data.decisions) * 100)
+    : 0;
+
+  return (
+    <div className="grid gap-5">
+    <AnalogyConfigurationPanel scope={scope} productTypeCode={productTypeCode} />
+    <section className="grid gap-5 rounded-xl border border-[var(--app-border)] p-4">
+      <div>
+        <h3 className="font-semibold">Качество предложений по аналогам</h3>
+        <p className="mt-1 text-sm text-[var(--app-muted)]">
+          Здесь учитываются показы и сохранённые решения пользователей.
+          Повторный показ того же предложения не создаёт дубликат.
+        </p>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard label="Показано" value={data.shown.toString()} />
+        <MetricCard label="Всего решений" value={data.decisions.toString()} />
+        <MetricCard label="Принято" value={data.accepted.toString()} />
+        <MetricCard label="Исправлено" value={data.corrected.toString()} />
+        <MetricCard label="Отклонено" value={data.rejected.toString()} />
+        <MetricCard
+          label="Ожидают решения"
+          value={data.awaitingDecision.toString()}
+        />
+        <MetricCard label="Устарело" value={data.stale.toString()} />
+        <MetricCard label="Принято без изменений" value={`${exactAcceptance}%`} />
+      </div>
+
+      <p className="text-sm text-[var(--app-muted)]">
+        Средняя поддержка похожими товарами: {data.averageSupport == null
+          ? "нет данных"
+          : `${Math.round(data.averageSupport * 100)}%`}. Отчёт на {new Date(
+            data.asOfUtc,
+          ).toLocaleString("ru-RU")}.
+      </p>
+
+      <div className="grid gap-3">
+        <h4 className="font-semibold">По характеристикам</h4>
+        {data.characteristics.length === 0 ? (
+          <p className="text-sm text-[var(--app-muted)]">
+            По выбранной области ещё нет сохранённых решений.
+          </p>
+        ) : (
+          data.characteristics.map((item) => (
+            <article
+              key={item.characteristicDefinitionId}
+              className="rounded-xl border border-[var(--app-border)] p-4"
+            >
+              <p className="font-medium">{item.characteristicCode}</p>
+              <p className="mt-1 text-sm text-[var(--app-muted)]">
+                Показано: {item.shown}; решений: {item.decisions}; ожидают решения:{" "}
+                {item.awaitingDecision}; устарело: {item.stale}; принято:{" "}
+                {item.accepted}; исправлено: {item.corrected}; отклонено:{" "}
+                {item.rejected}; средняя поддержка:{" "}
+                {item.averageSupport == null
+                  ? "нет данных"
+                  : `${Math.round(item.averageSupport * 100)}%`}.
+              </p>
+            </article>
+          ))
+        )}
+      </div>
+
+      {data.modelVersions.length > 0 && (
+        <details>
+          <summary className="cursor-pointer font-medium">
+            Версии алгоритма
+          </summary>
+          <div className="mt-3 grid gap-2 text-sm text-[var(--app-muted)]">
+            {data.modelVersions.map((item) => (
+              <p key={item.modelVersion}>
+                {item.modelVersion}: показано {item.shown}, решений:{" "}
+                {item.decisions}, последнее {new Date(
+                  item.lastDecisionAtUtc,
+                ).toLocaleString("ru-RU")}
+              </p>
+            ))}
+          </div>
+        </details>
+      )}
+    </section>
+    </div>
+  );
+}
+
+function AnalogyConfigurationPanel({
+  scope,
+  productTypeCode,
+}: {
+  scope: Scope;
+  productTypeCode: string;
+}) {
+  const client = useQueryClient();
+  const query = useQuery({
+    queryKey: ["catalog-analogy-configurations", scope],
+    queryFn: async ({ signal }) =>
+      (await httpClient.get<AnalogyConfigurationWorkspace>(
+        "/api/catalog/products/analogies/configurations",
+        { params: scope, signal },
+      )).data,
+    retry: false,
+  });
+  const characteristics = useQuery({
+    queryKey: ["catalog-product-type-characteristics", productTypeCode],
+    queryFn: () => getCatalogProductTypeCharacteristics(productTypeCode),
+    enabled: Boolean(productTypeCode),
+  });
+  const [name, setName] = useState("Новая настройка аналогов");
+  const [settings, setSettings] = useState<AnalogySettings | null>(null);
+  const [editing, setEditing] = useState<AnalogyConfiguration | null>(null);
+  const currentSettings = settings ?? query.data?.active.settings ?? null;
+
+  const save = useMutation({
+    mutationFn: async () => {
+      if (!currentSettings) return;
+      const body = {
+        name,
+        settings: currentSettings,
+        expectedVersion: editing?.version ?? undefined,
+      };
+      if (editing?.id) {
+        await httpClient.put(
+          `/api/catalog/products/analogies/configurations/${editing.id}`,
+          body,
+        );
+      } else {
+        await httpClient.post(
+          "/api/catalog/products/analogies/configurations",
+          body,
+          { params: scope },
+        );
+      }
+    },
+    onSuccess: async () => {
+      setEditing(null);
+      await client.invalidateQueries({
+        queryKey: ["catalog-analogy-configurations", scope],
+      });
+    },
+  });
+
+  if (query.isPending) return <p>Загружаем настройки аналогов…</p>;
+  if (query.isError || !query.data || !currentSettings) {
+    return <ErrorNotice error={query.error} />;
+  }
+
+  const active = query.data.active;
+  const numberField = (
+    label: string,
+    key: keyof Pick<AnalogySettings,
+      "minimumSupportingProducts" | "minimumProductsWithCharacteristic" |
+      "minimumSupportRatio" | "maximumAlternativeValues" | "maximumCandidatePoolSize">,
+    step = "1",
+  ) => (
+    <label className="grid gap-1 text-sm">
+      <span>{label}</span>
+      <input
+        className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] px-3 py-2"
+        type="number"
+        step={step}
+        value={currentSettings[key]}
+        onChange={(event) => setSettings({ ...currentSettings, [key]: Number(event.target.value) })}
+      />
+    </label>
+  );
+
+  return (
+    <section className="grid gap-4 rounded-xl border border-[var(--app-border)] p-4">
+      <div>
+        <h3 className="font-semibold">Настройки предложений по похожим товарам</h3>
+        <p className="mt-1 text-sm text-[var(--app-muted)]">
+          Сейчас используется: {active.name}{active.versionNumber ? ` · версия ${active.versionNumber}` : ""}.
+          Черновик не меняет импорт и распознавание, пока не пройдёт оценку и выпуск.
+        </p>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        {numberField("Минимум подтверждений", "minimumSupportingProducts")}
+        {numberField("Товаров с характеристикой", "minimumProductsWithCharacteristic")}
+        {numberField("Минимальное согласие", "minimumSupportRatio", "0.01")}
+        {numberField("Вариантов в отчёте", "maximumAlternativeValues")}
+        {numberField("Размер выборки", "maximumCandidatePoolSize")}
+      </div>
+
+      <label className="grid gap-1 text-sm">
+        <span>Название версии</span>
+        <input
+          className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] px-3 py-2"
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+        />
+      </label>
+
+      <div className="grid gap-2">
+        <h4 className="font-medium">Режимы характеристик</h4>
+        <p className="text-sm text-[var(--app-muted)]">
+          Off отключает предложение, Shadow только считает результат, Suggest показывает его пользователю. AutoFill начинает заполнять только пустые поля после оценки и выпуска версии. Номиналы конкретной модели защищены от AutoFill на сервере.
+        </p>
+        {characteristics.data?.map((item) => {
+          const current = currentSettings.characteristics[item.code]?.mode ?? "Suggest";
+          const isVariantCharacteristic = isVariantAnalogyCharacteristic(item.code);
+          return (
+            <div key={item.id} className="grid items-end gap-2 rounded-xl border border-[var(--app-border)] p-3 lg:grid-cols-[1fr_190px_180px_180px]">
+              <span>{item.name} · {item.code}</span>
+              <AppSelect
+                ariaLabel={`Режим ${item.name}`}
+                value={current}
+                options={[
+                  { value: "Off", label: "Выключено" },
+                  { value: "Shadow", label: "Только наблюдение" },
+                  { value: "Suggest", label: "Предлагать" },
+                  {
+                    value: "AutoFill",
+                    label: isVariantCharacteristic
+                      ? "Автозаполнение запрещено для номинала"
+                      : "Автозаполнение после выпуска",
+                    disabled: isVariantCharacteristic,
+                  },
+                ]}
+                onChange={(mode) => setSettings({
+                  ...currentSettings,
+                  characteristics: {
+                    ...currentSettings.characteristics,
+                    [item.code]: {
+                      ...(currentSettings.characteristics[item.code] ?? {
+                        minimumSupportingProducts: null,
+                        minimumSupportRatio: null,
+                      }),
+                      mode: mode as AnalogyMode,
+                    },
+                  },
+                })}
+              />
+              {isVariantCharacteristic && (
+                <p className="text-xs text-amber-200 lg:col-span-4">
+                  Это параметр конкретной модели. Аналоги могут показать предложение, но не заполняют его автоматически.
+                </p>
+              )}
+              <label className="grid gap-1 text-xs">
+                <span>Минимум подтверждений</span>
+                <input
+                  className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] px-3 py-2"
+                  type="number"
+                  placeholder={`${currentSettings.minimumSupportingProducts}`}
+                  value={currentSettings.characteristics[item.code]?.minimumSupportingProducts ?? ""}
+                  onChange={(event) => {
+                    const existing = currentSettings.characteristics[item.code];
+                    setSettings({
+                      ...currentSettings,
+                      characteristics: {
+                        ...currentSettings.characteristics,
+                        [item.code]: {
+                          mode: existing?.mode ?? "Suggest",
+                          minimumSupportRatio: existing?.minimumSupportRatio ?? null,
+                          minimumSupportingProducts: event.target.value
+                            ? Number(event.target.value)
+                            : null,
+                        },
+                      },
+                    });
+                  }}
+                />
+              </label>
+              <label className="grid gap-1 text-xs">
+                <span>Минимальное согласие</span>
+                <input
+                  className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] px-3 py-2"
+                  type="number"
+                  step="0.01"
+                  placeholder={`${currentSettings.minimumSupportRatio}`}
+                  value={currentSettings.characteristics[item.code]?.minimumSupportRatio ?? ""}
+                  onChange={(event) => {
+                    const existing = currentSettings.characteristics[item.code];
+                    setSettings({
+                      ...currentSettings,
+                      characteristics: {
+                        ...currentSettings.characteristics,
+                        [item.code]: {
+                          mode: existing?.mode ?? "Suggest",
+                          minimumSupportingProducts: existing?.minimumSupportingProducts ?? null,
+                          minimumSupportRatio: event.target.value
+                            ? Number(event.target.value)
+                            : null,
+                        },
+                      },
+                    });
+                  }}
+                />
+              </label>
+            </div>
+          );
+        })}
+      </div>
+
+      <ErrorNotice error={save.error} />
+      <AppButton loading={save.isPending} onClick={() => save.mutate()}>
+        {editing ? "Сохранить черновик" : "Создать новую версию-черновик"}
+      </AppButton>
+
+      {query.data.versions.length > 0 && (
+        <div className="grid gap-2">
+          <h4 className="font-medium">Сохранённые версии</h4>
+          {query.data.versions.map((version) => (
+            <AnalogyVersionReleaseCard
+              key={version.id}
+              version={version}
+              scope={scope}
+              onEdit={() => {
+                setEditing(version);
+                setName(version.name);
+                setSettings(structuredClone(version.settings));
+              }}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function AnalogyVersionReleaseCard({
+  version,
+  scope,
+  onEdit,
+}: {
+  version: AnalogyConfiguration;
+  scope: Scope;
+  onEdit: () => void;
+}) {
+  const client = useQueryClient();
+  const [confirmed, setConfirmed] = useState(false);
+  const reports = useQuery({
+    queryKey: ["catalog-analogy-evaluation-reports", version.id],
+    queryFn: async ({ signal }) =>
+      (await httpClient.get<AnalogyEvaluationReport[]>(
+        `/api/catalog/products/analogies/configurations/${version.id}/evaluation-reports`,
+        { signal },
+      )).data,
+    enabled: Boolean(version.id),
+    retry: false,
+  });
+  const refresh = async () => {
+    await Promise.all([
+      client.invalidateQueries({ queryKey: ["catalog-analogy-configurations", scope] }),
+      client.invalidateQueries({ queryKey: ["catalog-analogy-evaluation-reports", version.id] }),
+    ]);
+  };
+  const evaluate = useMutation({
+    mutationFn: () => httpClient.post(
+      `/api/catalog/products/analogies/configurations/${version.id}/evaluation`,
+    ),
+    onSettled: refresh,
+  });
+  const clone = useMutation({
+    mutationFn: () => httpClient.post(
+      `/api/catalog/products/analogies/configurations/${version.id}/clone`,
+    ),
+    onSettled: refresh,
+  });
+  const latest = reports.data?.[0];
+  const activate = useMutation({
+    mutationFn: () => httpClient.post(
+      `/api/catalog/products/analogies/configurations/${version.id}/activate`,
+      {
+        reportId: latest?.id,
+        expectedVersion: version.version,
+        confirmed,
+      },
+    ),
+    onSuccess: async () => {
+      setConfirmed(false);
+      await refresh();
+    },
+  });
+
+  return (
+    <article className="grid gap-3 rounded-xl border border-[var(--app-border)] p-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <span>Версия {version.versionNumber}: {version.name} · {version.status}</span>
+        <div className="flex flex-wrap gap-2">
+          {version.status === "Draft" && (
+            <AppButton variant="secondary" onClick={onEdit}>Редактировать</AppButton>
+          )}
+          {(version.status === "Draft" || version.status === "Evaluated") && (
+            <AppButton loading={evaluate.isPending} onClick={() => evaluate.mutate()}>
+              {version.status === "Evaluated" ? "Оценить повторно" : "Оценить версию"}
+            </AppButton>
+          )}
+          {(version.status === "Active" || version.status === "Superseded") && (
+            <AppButton variant="secondary" loading={clone.isPending} onClick={() => clone.mutate()}>
+              Создать новый черновик на основе
+            </AppButton>
+          )}
+        </div>
+      </div>
+      <ErrorNotice error={evaluate.error ?? clone.error ?? reports.error ?? activate.error} />
+      {latest && (
+        <div className="grid gap-2 rounded-xl bg-[var(--app-surface)] p-3 text-sm">
+          <p>
+            Отчёт от {new Date(latest.createdAtUtc).toLocaleString("ru-RU")} ·
+            товаров: {latest.controlProducts}; значений: {latest.controlValues};
+            улучшений: {latest.improvements}; регрессий: {latest.regressions}.
+          </p>
+          <p>
+            Правильных предложений: {latest.candidateCorrect}; неправильных: {latest.candidateIncorrect}.
+            {latest.isCurrent ? " Отчёт актуален." : " Отчёт устарел."}
+          </p>
+          {latest.blockingReasons.map((reason) => (
+            <p key={reason} className="text-amber-300">{reason}</p>
+          ))}
+          <AnalogyEvaluationDetails reportId={latest.id} />
+          {version.status === "Evaluated" && latest.isReady && latest.isCurrent && (
+            <>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={confirmed}
+                  onChange={(event) => setConfirmed(event.target.checked)}
+                />
+                Результаты проверены. Подтверждаю замену действующей версии.
+              </label>
+              <AppButton
+                loading={activate.isPending}
+                disabled={!confirmed || version.version == null}
+                onClick={() => activate.mutate()}
+              >
+                Включить эту версию
+              </AppButton>
+            </>
+          )}
+        </div>
+      )}
+    </article>
+  );
+}
+
+function AnalogyEvaluationDetails({ reportId }: { reportId: string }) {
+  const [open, setOpen] = useState(false);
+  const query = useQuery({
+    queryKey: ["catalog-analogy-evaluation-report", reportId],
+    queryFn: async ({ signal }) =>
+      (await httpClient.get<AnalogyEvaluationReportDetail>(
+        `/api/catalog/products/analogies/configurations/evaluation-reports/${reportId}`,
+        { signal },
+      )).data,
+    enabled: open,
+    retry: false,
+  });
+  return (
+    <details onToggle={(event) => setOpen(event.currentTarget.open)}>
+      <summary className="cursor-pointer font-medium">Показать контрольные результаты</summary>
+      <div className="mt-2 grid gap-2">
+        {query.isPending && <p>Загружаем сохранённый снимок…</p>}
+        <ErrorNotice error={query.error} />
+        {query.data?.rows.slice(0, 50).map((row) => (
+          <div key={`${row.productId}-${row.characteristicCode}`} className="rounded-lg border border-[var(--app-border)] p-2">
+            <p>{row.productName} · {row.characteristicCode}</p>
+            <p className="text-[var(--app-muted)]">
+              Ожидалось: {row.expectedValue}; было: {row.baselineValue ?? "нет предложения"}; стало: {row.candidateValue ?? "нет предложения"}.
+            </p>
+          </div>
+        ))}
+        {query.data && query.data.rows.length > 50 && (
+          <p>Показаны первые 50 из {query.data.rows.length} результатов.</p>
+        )}
+      </div>
+    </details>
+  );
+}
+
+function MetricCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
+      <p className="text-xs text-[var(--app-muted)]">{label}</p>
+      <p className="mt-1 text-2xl font-semibold">{value}</p>
+    </div>
   );
 }
 

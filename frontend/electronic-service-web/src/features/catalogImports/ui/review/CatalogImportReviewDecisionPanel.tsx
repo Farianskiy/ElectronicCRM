@@ -8,6 +8,7 @@ import { applyCatalogImportBatch } from "../../api/applyCatalogImportBatch";
 import { rejectCatalogImportBatch } from "../../api/rejectCatalogImportBatch";
 import { requestCatalogImportChanges } from "../../api/requestCatalogImportChanges";
 import { catalogImportQueryKeys } from "../../model/queryKeys";
+import { getCatalogImportApplyDescription } from "../../model/catalogImportMode";
 import type { CatalogImportMode } from "../../model/types";
 
 interface CatalogImportReviewDecisionPanelProps {
@@ -17,6 +18,8 @@ interface CatalogImportReviewDecisionPanelProps {
   rowsCount: number;
   validRowsCount: number;
   errorRowsCount: number;
+  plannedCreateProductsCount: number;
+  plannedUpdateProductsCount: number;
   canRequestChanges: boolean;
   canReject: boolean;
   canApply: boolean;
@@ -48,6 +51,8 @@ export function CatalogImportReviewDecisionPanel({
   rowsCount,
   validRowsCount,
   errorRowsCount,
+  plannedCreateProductsCount,
+  plannedUpdateProductsCount,
   canRequestChanges,
   canReject,
   canApply,
@@ -203,10 +208,10 @@ export function CatalogImportReviewDecisionPanel({
           `Применить пакет «${originalFileName}» к каталогу?`,
           "",
           `Будет обработано строк: ${validRowsCount}`,
-          importMode === "CreateOnly"
-            ? "Будут созданы только новые товары. Существующий артикул остановит применение пакета."
-            : "Будут обновлены только характеристики существующих товаров. Отсутствующий артикул остановит применение пакета.",
-          importMode === "UpdateCharacteristicsOnly"
+          `Будет создано товаров: ${plannedCreateProductsCount}`,
+          `Будут проверены для обновления характеристик: ${plannedUpdateProductsCount}`,
+          getCatalogImportApplyDescription(importMode),
+          importMode !== "CreateOnly"
             ? "Название, цена, остаток и характеристики, которых нет в Excel, останутся без изменений."
             : "",
           "",
@@ -266,7 +271,7 @@ export function CatalogImportReviewDecisionPanel({
         {canApply && (
           <DecisionCard
             title="Применить в каталог"
-            description="Все валидные строки будут превращены в новые товары рабочего каталога."
+            description={getCatalogImportApplyDescription(importMode)}
             selected={selectedAction === "apply"}
             disabled={isBusy}
             buttonLabel="Выбрать применение"
@@ -343,12 +348,12 @@ export function CatalogImportReviewDecisionPanel({
                 </h3>
 
                 <p className="mt-1 text-sm leading-6 text-slate-400">
-                  Backend создаст товары, значения характеристик и записи аудита
-                  в одной транзакции.
+                  Товары, характеристики и записи аудита будут сохранены в одной
+                  транзакции.
                 </p>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
                 <SummaryCard label="Всего строк" value={rowsCount} />
 
                 <SummaryCard
@@ -364,6 +369,18 @@ export function CatalogImportReviewDecisionPanel({
                     errorRowsCount > 0 ? "text-red-300" : "text-white"
                   }
                 />
+
+                <SummaryCard
+                  label="Будет создано"
+                  value={plannedCreateProductsCount}
+                  valueClassName="text-cyan-300"
+                />
+
+                <SummaryCard
+                  label="На обновление"
+                  value={plannedUpdateProductsCount}
+                  valueClassName="text-amber-300"
+                />
               </div>
 
               {errorRowsCount > 0 && (
@@ -375,8 +392,9 @@ export function CatalogImportReviewDecisionPanel({
               )}
 
               <div className="rounded-2xl border border-amber-500/30 bg-amber-500/[0.07] p-4 text-sm leading-6 text-amber-100">
-                Проверьте артикулы особенно внимательно. Существующий в каталоге
-                артикул остановит всё применение, а не только одну строку.
+                {getCatalogImportApplyDescription(importMode)} Название, цена и
+                остаток существующих товаров не изменяются. Товар определяется
+                по паре «производитель + артикул».
               </div>
             </div>
           )}

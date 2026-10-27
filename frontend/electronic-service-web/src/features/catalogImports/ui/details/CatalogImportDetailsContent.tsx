@@ -12,7 +12,10 @@ import { catalogImportQueryKeys } from "../../model/queryKeys";
 import { CatalogImportDiagnostics } from "./CatalogImportDiagnostics";
 import { CatalogImportBatchHistory } from "../history";
 import { CatalogImportMappingEditor } from "../mapping";
-import { CatalogImportAppliedProducts } from "../results";
+import {
+  CatalogImportAppliedProducts,
+  CatalogImportCompatibilityRules,
+} from "../results";
 import {
   CatalogImportReviewDecisionPanel,
   CatalogImportReviewPanel,
@@ -129,6 +132,8 @@ export function CatalogImportDetailsContent({
             rowsCount={batch.rowsCount}
             validRowsCount={batch.validRowsCount}
             errorRowsCount={batch.errorRowsCount}
+            plannedCreateProductsCount={batch.plannedCreateProductsCount}
+            plannedUpdateProductsCount={batch.plannedUpdateProductsCount}
             canRequestChanges={batch.canRequestChanges}
             canReject={batch.canReject}
             canApply={batch.canApply}
@@ -191,7 +196,12 @@ export function CatalogImportDetailsContent({
     views.push({
       id: "import-products",
       label: "Результат",
-      content: <CatalogImportAppliedProducts batchId={batch.batchId} />,
+      content: (
+        <>
+          <CatalogImportAppliedProducts batchId={batch.batchId} />
+          <CatalogImportCompatibilityRules batchId={batch.batchId} />
+        </>
+      ),
     });
   }
 

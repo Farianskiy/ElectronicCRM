@@ -97,6 +97,8 @@ export interface ComponentCompatibilityRule {
   componentProductId: string;
   componentArticle: string;
   componentName: string;
+  componentManufacturerId: string;
+  componentManufacturerName: string;
   mainProductTypeId: string;
   needDefinitionId: string | null;
   needCode: string | null;
@@ -126,7 +128,8 @@ export type ComponentCompatibilityImportRowStatus =
   | "Duplicate"
   | "WillCreate"
   | "WillUpdate"
-  | "Unchanged";
+  | "Unchanged"
+  | "RequiresConfirmation";
 
 export interface ComponentCompatibilityImportConstraint {
   characteristicDefinitionId: string;

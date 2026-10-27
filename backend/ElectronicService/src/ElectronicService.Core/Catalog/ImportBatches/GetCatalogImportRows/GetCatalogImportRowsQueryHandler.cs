@@ -195,29 +195,63 @@ public sealed class
 
         var skip = (int)skipLong;
 
-        var rows = await _importBatchRepository
-            .GetRowsAsync(
-                query.BatchId,
-                query.Status,
-                search,
-                issueCode,
-                query.ProblemKind,
-                manufacturerGroupKey,
-                skip,
-                query.PageSize,
-                cancellationToken)
-            .ConfigureAwait(false);
+        IReadOnlyCollection<CatalogImportRow> rows;
+        int totalCount;
 
-        var totalCount = await _importBatchRepository
-            .CountRowsAsync(
-                query.BatchId,
-                query.Status,
-                search,
-                issueCode,
-                query.ProblemKind,
-                manufacturerGroupKey,
-                cancellationToken)
-            .ConfigureAwait(false);
+        if (query.KnowledgeState.HasValue)
+        {
+            rows = await _importBatchRepository
+                .GetRowsByKnowledgeStateAsync(
+                    query.BatchId,
+                    query.Status,
+                    search,
+                    issueCode,
+                    query.ProblemKind,
+                    manufacturerGroupKey,
+                    query.KnowledgeState.Value,
+                    skip,
+                    query.PageSize,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            totalCount = await _importBatchRepository
+                .CountRowsByKnowledgeStateAsync(
+                    query.BatchId,
+                    query.Status,
+                    search,
+                    issueCode,
+                    query.ProblemKind,
+                    manufacturerGroupKey,
+                    query.KnowledgeState.Value,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        else
+        {
+            rows = await _importBatchRepository
+                .GetRowsAsync(
+                    query.BatchId,
+                    query.Status,
+                    search,
+                    issueCode,
+                    query.ProblemKind,
+                    manufacturerGroupKey,
+                    skip,
+                    query.PageSize,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            totalCount = await _importBatchRepository
+                .CountRowsAsync(
+                    query.BatchId,
+                    query.Status,
+                    search,
+                    issueCode,
+                    query.ProblemKind,
+                    manufacturerGroupKey,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
 
         var items =
             new List<GetCatalogImportRowResult>(

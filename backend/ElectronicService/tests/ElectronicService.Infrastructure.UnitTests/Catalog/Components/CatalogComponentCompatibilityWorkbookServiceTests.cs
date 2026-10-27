@@ -26,10 +26,17 @@ public sealed class CatalogComponentCompatibilityWorkbookServiceTests
         var rules = workbook.Worksheet("Правила совместимости");
 
         Assert.Equal("Артикул комплектующего", rules.Cell(1, 1).GetString());
-        Assert.Equal("Тип основного товара", rules.Cell(1, 2).GetString());
-        Assert.Equal("Потребность", rules.Cell(1, 3).GetString());
-        Assert.Equal("Активно", rules.Cell(1, 4).GetString());
-        Assert.Equal("Да", rules.Cell(2, 4).GetString());
+        Assert.Equal("Наименование комплектующего", rules.Cell(1, 2).GetString());
+        Assert.Equal("Производитель комплектующего", rules.Cell(1, 3).GetString());
+        Assert.Equal("Тип основного товара", rules.Cell(1, 4).GetString());
+        Assert.Equal("Потребность", rules.Cell(1, 5).GetString());
+        Assert.Equal("Активно", rules.Cell(1, 6).GetString());
+        Assert.Equal("Да", rules.Cell(2, 6).GetString());
+        var products = workbook.Worksheet("Товары");
+        Assert.Equal("Производитель", products.Cell(1, 1).GetString());
+        Assert.Equal("Артикул", products.Cell(1, 2).GetString());
+        Assert.Equal("Наименование", products.Cell(1, 3).GetString());
+        Assert.Equal("Назначение товара", products.Cell(1, 4).GetString());
         Assert.True(workbook.TryGetWorksheet("Инструкция", out _));
     }
 
@@ -67,6 +74,36 @@ public sealed class CatalogComponentCompatibilityWorkbookServiceTests
 
         Assert.True(result.IsFailure);
         Assert.Contains("Тип основного товара", result.Error.Message, StringComparison.Ordinal);
+        Assert.Contains("Потребность", result.Error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PreviewUsesCompatibilityWorksheetFromUnifiedWorkbook()
+    {
+        var service = new CatalogComponentCompatibilityWorkbookService(null!);
+        using var workbook = new XLWorkbook();
+        workbook.Worksheets.Add("Товары").Cell(1, 1).Value = "Артикул";
+        var rules = workbook.Worksheets.Add("Совместимость");
+        rules.Cell(1, 1).Value = "Артикул комплектующего";
+        rules.Cell(1, 2).Value = "Тип основного товара";
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        stream.Position = 0;
+
+        var result = await service.PreviewAsync(
+            stream,
+            TestContext.Current.CancellationToken);
+
+        Assert.True(result.IsFailure);
+        Assert.DoesNotContain(
+            "Артикул комплектующего",
+            result.Error.Message,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "Тип основного товара",
+            result.Error.Message,
+            StringComparison.Ordinal);
         Assert.Contains("Потребность", result.Error.Message, StringComparison.Ordinal);
     }
 }

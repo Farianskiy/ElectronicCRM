@@ -11,6 +11,8 @@ public sealed record GetCatalogImportBatchResponse(
     int RowsCount,
     int ValidRowsCount,
     int ErrorRowsCount,
+    int PlannedCreateProductsCount,
+    int PlannedUpdateProductsCount,
     DateTime CreatedAtUtc,
     DateTime? UpdatedAtUtc,
     DateTime? SubmittedAtUtc,

@@ -12,5 +12,7 @@ public enum CatalogRecognitionFeedbackType
 
     AddedManually = 4,
 
-    ConflictResolved = 5
+    ConflictResolved = 5,
+
+    Shown = 6
 }

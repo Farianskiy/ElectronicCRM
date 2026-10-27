@@ -1,5 +1,6 @@
 using System.Text.Json;
 using CSharpFunctionalExtensions;
+using ElectronicService.Core.Catalog.Products.Analogies;
 using ElectronicService.Core.Catalog.ProductTypes.Suggestions;
 using ElectronicService.Domain.Catalog.ImportBatches;
 using ElectronicService.Domain.Catalog.ProductTypes;
@@ -20,13 +21,16 @@ public sealed class CatalogImportProductTypeAssignmentService
 
     private readonly ICatalogProductTypeSuggestionService
         _suggestionService;
+    private readonly ICatalogProductAnalogyReader? _analogyReader;
 
     public CatalogImportProductTypeAssignmentService(
-        ICatalogProductTypeSuggestionService suggestionService)
+        ICatalogProductTypeSuggestionService suggestionService,
+        ICatalogProductAnalogyReader? analogyReader = null)
     {
         ArgumentNullException.ThrowIfNull(suggestionService);
 
         _suggestionService = suggestionService;
+        _analogyReader = analogyReader;
     }
 
     public async Task<
@@ -46,6 +50,9 @@ public sealed class CatalogImportProductTypeAssignmentService
         }
 
         CatalogProductTypeSuggestionIndex? suggestionIndex = null;
+        var analogySnapshots = new Dictionary<
+            Guid,
+            CatalogProductAnalogyCandidateSnapshot>();
 
         if (batchProductType is null)
         {
@@ -99,16 +106,30 @@ public sealed class CatalogImportProductTypeAssignmentService
             }
             else
             {
+                var productTypeEvidence = string.IsNullOrWhiteSpace(
+                    data.RequestedProductType)
+                    ? data.Name
+                    : data.RequestedProductType;
                 var suggestion = suggestionIndex!.Suggest(
-                    data.Name,
+                    productTypeEvidence,
                     cancellationToken);
 
                 var candidate = suggestion.SelectedCandidate;
+                var analogyProposal = candidate is not null
+                                      && suggestion.IsSuggested
+                                      && candidate.Confidence >= MinimumAutomaticConfidence
+                    ? null
+                    : await TryResolveFromCatalogExamplesAsync(
+                            data,
+                            analogySnapshots,
+                            cancellationToken)
+                        .ConfigureAwait(false);
 
-                if (!suggestion.IsSuggested
-                    || candidate is null
-                    || candidate.Confidence
-                        < MinimumAutomaticConfidence)
+                if (analogyProposal is null
+                    && (!suggestion.IsSuggested
+                        || candidate is null
+                        || candidate.Confidence
+                            < MinimumAutomaticConfidence))
                 {
                     var issueCode = "product_type.not_resolved";
                     var issueMessage =
@@ -159,10 +180,24 @@ public sealed class CatalogImportProductTypeAssignmentService
                     continue;
                 }
 
-                productTypeId = candidate.ProductTypeId;
-                productTypeName = candidate.ProductTypeName;
-                resolutionSource = "Automatic";
-                resolutionConfidence = candidate.Confidence;
+                if (analogyProposal is not null)
+                {
+                    productTypeId = analogyProposal.ProductTypeId;
+                    productTypeName = analogyProposal.ProductTypeName;
+                    resolutionSource = "CatalogAnalogy";
+                    resolutionConfidence = analogyProposal.SupportRatio;
+                }
+                else
+                {
+                    productTypeId = candidate!.ProductTypeId;
+                    productTypeName = candidate.ProductTypeName;
+                    resolutionSource = string.IsNullOrWhiteSpace(
+                        data.RequestedProductType)
+                        ? "Automatic"
+                        : "ExcelProductType";
+                    resolutionConfidence = candidate.Confidence;
+                }
+
                 automaticallyResolved = true;
             }
 
@@ -196,12 +231,40 @@ public sealed class CatalogImportProductTypeAssignmentService
                     .ToArray()
                 : issues;
 
+            var resolvedFromCatalogExamples = string.Equals(
+                resolutionSource,
+                "CatalogAnalogy",
+                StringComparison.Ordinal);
+            string resolutionWarningCode;
+            string resolutionWarningMessage;
+            if (resolvedFromCatalogExamples)
+            {
+                resolutionWarningCode = "product_type.resolved_from_catalog_examples";
+                resolutionWarningMessage =
+                    $"Тип товара '{productTypeName}' определён по похожим товарам этого производителя.";
+            }
+            else if (string.Equals(
+                         resolutionSource,
+                         "ExcelProductType",
+                         StringComparison.Ordinal))
+            {
+                resolutionWarningCode = "product_type.resolved_from_excel";
+                resolutionWarningMessage =
+                    $"Тип товара '{productTypeName}' определён из колонки «Тип товара» или назначения позиции.";
+            }
+            else
+            {
+                resolutionWarningCode = "product_type.resolved_from_name";
+                resolutionWarningMessage =
+                    $"Тип товара '{productTypeName}' определён из наименования.";
+            }
+
             var nextWarnings = automaticallyResolved
                 ? warnings
                     .Append(
                         new CatalogImportRowIssue(
-                            "product_type.resolved_from_name",
-                            $"Тип товара '{productTypeName}' определён из наименования.",
+                            resolutionWarningCode,
+                            resolutionWarningMessage,
                             "productTypeId",
                             null))
                     .Distinct()
@@ -250,6 +313,55 @@ public sealed class CatalogImportProductTypeAssignmentService
         return Result.Success<
             CatalogImportWorkbookAnalysis,
             DomainError>(enrichedAnalysis);
+    }
+
+    private async Task<CatalogProductAnalogyProductTypeProposal?>
+        TryResolveFromCatalogExamplesAsync(
+            CatalogImportNormalizedRowData data,
+            Dictionary<Guid, CatalogProductAnalogyCandidateSnapshot> snapshots,
+            CancellationToken cancellationToken)
+    {
+        if (_analogyReader is null
+            || !data.ManufacturerId.HasValue
+            || data.ManufacturerId.Value == Guid.Empty
+            || string.IsNullOrWhiteSpace(data.Name))
+        {
+            return null;
+        }
+
+        var manufacturerId = data.ManufacturerId.Value;
+
+        if (!snapshots.TryGetValue(manufacturerId, out var snapshot))
+        {
+            snapshot = await _analogyReader
+                .ReadCandidateSnapshotAsync(
+                    manufacturerId,
+                    null,
+                    CatalogProductAnalogySettings.SystemDefault
+                        .MaximumCandidatePoolSize,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            snapshots[manufacturerId] = snapshot;
+        }
+
+        var result = CatalogProductAnalogyEvaluator.Evaluate(
+            new CatalogProductAnalogyRequest(
+                data.Name,
+                data.Article,
+                manufacturerId,
+                null,
+                new Dictionary<string, string>(StringComparer.Ordinal),
+                MaximumResults: 100),
+            snapshot.Candidates,
+            CatalogProductAnalogySettings.SystemDefault);
+
+        return result.ProductTypeProposals
+            .Where(proposal => proposal.IsSuggested)
+            .OrderByDescending(proposal => proposal.SupportRatio)
+            .ThenByDescending(proposal => proposal.SupportingProductCount)
+            .ThenBy(proposal => proposal.ProductTypeName, StringComparer.Ordinal)
+            .FirstOrDefault();
     }
 
     private static CatalogImportNormalizedRowData?

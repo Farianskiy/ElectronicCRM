@@ -13,4 +13,5 @@ public sealed record UpdateCatalogImportRowCommand(
     decimal? Price,
     int? StockQuantity,
     IReadOnlyDictionary<string, string> Characteristics,
-    IReadOnlyDictionary<Guid, CatalogImportConfirmedSpan>? ConfirmedSpans = null);
+    IReadOnlyDictionary<Guid, CatalogImportConfirmedSpan>? ConfirmedSpans = null,
+    IReadOnlyCollection<CatalogImportAnalogyDecision>? AnalogyDecisions = null);

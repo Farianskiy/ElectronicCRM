@@ -27,6 +27,31 @@ public sealed class CatalogProductTypeSuggestionIndex
 
         var indexedTerms = new List<IndexedProductTypeTerm>();
 
+        // The canonical product type name is authoritative evidence too. This
+        // prevents a generic dictionary term such as "автомат" from winning
+        // over an explicit name such as "мотор-автомат" or
+        // "дифференциальный автомат" and also lets a new type (for example
+        // "УЗО") be recognized before a separate dictionary term is created.
+        foreach (var productType in productTypes)
+        {
+            var normalizedPhrase =
+                NormalizeTextPreservingLength(productType.Name.Trim());
+
+            if (string.IsNullOrWhiteSpace(normalizedPhrase))
+            {
+                continue;
+            }
+
+            indexedTerms.Add(
+                new IndexedProductTypeTerm(
+                    productType.Id,
+                    productType.Name,
+                    normalizedPhrase,
+                    StrongTermPriority,
+                    "ProductTypeName",
+                    productType));
+        }
+
         foreach (var term in dictionaryTerms)
         {
             if (!string.Equals(

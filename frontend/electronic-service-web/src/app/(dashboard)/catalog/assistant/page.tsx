@@ -504,7 +504,7 @@ export default function CatalogAssistantPage() {
 
             <label className="grid gap-2">
               <span className="text-sm font-medium text-slate-300">
-                Минимальное совпадение
+                Минимальное совпадение для замен
               </span>
               <input
                 type="number"

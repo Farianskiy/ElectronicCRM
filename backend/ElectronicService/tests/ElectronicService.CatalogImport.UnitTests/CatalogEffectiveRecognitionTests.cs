@@ -164,6 +164,52 @@ public sealed class CatalogEffectiveRecognitionTests
     }
 
     [Fact]
+    public async Task StrictRecognitionReplacesPreviouslyAcceptedCatalogAnalogy()
+    {
+        var catalog = new RecognitionTestCatalog();
+        catalog.Activate();
+        var row = Row(catalog, "learned", "B");
+        var key = catalog.Definition.Id.ToString();
+        var data = Data(row) with
+        {
+            CharacteristicOrigins =
+                new Dictionary<string, CatalogImportCharacteristicValueOrigin>(
+                    StringComparer.Ordinal)
+                {
+                    [key] = CatalogImportCharacteristicValueOrigin
+                        .FromCatalogAnalogy("B", 1m)
+                }
+        };
+
+        Assert.True(
+            row.ReplaceValidationResult(
+                CatalogImportRowStatus.Valid,
+                JsonSerializer.Serialize(data, JsonOptions),
+                "[]",
+                "[]").IsSuccess);
+
+        var result = await new CatalogImportRecognitionEnrichmentService(
+                catalog.Service(),
+                new CatalogImportRowValidator())
+            .EnrichAsync(
+                Analysis(row),
+                catalog.ProductType,
+                [catalog.Definition],
+                TestContext.Current.CancellationToken);
+
+        Assert.True(result.IsSuccess);
+        var enriched = Data(row);
+        Assert.Equal("D", enriched.Characteristics[key]);
+        Assert.Equal(
+            CatalogImportCharacteristicValueSource.Recognition,
+            enriched.CharacteristicOrigins![key].Source);
+        Assert.DoesNotContain(
+            "characteristic.value_conflict",
+            row.IssuesJson,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task MixedTypesReuseRunAndExplainBothScopesWithoutAnotherRecognitionPass()
     {
         var catalog = new RecognitionTestCatalog();

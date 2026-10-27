@@ -24,6 +24,7 @@ import { RecognitionDictionaryManagementPanel } from "@/features/catalogDictiona
 import { EvaluationReportLookup } from "@/features/catalogRecognition/ui/EvaluationReportLookup";
 import { RecognitionDatasetExportPanel } from "@/features/catalogRecognition/ui/RecognitionDatasetExportPanel";
 import { ProductTypeSuggestionPreviewPanel } from "@/features/catalogProductTypeSuggestions/ui/ProductTypeSuggestionPreviewPanel";
+import { ProductAnalogiesPreviewPanel } from "@/features/catalogProductAnalogies/ui/ProductAnalogiesPreviewPanel";
 
 interface RecognitionExample {
   label: string;
@@ -440,6 +441,19 @@ function RecognitionResult({
       />
 
       <AcceptedCharacteristics preview={preview} />
+
+      <ProductAnalogiesPreviewPanel
+        key={`${preview.productName}-${preview.manufacturerId ?? "no-manufacturer"}-${preview.productTypeId ?? "no-type"}`}
+        productName={preview.productName}
+        manufacturerId={preview.manufacturerId}
+        productTypeId={preview.productTypeId}
+        knownCharacteristics={Object.fromEntries(
+          preview.characteristics.map((characteristic) => [
+            characteristic.characteristicCode,
+            characteristic.normalizedValue,
+          ]),
+        )}
+      />
 
       <RecognitionConflicts
         conflicts={preview.conflicts}

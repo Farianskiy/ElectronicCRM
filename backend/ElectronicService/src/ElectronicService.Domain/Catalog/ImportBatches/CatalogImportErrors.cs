@@ -352,6 +352,27 @@ public static class CatalogImportErrors
             "Пакет импорта уже был изменён другим пользователем. Обновите данные и повторите действие.");
     }
 
+    public static DomainError ExampleFillRequiresConfirmedExamples()
+    {
+        return new DomainError(
+            "catalog.import.example_fill.examples_required",
+            "В выбранных строках нет активных подтверждённых учебных примеров.");
+    }
+
+    public static DomainError ExampleFillExampleLimitExceeded(int maximumCount)
+    {
+        return new DomainError(
+            "catalog.import.example_fill.example_limit_exceeded",
+            $"Для одного заполнения можно использовать не более {maximumCount} строк-примеров.");
+    }
+
+    public static DomainError ExampleFillTargetLimitExceeded(int maximumCount)
+    {
+        return new DomainError(
+            "catalog.import.example_fill.target_limit_exceeded",
+            $"За один запуск можно проверить не более {maximumCount} строк.");
+    }
+
     public static DomainError ChangesRequestCommentIsRequired()
     {
         return new DomainError(
@@ -570,6 +591,20 @@ public static class CatalogImportErrors
         return new DomainError(
             "catalog.import.error_report.unavailable",
             "В пакете отсутствуют строки с ошибками.");
+    }
+
+    public static DomainError ExampleFillApplyRequiresTargetRows()
+    {
+        return new DomainError(
+            "catalog.import.example_fill.target_rows_required",
+            "Выберите хотя бы одну строку для заполнения по примерам.");
+    }
+
+    public static DomainError ExampleFillApplyNotReady(int rowNumber)
+    {
+        return new DomainError(
+            "catalog.import.example_fill.row_not_ready",
+            $"Строку {rowNumber} нельзя заполнить: совпадение отсутствует или содержит конфликт.");
     }
 
 }

@@ -18,6 +18,7 @@ export type CatalogImportBatchStatus =
 export const catalogImportModes = [
   "CreateOnly",
   "UpdateCharacteristicsOnly",
+  "CreateMissingAndUpdateCharacteristics",
 ] as const;
 
 export type CatalogImportMode = (typeof catalogImportModes)[number];
@@ -73,6 +74,8 @@ export interface CatalogImportBatchDetails {
   rowsCount: number;
   validRowsCount: number;
   errorRowsCount: number;
+  plannedCreateProductsCount: number;
+  plannedUpdateProductsCount: number;
   createdAtUtc: string;
   updatedAtUtc?: string | null;
   submittedAtUtc?: string | null;
@@ -493,6 +496,17 @@ export type CatalogImportRowFilterStatus =
 
 export type CatalogImportRowProblemKind = "Error" | "Warning";
 
+export const catalogImportRowKnowledgeStates = [
+  "Strict",
+  "CatalogAnalogy",
+  "AwaitingConfirmation",
+  "Conflict",
+  "RequiredMissing",
+] as const;
+
+export type CatalogImportRowKnowledgeState =
+  (typeof catalogImportRowKnowledgeStates)[number];
+
 export interface CatalogImportRowIssue {
   code: string;
   message: string;
@@ -508,9 +522,31 @@ export interface CatalogImportNormalizedRow {
   price?: number | null;
   stockQuantity?: number | null;
   characteristics: Record<string, string>;
+  characteristicOrigins: Record<string, CatalogImportCharacteristicOrigin>;
   productTypeId?: string | null;
   productTypeResolutionSource?: string | null;
   productTypeResolutionConfidence?: number | null;
+}
+
+export interface CatalogImportCharacteristicOrigin {
+  source:
+    | "Excel"
+    | "Recognition"
+    | "Manual"
+    | "CatalogAnalogy"
+    | "TrainingExample";
+  confidence?: number | null;
+  rawValue?: string | null;
+  analogyConfigurationId?: string | null;
+  analogyConfigurationVersion?: number | null;
+  analogySupportingProductIds: string[];
+  analogyConfigurationHash?: string | null;
+  analogyCandidateSnapshotId?: string | null;
+  analogyCandidateSnapshotCreatedAtUtc?: string | null;
+  analogyFamilyAnchor?: string | null;
+  analogySupportingProductCount?: number | null;
+  trainingExampleIds?: string[];
+  trainingSourceRowIds?: string[];
 }
 
 export interface CatalogImportRow {
@@ -544,6 +580,7 @@ export interface GetCatalogImportRowsParams {
   issueCode?: string | null;
   problemKind?: CatalogImportRowProblemKind | null;
   manufacturerGroupKey?: string | null;
+  knowledgeState?: CatalogImportRowKnowledgeState | null;
   page: number;
   pageSize: number;
 }
@@ -593,6 +630,11 @@ export interface GetCatalogImportRowProblemCodesResponse {
   totalRowsCount: number;
   errorRowsCount: number;
   warningRowsCount: number;
+  strictRowsCount: number;
+  catalogAnalogyRowsCount: number;
+  awaitingConfirmationRowsCount: number;
+  conflictRowsCount: number;
+  requiredMissingRowsCount: number;
   items: CatalogImportRowProblemCode[];
 }
 
@@ -710,6 +752,14 @@ export interface UpdateCatalogImportRowRequest {
   stockQuantity?: number | null;
   characteristics: Record<string, string>;
   confirmedSpans?: Record<string, CatalogImportConfirmedSpan>;
+  analogyDecisions?: CatalogImportAnalogyDecision[];
+}
+
+export interface CatalogImportAnalogyDecision {
+  characteristicDefinitionId: string;
+  decision: "Accepted" | "Rejected";
+  reason?: string | null;
+  feedbackId?: string | null;
 }
 
 export interface UpdateCatalogImportRowResponse {
@@ -759,6 +809,63 @@ export interface BulkUpdateCatalogImportRowsResponse {
   validRowsCount: number;
   errorRowsCount: number;
   version: number;
+}
+
+export type CatalogImportExampleFillRowState =
+  | "Ready"
+  | "Review"
+  | "Conflict";
+
+export interface PreviewCatalogImportExampleFillRequest {
+  expectedVersion: number;
+  exampleRowIds: string[];
+  targetRowIds: string[];
+}
+
+export interface CatalogImportExampleFillProposal {
+  characteristicDefinitionId: string;
+  characteristicName: string;
+  proposedValue: string;
+  currentValue?: string | null;
+  matchedRawValue: string;
+  confidence: number;
+  sourceExampleIds: string[];
+  sourceRowIds: string[];
+}
+
+export interface CatalogImportExampleFillConflict {
+  characteristicDefinitionId: string;
+  characteristicName: string;
+  reason: string;
+  currentValue?: string | null;
+  proposedValues: string[];
+  sourceExampleIds: string[];
+}
+
+export interface CatalogImportExampleFillRow {
+  rowId: string;
+  rowNumber: number;
+  productName: string;
+  state: CatalogImportExampleFillRowState;
+  proposals: CatalogImportExampleFillProposal[];
+  conflicts: CatalogImportExampleFillConflict[];
+}
+
+export interface PreviewCatalogImportExampleFillResponse {
+  version: number;
+  examplesCount: number;
+  targetRowsCount: number;
+  readyRowsCount: number;
+  reviewRowsCount: number;
+  conflictRowsCount: number;
+  unmatchedRowsCount: number;
+  rows: CatalogImportExampleFillRow[];
+}
+
+export interface ApplyCatalogImportExampleFillRequest {
+  expectedVersion: number;
+  exampleRowIds: string[];
+  targetRowIds: string[];
 }
 
 export interface SubmitCatalogImportBatchResponse {

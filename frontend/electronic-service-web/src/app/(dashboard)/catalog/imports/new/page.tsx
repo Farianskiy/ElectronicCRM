@@ -226,7 +226,7 @@ export default function NewCatalogImportPage() {
             Выберите, что система должна сделать с товарами из Excel.
           </p>
 
-          <div className="mt-5 grid gap-4 md:grid-cols-2">
+          <div className="mt-5 grid gap-4 lg:grid-cols-3">
             <ImportModeOption
               mode="CreateOnly"
               selectedMode={importMode}
@@ -241,6 +241,15 @@ export default function NewCatalogImportPage() {
               selectedMode={importMode}
               title="Обновить характеристики"
               description="Работает только с существующими артикулами. Цена, остаток и название не изменяются."
+              disabled={isBusy}
+              onSelect={setImportMode}
+            />
+
+            <ImportModeOption
+              mode="CreateMissingAndUpdateCharacteristics"
+              selectedMode={importMode}
+              title="Создать отсутствующие и обновить характеристики"
+              description="Отсутствующие товары будут созданы. У существующих обновятся только характеристики; название, цена и остаток сохранятся."
               disabled={isBusy}
               onSelect={setImportMode}
             />

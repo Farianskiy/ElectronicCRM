@@ -4,5 +4,6 @@ public enum CatalogImportMode
 {
     None = 0,
     CreateOnly = 1,
-    UpdateCharacteristicsOnly = 2
+    UpdateCharacteristicsOnly = 2,
+    CreateMissingAndUpdateCharacteristics = 3
 }

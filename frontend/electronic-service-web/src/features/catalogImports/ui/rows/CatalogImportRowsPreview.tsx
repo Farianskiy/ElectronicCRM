@@ -2,7 +2,6 @@
 
 import { useQuery } from "@tanstack/react-query";
 import {
-  Fragment,
   useCallback,
   useEffect,
   useState,
@@ -23,20 +22,19 @@ import {
   type CatalogImportRow,
   type CatalogImportRowFilterStatus,
   type CatalogImportRowIssue,
+  type CatalogImportRowKnowledgeState,
   type CatalogImportRowProblemCode,
   type CatalogImportRowProblemKind,
   type CatalogImportManufacturerGroup,
 } from "../../model/types";
-import { CatalogImportRowStatusBadge } from "../CatalogImportRowStatusBadge";
 import { CatalogImportBulkRowsEditor } from "./CatalogImportBulkRowsEditor";
 import { CatalogImportRowEditor } from "./CatalogImportRowEditor";
+import { CatalogImportRowListItem } from "./CatalogImportRowListItem";
 import { useCatalogImportRowExplanations } from "../../model/useCatalogImportRowExplanations";
 import { getCatalogImportManufacturerGroups } from "../../api/getCatalogImportManufacturerGroups";
-import {
-  CatalogImportNameLegend,
-  CatalogImportRowName,
-} from "./CatalogImportRowName";
+import { CatalogImportNameLegend } from "./CatalogImportRowName";
 import { CatalogImportTrainingSummary } from "./CatalogImportTrainingSummary";
+import { CatalogImportExampleFillPreview } from "./CatalogImportExampleFillPreview";
 
 interface CatalogImportRowsPreviewProps {
   batchId: string;
@@ -50,12 +48,37 @@ interface CatalogImportRowsPreviewProps {
 
 const pageSize = 25;
 
-const priceFormatter = new Intl.NumberFormat("ru-RU", {
-  style: "currency",
-  currency: "RUB",
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
+function getProductTypeResolutionLabel(source: string): string {
+  switch (source) {
+    case "Automatic":
+      return "Определён по термину в наименовании";
+    case "CatalogAnalogy":
+      return "Определён по похожим товарам";
+    case "Manual":
+      return "Выбран вручную";
+    case "BatchDefault":
+      return "Общий тип пакета";
+    default:
+      return source;
+  }
+}
+
+function getKnowledgeStateLabel(
+  state: CatalogImportRowKnowledgeState,
+): string {
+  switch (state) {
+    case "Strict":
+      return "Есть строгие значения";
+    case "CatalogAnalogy":
+      return "Заполнено по аналогам";
+    case "AwaitingConfirmation":
+      return "Ожидает подтверждения";
+    case "Conflict":
+      return "Заблокировано конфликтом";
+    case "RequiredMissing":
+      return "Остались обязательные пустые";
+  }
+}
 
 function formatCount(
   count: number,
@@ -142,6 +165,9 @@ function getProblemCodeTitle(code: string): string {
 
     case "characteristic.low_confidence":
       return "Характеристика требует подтверждения";
+
+    case "characteristic.analogy_stale":
+      return "Значение по аналогам больше не подтверждено";
 
     case "price.invalid":
       return "Некорректная цена";
@@ -267,28 +293,6 @@ function getManufacturerGroupBreakdown(
   ].filter((item) => item.count > 0);
 }
 
-function formatNullableText(value: string | null | undefined): string {
-  const normalizedValue = value?.trim();
-
-  return normalizedValue ? normalizedValue : "—";
-}
-
-function formatNullablePrice(value: number | null | undefined): string {
-  if (value === null || value === undefined) {
-    return "—";
-  }
-
-  return priceFormatter.format(value);
-}
-
-function formatNullableInteger(value: number | null | undefined): string {
-  if (value === null || value === undefined) {
-    return "—";
-  }
-
-  return value.toLocaleString("ru-RU");
-}
-
 function getRawDataEntries(row: CatalogImportRow): Array<[string, string]> {
   return Object.entries(row.rawData).sort(
     ([leftColumn], [rightColumn]) => Number(leftColumn) - Number(rightColumn),
@@ -320,11 +324,12 @@ export function CatalogImportRowsPreview({
 
   const manufacturerGroupKey = selectedManufacturerGroup?.groupKey ?? null;
 
+  const [knowledgeState, setKnowledgeState] =
+    useState<CatalogImportRowKnowledgeState | null>(null);
+
   const [page, setPage] = useState(1);
 
-  const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
-
-  const [editingRowId, setEditingRowId] = useState<string | null>(null);
+  const [activeRowId, setActiveRowId] = useState<string | null>(null);
 
   const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(
     () => new Set(),
@@ -332,11 +337,13 @@ export function CatalogImportRowsPreview({
 
   const [isBulkEditorOpen, setIsBulkEditorOpen] = useState(false);
 
+  const [isExampleFillOpen, setIsExampleFillOpen] = useState(false);
+
   const resetRowsWorkspace = useCallback((): void => {
-    setExpandedRowId(null);
-    setEditingRowId(null);
+    setActiveRowId(null);
     setSelectedRowIds(new Set());
     setIsBulkEditorOpen(false);
+    setIsExampleFillOpen(false);
     setPage(1);
   }, []);
 
@@ -366,6 +373,7 @@ export function CatalogImportRowsPreview({
         issueCode,
         problemKind,
         manufacturerGroupKey,
+        knowledgeState,
         page,
         pageSize,
       ),
@@ -379,6 +387,7 @@ export function CatalogImportRowsPreview({
         issueCode,
         problemKind,
         manufacturerGroupKey,
+        knowledgeState,
         page,
         pageSize,
       }),
@@ -391,7 +400,8 @@ export function CatalogImportRowsPreview({
         previousKey?.[4] === search &&
         previousKey?.[5] === issueCode &&
         previousKey?.[6] === problemKind &&
-        previousKey?.[7] === manufacturerGroupKey;
+        previousKey?.[7] === manufacturerGroupKey &&
+        previousKey?.[8] === knowledgeState;
 
       return filtersDidNotChange ? previousData : undefined;
     },
@@ -539,12 +549,15 @@ export function CatalogImportRowsPreview({
     searchDraft.trim().length > 0 ||
     issueCode !== null ||
     problemKind !== null ||
-    manufacturerGroupKey !== null;
+    manufacturerGroupKey !== null ||
+    knowledgeState !== null;
 
   let emptyFilteredRowsMessage =
     "Строк, соответствующих выбранным условиям, больше нет.";
 
-  if (selectedManufacturerGroup !== null) {
+  if (knowledgeState !== null) {
+    emptyFilteredRowsMessage = `Строк в состоянии «${getKnowledgeStateLabel(knowledgeState)}» больше нет.`;
+  } else if (selectedManufacturerGroup !== null) {
     emptyFilteredRowsMessage = `Строк с исходным производителем «${selectedManufacturerGroup.sourceValue}» больше нет. Возможно, данные строки были изменены.`;
   } else if (issueCode !== null) {
     emptyFilteredRowsMessage = `Строк с проблемой «${issueCode}» больше нет. Возможно, они были исправлены.`;
@@ -565,12 +578,16 @@ export function CatalogImportRowsPreview({
 
   const selectedRows = items.filter((row) => selectedRowIds.has(row.rowId));
 
+  const activeRowIndex = items.findIndex((row) => row.rowId === activeRowId);
+  const activeRow = activeRowIndex >= 0 ? items[activeRowIndex] : null;
+
   const allPageRowsSelected =
     items.length > 0 && selectedRows.length === items.length;
 
   function clearSelectedRows(): void {
     setSelectedRowIds(new Set());
     setIsBulkEditorOpen(false);
+    setIsExampleFillOpen(false);
   }
 
   function toggleSelectedRow(rowId: string): void {
@@ -587,7 +604,7 @@ export function CatalogImportRowsPreview({
     });
 
     setIsBulkEditorOpen(false);
-    setEditingRowId(null);
+    setIsExampleFillOpen(false);
   }
 
   function toggleCurrentPageSelection(): void {
@@ -599,7 +616,8 @@ export function CatalogImportRowsPreview({
 
     setSelectedRowIds(new Set(items.map((row) => row.rowId)));
     setIsBulkEditorOpen(false);
-    setEditingRowId(null);
+    setIsExampleFillOpen(false);
+    setActiveRowId(null);
   }
 
   function openBulkEditor(): void {
@@ -607,9 +625,19 @@ export function CatalogImportRowsPreview({
       return;
     }
 
-    setExpandedRowId(null);
-    setEditingRowId(null);
+    setActiveRowId(null);
     setIsBulkEditorOpen(true);
+    setIsExampleFillOpen(false);
+  }
+
+  function openExampleFill(): void {
+    if (!canUseBulkEditing || selectedRows.length === 0) {
+      return;
+    }
+
+    setActiveRowId(null);
+    setIsBulkEditorOpen(false);
+    setIsExampleFillOpen(true);
   }
 
   function openVisibleProblemGroup(): void {
@@ -618,8 +646,7 @@ export function CatalogImportRowsPreview({
     }
 
     setSelectedRowIds(new Set(items.map((row) => row.rowId)));
-    setExpandedRowId(null);
-    setEditingRowId(null);
+    setActiveRowId(null);
     setIsBulkEditorOpen(true);
   }
 
@@ -671,6 +698,15 @@ export function CatalogImportRowsPreview({
     resetRowsWorkspace();
   }
 
+  function toggleKnowledgeState(
+    nextKnowledgeState: CatalogImportRowKnowledgeState,
+  ): void {
+    setKnowledgeState((currentState) =>
+      currentState === nextKnowledgeState ? null : nextKnowledgeState,
+    );
+    resetRowsWorkspace();
+  }
+
   function resetFilters(): void {
     setSearchDraft("");
     setSearch("");
@@ -678,6 +714,7 @@ export function CatalogImportRowsPreview({
     setIssueCode(null);
     setProblemKind(null);
     setSelectedManufacturerGroup(null);
+    setKnowledgeState(null);
     resetRowsWorkspace();
   }
 
@@ -688,23 +725,30 @@ export function CatalogImportRowsPreview({
       return;
     }
 
-    setExpandedRowId(null);
-    setEditingRowId(null);
+    setActiveRowId(null);
     clearSelectedRows();
     setPage(nextPage);
   }
 
-  function toggleRow(rowId: string): void {
-    setEditingRowId(null);
-
-    setExpandedRowId((currentRowId) => (currentRowId === rowId ? null : rowId));
+  function openRow(rowId: string): void {
+    clearSelectedRows();
+    setActiveRowId(rowId);
   }
 
-  function editRow(rowId: string): void {
-    setExpandedRowId(null);
-    clearSelectedRows();
+  function openAdjacentRow(direction: -1 | 1): void {
+    if (activeRowIndex < 0) {
+      return;
+    }
 
-    setEditingRowId((currentRowId) => (currentRowId === rowId ? null : rowId));
+    const nextRow = items[activeRowIndex + direction];
+    if (nextRow) {
+      setActiveRowId(nextRow.rowId);
+    }
+  }
+
+  function handleActiveRowSaved(): void {
+    const nextRow = activeRowIndex >= 0 ? items[activeRowIndex + 1] : null;
+    setActiveRowId(nextRow?.rowId ?? activeRowId);
   }
 
   return (
@@ -819,6 +863,91 @@ export function CatalogImportRowsPreview({
                 </dd>
               </div>
             </dl>
+
+            <div className="mt-4">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--app-muted)]">
+                Как заполнены характеристики
+              </h4>
+
+              <p className="mt-1 text-xs leading-5 text-[var(--app-muted)]">
+                Счётчики относятся ко всему пакету и могут пересекаться: одна
+                строка может содержать строгие значения и дополнения по
+                аналогам. Нажмите карточку, чтобы отфильтровать строки.
+              </p>
+
+              <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                {(
+                  [
+                    {
+                      state: "Strict",
+                      value: packageProblemCodesQuery.data.strictRowsCount,
+                      className:
+                        "border-[var(--app-success-border)] bg-[var(--app-success-soft)] text-[var(--app-success)]",
+                    },
+                    {
+                      state: "CatalogAnalogy",
+                      value:
+                        packageProblemCodesQuery.data.catalogAnalogyRowsCount,
+                      className:
+                        "border-[var(--app-accent-border)] bg-[var(--app-accent-soft)] text-[var(--app-accent)]",
+                    },
+                    {
+                      state: "AwaitingConfirmation",
+                      value:
+                        packageProblemCodesQuery.data
+                          .awaitingConfirmationRowsCount,
+                      className:
+                        "border-[var(--app-warning-border)] bg-[var(--app-warning-soft)] text-[var(--app-warning)]",
+                    },
+                    {
+                      state: "Conflict",
+                      value: packageProblemCodesQuery.data.conflictRowsCount,
+                      className:
+                        "border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] text-[var(--app-danger)]",
+                    },
+                    {
+                      state: "RequiredMissing",
+                      value:
+                        packageProblemCodesQuery.data.requiredMissingRowsCount,
+                      className:
+                        "border-[var(--app-danger-border)] bg-[var(--app-panel)] text-[var(--app-danger)]",
+                    },
+                  ] as Array<{
+                    state: CatalogImportRowKnowledgeState;
+                    value: number;
+                    className: string;
+                  }>
+                ).map((item) => {
+                  const isActive = knowledgeState === item.state;
+
+                  return (
+                    <button
+                      key={item.state}
+                      type="button"
+                      aria-pressed={isActive}
+                      onClick={() => toggleKnowledgeState(item.state)}
+                      className={[
+                        "rounded-xl border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]",
+                        item.className,
+                        isActive ? "ring-2 ring-[var(--app-accent)]" : "",
+                      ].join(" ")}
+                    >
+                      <span className="block text-xs font-medium leading-5">
+                        {getKnowledgeStateLabel(item.state)}
+                      </span>
+
+                      <strong className="mt-1 block text-xl tabular-nums">
+                        {item.value.toLocaleString("ru-RU")}
+                      </strong>
+
+                      <span className="mt-2 block text-[11px] text-[var(--app-muted)]">
+                        {isActive ? "Фильтр включён" : "Показать строки"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
             <div className="mt-4">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--app-muted)]">
@@ -1285,6 +1414,15 @@ export function CatalogImportRowsPreview({
               Редактировать выбранные
             </AppButton>
 
+            <AppButton
+              size="sm"
+              variant="secondary"
+              disabled={isExampleFillOpen}
+              onClick={openExampleFill}
+            >
+              Заполнить остальные по примерам
+            </AppButton>
+
             <AppButton size="sm" onClick={clearSelectedRows}>
               Снять выбор
             </AppButton>
@@ -1308,6 +1446,16 @@ export function CatalogImportRowsPreview({
             }}
           />
         </div>
+      )}
+
+      {isExampleFillOpen && selectedRows.length > 0 && (
+        <CatalogImportExampleFillPreview
+          batchId={batchId}
+          expectedVersion={expectedVersion}
+          exampleRows={selectedRows}
+          onCancel={() => setIsExampleFillOpen(false)}
+          onApplied={clearSelectedRows}
+        />
       )}
 
       {rowsQuery.isError && (
@@ -1383,199 +1531,141 @@ export function CatalogImportRowsPreview({
           )}
         </div>
       ) : (
-        <div className="mt-4 max-w-full overflow-x-auto rounded-xl border border-[var(--app-border)]">
-          <table className="w-full min-w-[1280px] border-collapse text-left text-sm">
-            <thead className="bg-[var(--app-surface)] text-[var(--app-muted)]">
-              <tr>
-                <th className="w-14 px-3 py-3 font-medium">
-                  <input
-                    type="checkbox"
-                    checked={allPageRowsSelected}
-                    disabled={
-                      !canUseBulkEditing ||
-                      items.length === 0 ||
-                      isBulkEditorOpen
-                    }
-                    onChange={toggleCurrentPageSelection}
-                    aria-label="Выбрать все строки текущей страницы"
-                    className="h-4 w-4 cursor-pointer accent-[var(--app-accent-strong)] disabled:cursor-not-allowed disabled:opacity-40"
-                  />
-                </th>
+        <div className="mt-4 grid min-w-0 gap-4 xl:grid-cols-[minmax(320px,0.78fr)_minmax(0,1.22fr)] xl:items-start">
+          <section className="min-w-0 overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-panel)]">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-3">
+              <label className="flex items-center gap-2 text-sm font-medium text-[var(--app-text)]">
+                <input
+                  type="checkbox"
+                  checked={allPageRowsSelected}
+                  disabled={
+                    !canUseBulkEditing ||
+                    items.length === 0 ||
+                    isBulkEditorOpen ||
+                    isExampleFillOpen
+                  }
+                  onChange={toggleCurrentPageSelection}
+                  aria-label="Выбрать все строки текущей страницы"
+                  className="h-4 w-4 cursor-pointer accent-[var(--app-accent-strong)] disabled:cursor-not-allowed disabled:opacity-40"
+                />
+                Выбрать страницу
+              </label>
 
-                <th className="px-3 py-3 font-medium">Строка</th>
+              <span className="text-xs text-[var(--app-muted)]">
+                Нажмите строку для разбора
+              </span>
+            </div>
 
-                <th className="px-3 py-3 font-medium">Статус</th>
-
-                <th className="px-3 py-3 font-medium">Наименование</th>
-
-                <th className="px-3 py-3 font-medium">Артикул</th>
-
-                <th className="px-3 py-3 font-medium">Производитель</th>
-
-                <th className="px-3 py-3 font-medium">Тип товара</th>
-
-                <th className="px-3 py-3 font-medium">Цена</th>
-
-                <th className="px-3 py-3 font-medium">Остаток</th>
-
-                <th className="px-3 py-3 font-medium">Проблемы</th>
-
-                <th className="px-3 py-3 font-medium">Действия</th>
-              </tr>
-            </thead>
-
-            <tbody className="divide-y divide-[var(--app-border)]">
+            <div className="max-h-[72vh] overflow-y-auto">
               {items.map((row) => {
-                const isExpanded = expandedRowId === row.rowId;
-
-                const isEditing = editingRowId === row.rowId;
-
                 const rowProductType = productTypesQuery.data?.find(
                   (item) => item.id === row.data.productTypeId,
                 );
-
-                const rowCanBeEdited = canEditRows;
+                const resolutionLabel = row.data.productTypeResolutionSource
+                  ? `${getProductTypeResolutionLabel(
+                      row.data.productTypeResolutionSource,
+                    )}${
+                      row.data.productTypeResolutionConfidence != null
+                        ? ` · ${Math.round(
+                            row.data.productTypeResolutionConfidence * 100,
+                          )}%`
+                        : ""
+                    }`
+                  : null;
 
                 return (
-                  <Fragment key={row.rowId}>
-                    <tr
-                      className={[
-                        "align-top transition-colors",
-                        selectedRowIds.has(row.rowId)
-                          ? "bg-[var(--app-accent-soft)]"
-                          : "bg-[var(--app-panel)] hover:bg-[var(--app-panel-hover)]",
-                      ].join(" ")}
-                    >
-                      <td className="px-3 py-3">
-                        <input
-                          type="checkbox"
-                          checked={selectedRowIds.has(row.rowId)}
-                          disabled={!rowCanBeEdited || isBulkEditorOpen}
-                          onChange={() => toggleSelectedRow(row.rowId)}
-                          aria-label={`Выбрать строку ${row.rowNumber}`}
-                          className="h-4 w-4 cursor-pointer accent-[var(--app-accent-strong)] disabled:cursor-not-allowed disabled:opacity-40"
-                        />
-                      </td>
-
-                      <td className="px-3 py-3 font-medium text-[var(--app-text)]">
-                        {row.rowNumber}
-                      </td>
-
-                      <td className="px-3 py-3">
-                        <CatalogImportRowStatusBadge status={row.status} />
-                      </td>
-
-                      <td className="max-w-72 px-3 py-3 text-[var(--app-text)]">
-                        <CatalogImportRowName
-                          row={row}
-                          item={nameExplanations.data?.items.find(
-                            (item) => item.rowId === row.rowId,
-                          )}
-                        />
-                      </td>
-
-                      <td className="px-3 py-3 text-[var(--app-text)]">
-                        {formatNullableText(row.data.article)}
-                      </td>
-
-                      <td className="max-w-56 px-3 py-3 text-[var(--app-text)]">
-                        <p className="line-clamp-2">
-                          {formatNullableText(row.data.manufacturer)}
-                        </p>
-                      </td>
-
-                      <td className="max-w-56 px-3 py-3">
-                        <p className="font-medium text-[var(--app-text)]">
-                          {rowProductType?.name ??
-                            (row.data.productTypeId
-                              ? "Тип отсутствует в справочнике"
-                              : "Не определён")}
-                        </p>
-
-                        {row.data.productTypeResolutionSource && (
-                          <p className="mt-1 text-xs text-[var(--app-muted)]">
-                            {row.data.productTypeResolutionSource ===
-                            "Automatic"
-                              ? "Определён автоматически"
-                              : row.data.productTypeResolutionSource ===
-                                  "Manual"
-                                ? "Выбран вручную"
-                                : "Общий тип пакета"}
-
-                            {row.data.productTypeResolutionConfidence != null
-                              ? ` · ${Math.round(
-                                  row.data.productTypeResolutionConfidence *
-                                    100,
-                                )}%`
-                              : ""}
-                          </p>
-                        )}
-                      </td>
-
-                      <td className="whitespace-nowrap px-3 py-3 text-[var(--app-text)]">
-                        {formatNullablePrice(row.data.price)}
-                      </td>
-
-                      <td className="px-3 py-3 text-[var(--app-text)]">
-                        {formatNullableInteger(row.data.stockQuantity)}
-                      </td>
-
-                      <td className="px-3 py-3">
-                        <CatalogImportRowProblems row={row} />
-                      </td>
-
-                      <td className="px-3 py-3">
-                        <div className="flex flex-wrap gap-2">
-                          <AppButton
-                            size="sm"
-                            variant="secondary"
-                            aria-expanded={isExpanded}
-                            onClick={() => toggleRow(row.rowId)}
-                          >
-                            {isExpanded ? "Скрыть" : "Подробнее"}
-                          </AppButton>
-
-                          {rowCanBeEdited && (
-                            <AppButton
-                              size="sm"
-                              variant={isEditing ? "secondary" : "primary"}
-                              aria-expanded={isEditing}
-                              onClick={() => editRow(row.rowId)}
-                            >
-                              {isEditing ? "Закрыть редактор" : "Редактировать"}
-                            </AppButton>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-
-                    {(isExpanded || isEditing) && (
-                      <tr className="bg-[var(--app-surface)]">
-                        <td colSpan={11} className="px-5 py-5">
-                          {isEditing ? (
-                            <CatalogImportRowEditor
-                              key={`${row.rowId}-${row.status}`}
-                              batchId={batchId}
-                              defaultProductTypeId={productTypeId}
-                              row={row}
-                              onCancel={() => {
-                                setEditingRowId(null);
-                              }}
-                              onSaved={() => {
-                                setEditingRowId(null);
-                              }}
-                            />
-                          ) : (
-                            <CatalogImportRowDetails row={row} />
-                          )}
-                        </td>
-                      </tr>
+                  <CatalogImportRowListItem
+                    key={row.rowId}
+                    row={row}
+                    explanation={nameExplanations.data?.items.find(
+                      (item) => item.rowId === row.rowId,
                     )}
-                  </Fragment>
+                    productTypeName={
+                      rowProductType?.name ??
+                      (row.data.productTypeId
+                        ? "Тип отсутствует в справочнике"
+                        : "Тип не определён")
+                    }
+                    productTypeResolutionLabel={resolutionLabel}
+                    isActive={activeRowId === row.rowId}
+                    isSelected={selectedRowIds.has(row.rowId)}
+                    selectionDisabled={
+                      !canEditRows || isBulkEditorOpen || isExampleFillOpen
+                    }
+                    onOpen={() => openRow(row.rowId)}
+                    onToggleSelected={() => toggleSelectedRow(row.rowId)}
+                  />
                 );
               })}
-            </tbody>
-          </table>
+            </div>
+          </section>
+
+          <section className="min-w-0 xl:sticky xl:top-4">
+            {activeRow ? (
+              <div className="grid gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-3">
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--app-text)]">
+                      Разбор строки {activeRow.rowNumber}
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--app-muted)]">
+                      Исправьте значения и сохраните строку. После сохранения откроется следующая строка страницы.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <AppButton
+                      size="sm"
+                      variant="secondary"
+                      disabled={activeRowIndex <= 0}
+                      onClick={() => openAdjacentRow(-1)}
+                    >
+                      Предыдущая
+                    </AppButton>
+                    <AppButton
+                      size="sm"
+                      variant="secondary"
+                      disabled={activeRowIndex >= items.length - 1}
+                      onClick={() => openAdjacentRow(1)}
+                    >
+                      Следующая
+                    </AppButton>
+                    <AppButton
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setActiveRowId(null)}
+                    >
+                      Закрыть
+                    </AppButton>
+                  </div>
+                </div>
+
+                {canEditRows ? (
+                  <CatalogImportRowEditor
+                    key={`${activeRow.rowId}-${activeRow.status}`}
+                    batchId={batchId}
+                    defaultProductTypeId={productTypeId}
+                    row={activeRow}
+                    onCancel={() => setActiveRowId(null)}
+                    onSaved={handleActiveRowSaved}
+                  />
+                ) : (
+                  <CatalogImportRowDetails row={activeRow} />
+                )}
+              </div>
+            ) : (
+              <div className="grid min-h-72 place-items-center rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-surface)] p-8 text-center">
+                <div className="max-w-md">
+                  <h3 className="font-semibold text-[var(--app-text)]">
+                    Выберите строку слева
+                  </h3>
+                  <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">
+                    Здесь появятся основные данные, характеристики, источники значений и действия обучения. Список останется на месте.
+                  </p>
+                </div>
+              </div>
+            )}
+          </section>
         </div>
       )}
 
@@ -1710,51 +1800,6 @@ function CatalogImportRowsPagination({
         </AppButton>
       </div>
     </nav>
-  );
-}
-
-function CatalogImportRowProblems({ row }: { row: CatalogImportRow }) {
-  const errorCount = row.issues.length;
-  const warningCount = row.warnings.length;
-  const firstIssue = row.issues[0] ?? row.warnings[0];
-
-  if (!firstIssue) {
-    return <span className="text-[var(--app-muted)]">—</span>;
-  }
-
-  const message =
-    firstIssue.message.trim() ||
-    firstIssue.code.trim() ||
-    "Описание отсутствует. Откройте подробности строки.";
-
-  return (
-    <div className="w-60 max-w-full space-y-1.5">
-      <div className="flex flex-wrap gap-2">
-        {errorCount > 0 && (
-          <span className="rounded-full border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] px-2.5 py-1 text-xs font-medium text-[var(--app-danger)]">
-            Ошибок: {errorCount}
-          </span>
-        )}
-
-        {warningCount > 0 && (
-          <span className="rounded-full border border-[var(--app-warning-border)] bg-[var(--app-warning-soft)] px-2.5 py-1 text-xs font-medium text-[var(--app-warning)]">
-            Предупреждений: {warningCount}
-          </span>
-        )}
-      </div>
-
-      <p
-        title={message}
-        className={[
-          "line-clamp-2 break-words text-xs leading-4",
-          errorCount > 0
-            ? "text-[var(--app-danger)]"
-            : "text-[var(--app-warning)]",
-        ].join(" ")}
-      >
-        {message}
-      </p>
-    </div>
   );
 }
 

@@ -11,6 +11,7 @@ import {
   type MyCatalogImportBatchItem,
 } from "@/features/catalogImports/model/types";
 import { getCatalogImportStatusLabel } from "@/features/catalogImports/model/catalogImportStatus";
+import { getCatalogImportModeLabel } from "@/features/catalogImports/model/catalogImportMode";
 import {
   catalogImportQueryKeys,
   CatalogImportStatusBadge,
@@ -42,9 +43,7 @@ function CatalogImportRow({
           {formatFileSize(item.fileSizeBytes)}
         </p>
         <p className="mt-1 text-xs font-medium text-[var(--app-accent)]">
-          {item.importMode === "CreateOnly"
-            ? "Добавление новых"
-            : "Обновление характеристик"}
+          {getCatalogImportModeLabel(item.importMode)}
         </p>
       </td>
 

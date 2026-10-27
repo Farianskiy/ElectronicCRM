@@ -186,6 +186,10 @@ public sealed class
             && currentUser.CanDeleteOwnCatalogImport()
             && batch.CanBeDeletedByOwner;
 
+        var applicationPlan = await _importBatchRepository
+            .GetApplicationPlanAsync(batch.Id, cancellationToken)
+            .ConfigureAwait(false);
+
         var result = new GetCatalogImportBatchResult(
             batch.Id,
             batch.CreatedByUserId,
@@ -197,6 +201,8 @@ public sealed class
             batch.RowsCount,
             batch.ValidRowsCount,
             batch.ErrorRowsCount,
+            applicationPlan.CreateProductsCount,
+            applicationPlan.UpdateProductsCount,
             batch.CreatedAtUtc,
             batch.UpdatedAtUtc,
             batch.SubmittedAtUtc,

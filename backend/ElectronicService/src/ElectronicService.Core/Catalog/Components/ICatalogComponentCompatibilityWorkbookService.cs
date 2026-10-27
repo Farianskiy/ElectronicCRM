@@ -16,7 +16,8 @@ public enum ComponentCompatibilityImportRowStatus
     Duplicate = 7,
     WillCreate = 8,
     WillUpdate = 9,
-    Unchanged = 10
+    Unchanged = 10,
+    RequiresConfirmation = 11
 }
 
 public sealed record ComponentCompatibilityImportConstraint(
@@ -62,6 +63,7 @@ public interface ICatalogComponentCompatibilityWorkbookService
 
     Task<Result<byte[], DomainError>> ExportRulesAsync(
         string mainProductTypeCode,
+        IReadOnlyCollection<Guid>? componentManufacturerIds = null,
         CancellationToken cancellationToken = default);
 
     Task<Result<ComponentCompatibilityImportPreview, DomainError>> PreviewAsync(
@@ -70,5 +72,6 @@ public interface ICatalogComponentCompatibilityWorkbookService
 
     Task<Result<int, DomainError>> ApplyAsync(
         IReadOnlyList<ApplyComponentCompatibilityImportRow> rows,
+        bool allowRulesWithoutConditions = false,
         CancellationToken cancellationToken = default);
 }

@@ -11,5 +11,9 @@ public enum CatalogImportCharacteristicValueSource
 
     Recognition = 2,
 
-    Manual = 3
+    Manual = 3,
+
+    CatalogAnalogy = 4,
+
+    TrainingExample = 5
 }

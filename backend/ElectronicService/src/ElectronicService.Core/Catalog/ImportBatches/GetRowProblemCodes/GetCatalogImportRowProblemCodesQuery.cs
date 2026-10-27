@@ -22,4 +22,9 @@ public sealed record GetCatalogImportRowProblemCodesResult(
     int TotalRowsCount,
     int ErrorRowsCount,
     int WarningRowsCount,
+    int StrictRowsCount,
+    int CatalogAnalogyRowsCount,
+    int AwaitingConfirmationRowsCount,
+    int ConflictRowsCount,
+    int RequiredMissingRowsCount,
     IReadOnlyCollection<CatalogImportRowProblemCodeResult> Items);

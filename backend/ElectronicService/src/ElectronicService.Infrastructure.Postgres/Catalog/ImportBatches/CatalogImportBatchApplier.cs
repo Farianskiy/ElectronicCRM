@@ -204,7 +204,8 @@ public sealed class CatalogImportBatchApplier : ICatalogImportBatchApplier
             .Select(product => new
             {
                 product.Id,
-                Article = product.Article.Value
+                Article = product.Article.Value,
+                product.ManufacturerId
             })
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -222,17 +223,21 @@ public sealed class CatalogImportBatchApplier : ICatalogImportBatchApplier
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        var existingProductsByArticle = existingProducts.ToDictionary(
-            product => product.Article.Value,
-            StringComparer.OrdinalIgnoreCase);
+        var existingProductsByKey = existingProducts.ToDictionary(
+            product => CreateProductKey(
+                product.Article.Value,
+                product.ManufacturerId));
 
         foreach (var preparedRow in preparedRows)
         {
             var article = preparedRow.Data.Article!;
-            var productExists = existingProductsByArticle.ContainsKey(article);
+            var productKey = CreateProductKey(
+                article,
+                preparedRow.Data.ManufacturerId!.Value);
+            var productExists = existingProductsByKey.ContainsKey(productKey);
 
             if (productExists
-                && existingProductsByArticle[article].IsArchived)
+                && existingProductsByKey[productKey].IsArchived)
             {
                 return Result.Failure<CatalogImportApplyExecutionResult, DomainError>(
                     CatalogImportErrors.ProductArticleIsArchived(
@@ -345,8 +350,8 @@ public sealed class CatalogImportBatchApplier : ICatalogImportBatchApplier
             var manufacturerId = data.ManufacturerId!.Value;
             var productType = productTypesById[data.ProductTypeId!.Value];
             var manufacturer = manufacturersById[manufacturerId];
-            var isExistingProduct = existingProductsByArticle.TryGetValue(
-                data.Article!,
+            var isExistingProduct = existingProductsByKey.TryGetValue(
+                CreateProductKey(data.Article!, manufacturerId),
                 out var product);
             string? beforeJson = null;
 
@@ -541,8 +546,7 @@ public sealed class CatalogImportBatchApplier : ICatalogImportBatchApplier
     {
         var preparedRows = new List<PreparedImportRow>(rows.Count);
 
-        var firstRowsByArticle = new Dictionary<string, int>(
-            StringComparer.OrdinalIgnoreCase);
+        var firstRowsByProductKey = new Dictionary<ProductImportKey, int>();
 
         foreach (var row in rows)
         {
@@ -596,9 +600,12 @@ public sealed class CatalogImportBatchApplier : ICatalogImportBatchApplier
             }
 
             var normalizedArticle = data.Article.Trim();
-
-            if (firstRowsByArticle.TryGetValue(
+            var productKey = CreateProductKey(
                 normalizedArticle,
+                data.ManufacturerId.Value);
+
+            if (firstRowsByProductKey.TryGetValue(
+                productKey,
                 out var firstRowNumber))
             {
                 return Result.Failure<List<PreparedImportRow>, DomainError>(
@@ -608,8 +615,8 @@ public sealed class CatalogImportBatchApplier : ICatalogImportBatchApplier
                         row.RowNumber));
             }
 
-            firstRowsByArticle.Add(
-                normalizedArticle,
+            firstRowsByProductKey.Add(
+                productKey,
                 row.RowNumber);
 
             preparedRows.Add(
@@ -661,6 +668,19 @@ public sealed class CatalogImportBatchApplier : ICatalogImportBatchApplier
                 rowNumber,
                 definition.Id));
     }
+
+    private static ProductImportKey CreateProductKey(
+        string article,
+        Guid manufacturerId)
+    {
+        return new ProductImportKey(
+            article.Trim().ToUpperInvariant(),
+            manufacturerId);
+    }
+
+    private readonly record struct ProductImportKey(
+        string NormalizedArticle,
+        Guid ManufacturerId);
 
     private sealed record PreparedImportRow(
         int RowNumber,

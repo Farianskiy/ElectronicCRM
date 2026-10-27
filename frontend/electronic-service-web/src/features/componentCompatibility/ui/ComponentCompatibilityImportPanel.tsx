@@ -24,6 +24,8 @@ function getStatusLabel(status: ComponentCompatibilityImportRowStatus): string {
       return "Будет изменено";
     case "Unchanged":
       return "Без изменений";
+    case "RequiresConfirmation":
+      return "Нужно подтверждение";
     case "AlreadyExists":
       return "Уже существует";
     case "ComponentNotFound":
@@ -50,6 +52,10 @@ function getStatusClassName(status: ComponentCompatibilityImportRowStatus): stri
     return "border-[var(--app-border)] bg-[var(--app-surface)] text-[var(--app-muted)]";
   }
 
+  if (status === "RequiresConfirmation") {
+    return "border-amber-500/40 bg-amber-500/10 text-amber-300";
+  }
+
   return "border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] text-[var(--app-danger)]";
 }
 
@@ -62,6 +68,8 @@ export function ComponentCompatibilityImportPanel({
   const { hasPermission } = useCurrentUserAccess();
   const canEditProducts = hasPermission("ProductsEdit");
   const [file, setFile] = useState<File | null>(null);
+  const [allowRulesWithoutConditions, setAllowRulesWithoutConditions] =
+    useState(false);
   const [showColumnSelection, setShowColumnSelection] = useState(false);
   const [columnSearch, setColumnSearch] = useState("");
   const [columnSelection, setColumnSelection] = useState<{
@@ -130,6 +138,16 @@ export function ComponentCompatibilityImportPanel({
       ),
     [previewMutation.data?.rows],
   );
+  const broadRows = useMemo(
+    () =>
+      (previewMutation.data?.rows ?? []).filter(
+        (row) =>
+          row.status === "RequiresConfirmation" &&
+          row.componentProductId !== null &&
+          row.mainProductTypeId !== null,
+      ),
+    [previewMutation.data?.rows],
+  );
   const previewSummary = useMemo(() => {
     const rows = previewMutation.data?.rows ?? [];
     return {
@@ -140,7 +158,11 @@ export function ComponentCompatibilityImportPanel({
         (row) =>
           row.status !== "WillCreate" &&
           row.status !== "WillUpdate" &&
-          row.status !== "Unchanged",
+          row.status !== "Unchanged" &&
+          row.status !== "RequiresConfirmation",
+      ).length,
+      requiresConfirmation: rows.filter(
+        (row) => row.status === "RequiresConfirmation",
       ).length,
     };
   }, [previewMutation.data?.rows]);
@@ -153,23 +175,29 @@ export function ComponentCompatibilityImportPanel({
     }
 
     applyMutation.reset();
+    setAllowRulesWithoutConditions(false);
     previewMutation.mutate(file);
   }
 
   function handleApply(): void {
-    if (readyRows.length === 0) {
+    const rowsToApply = allowRulesWithoutConditions
+      ? [...readyRows, ...broadRows]
+      : readyRows;
+
+    if (rowsToApply.length === 0) {
       return;
     }
 
-    applyMutation.mutate(
-      readyRows.map((row) => ({
+    applyMutation.mutate({
+      rows: rowsToApply.map((row) => ({
         componentProductId: row.componentProductId as string,
         mainProductTypeId: row.mainProductTypeId as string,
         needDefinitionId: row.needDefinitionId,
         isActive: row.isActive,
         constraints: row.constraints,
       })),
-    );
+      allowRulesWithoutConditions,
+    });
   }
 
   async function handleComponentCreated(): Promise<void> {
@@ -380,6 +408,7 @@ export function ComponentCompatibilityImportPanel({
               setFile(event.target.files?.[0] ?? null);
               previewMutation.reset();
               applyMutation.reset();
+              setAllowRulesWithoutConditions(false);
             }}
             className="min-h-11 w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] px-3 py-2 text-sm text-[var(--app-text)] file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--app-accent-soft)] file:px-3 file:py-1.5 file:font-semibold file:text-[var(--app-accent)]"
           />
@@ -453,12 +482,34 @@ export function ComponentCompatibilityImportPanel({
               type="button"
               variant="primary"
               loading={applyMutation.isPending}
-              disabled={readyRows.length === 0 || applyMutation.isSuccess}
+              disabled={
+                (readyRows.length === 0 &&
+                  (!allowRulesWithoutConditions || broadRows.length === 0)) ||
+                applyMutation.isSuccess
+              }
               onClick={handleApply}
             >
               Создать или обновить правила
             </AppButton>
           </div>
+
+          {broadRows.length > 0 && (
+            <label className="flex items-start gap-3 rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-[var(--app-text)]">
+              <input
+                type="checkbox"
+                checked={allowRulesWithoutConditions}
+                onChange={(event) =>
+                  setAllowRulesWithoutConditions(event.target.checked)
+                }
+                className="mt-1"
+              />
+              <span>
+                Подтверждаю создание {previewSummary.requiresConfirmation} правил
+                без условий. Они будут показывать комплектующее для всех товаров
+                выбранного типа.
+              </span>
+            </label>
+          )}
 
           {applyMutation.isError && (
             <div

@@ -1,0 +1,78 @@
+{
+  "createdAtUtc": "2026-10-22T11:29:13.581Z",
+  "outputDir": "F:\\Projects\\ElectronicCRM\\outputs\\analogy-learning-full-test",
+  "fileCount": 14,
+  "overview": "{\"kind\":\"workbook\",\"id\":\"wb/of20ey\",\"sheets\":3}\n{\"kind\":\"sheet\",\"id\":\"ws/w6r4v9\",\"name\":\"Порядок\",\"index\":0,\"range\":\"A1:D11\",\"address\":\"A1:D11\"}\n{\"kind\":\"sheet\",\"id\":\"ws/hqksed\",\"name\":\"Файлы\",\"index\":1,\"range\":\"A1:D14\",\"address\":\"A1:D14\"}\n{\"kind\":\"sheet\",\"id\":\"ws/thm1uu\",\"name\":\"Типы\",\"index\":2,\"range\":\"A1:C11\",\"address\":\"A1:C11\"}",
+  "files": [
+    {
+      "file": "01_Комплектующие.xlsx",
+      "type": "Комплектующие",
+      "rows": 3
+    },
+    {
+      "file": "02_Модульный_автомат_обучение.xlsx",
+      "type": "Модульный автомат",
+      "rows": 9
+    },
+    {
+      "file": "03_Дифференциальный_автомат_обучение.xlsx",
+      "type": "Дифференциальный автомат",
+      "rows": 6
+    },
+    {
+      "file": "04_УЗО_обучение.xlsx",
+      "type": "УЗО",
+      "rows": 6
+    },
+    {
+      "file": "05_Силовой_автомат_обучение.xlsx",
+      "type": "Силовой автомат",
+      "rows": 6
+    },
+    {
+      "file": "06_Напольный_корпус_обучение.xlsx",
+      "type": "Напольный корпус",
+      "rows": 6
+    },
+    {
+      "file": "07_Корпус_ЩМП_обучение.xlsx",
+      "type": "Корпус ЩМП",
+      "rows": 6
+    },
+    {
+      "file": "08_Корпус_ЩРн_ЩРв_обучение.xlsx",
+      "type": "Корпус ЩРн/ЩРв",
+      "rows": 6
+    },
+    {
+      "file": "09_Выключатель_нагрузки_обучение.xlsx",
+      "type": "Выключатель нагрузки",
+      "rows": 6
+    },
+    {
+      "file": "10_Рубильник_обучение.xlsx",
+      "type": "Рубильник",
+      "rows": 6
+    },
+    {
+      "file": "11_Модульный_автомат_AutoFill.xlsx",
+      "type": "Модульный автомат",
+      "rows": 3
+    },
+    {
+      "file": "12_Модульный_автомат_приоритет_Excel.xlsx",
+      "type": "Модульный автомат",
+      "rows": 1
+    },
+    {
+      "file": "13_УЗО_регрессия.xlsx",
+      "type": "УЗО",
+      "rows": 3
+    }
+  ],
+  "verification": {
+    "renderedSheets": 16,
+    "inspectedWorkbooks": 14,
+    "formulasExpected": 0
+  }
+}

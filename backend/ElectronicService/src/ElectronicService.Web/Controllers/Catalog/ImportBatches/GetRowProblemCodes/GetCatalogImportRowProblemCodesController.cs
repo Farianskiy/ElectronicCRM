@@ -69,6 +69,11 @@ public sealed class
                 result.Value.TotalRowsCount,
                 result.Value.ErrorRowsCount,
                 result.Value.WarningRowsCount,
+                result.Value.StrictRowsCount,
+                result.Value.CatalogAnalogyRowsCount,
+                result.Value.AwaitingConfirmationRowsCount,
+                result.Value.ConflictRowsCount,
+                result.Value.RequiredMissingRowsCount,
                 result.Value.Items
                     .Select(item =>
                         new CatalogImportRowProblemCodeResponse(

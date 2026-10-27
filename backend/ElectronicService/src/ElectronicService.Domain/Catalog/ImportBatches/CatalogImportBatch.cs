@@ -264,7 +264,8 @@ public sealed class CatalogImportBatch : AggregateRoot
         }
 
         if (importMode is not CatalogImportMode.CreateOnly
-            and not CatalogImportMode.UpdateCharacteristicsOnly)
+            and not CatalogImportMode.UpdateCharacteristicsOnly
+            and not CatalogImportMode.CreateMissingAndUpdateCharacteristics)
         {
             return CatalogImportErrors.InvalidImportMode(importMode.ToString());
         }

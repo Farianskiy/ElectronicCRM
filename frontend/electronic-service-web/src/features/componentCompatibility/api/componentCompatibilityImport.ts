@@ -21,17 +21,31 @@ export async function previewComponentCompatibilityImport(
   return response.data;
 }
 
-export async function applyComponentCompatibilityImport(rows: Array<{
-  componentProductId: string;
-  mainProductTypeId: string;
-  needDefinitionId: string | null;
-  isActive: boolean;
-  constraints: ComponentCompatibilityImportConstraint[];
-}>): Promise<ApplyComponentCompatibilityImportResponse> {
+export async function previewComponentCompatibilityImportBatch(
+  batchId: string,
+): Promise<PreviewComponentCompatibilityImportResponse> {
+  const response =
+    await httpClient.post<PreviewComponentCompatibilityImportResponse>(
+      `/api/catalog/component-compatibility/import/batches/${batchId}/preview`,
+    );
+
+  return response.data;
+}
+
+export async function applyComponentCompatibilityImport(request: {
+  rows: Array<{
+    componentProductId: string;
+    mainProductTypeId: string;
+    needDefinitionId: string | null;
+    isActive: boolean;
+    constraints: ComponentCompatibilityImportConstraint[];
+  }>;
+  allowRulesWithoutConditions: boolean;
+}): Promise<ApplyComponentCompatibilityImportResponse> {
   const response =
     await httpClient.post<ApplyComponentCompatibilityImportResponse>(
       "/api/catalog/component-compatibility/import/apply",
-      { rows },
+      request,
     );
 
   return response.data;
@@ -39,18 +53,26 @@ export async function applyComponentCompatibilityImport(rows: Array<{
 
 export async function downloadCurrentComponentCompatibilityRules(
   mainProductTypeCode: string,
+  componentManufacturerIds?: string[],
 ): Promise<string> {
+  const params = new URLSearchParams({ mainProductTypeCode });
+  for (const manufacturerId of componentManufacturerIds ?? []) {
+    params.append("componentManufacturerIds", manufacturerId);
+  }
+
   const response = await httpClient.get<Blob>(
     "/api/catalog/component-compatibility/import/export",
     {
       responseType: "blob",
-      params: { mainProductTypeCode },
+      params,
     },
   );
 
   return downloadFileResponse(
     response,
-    `component-compatibility-${mainProductTypeCode}.xlsx`,
+    `component-compatibility-${mainProductTypeCode}${
+      componentManufacturerIds?.length ? "-selected-manufacturers" : ""
+    }.xlsx`,
   );
 }
 

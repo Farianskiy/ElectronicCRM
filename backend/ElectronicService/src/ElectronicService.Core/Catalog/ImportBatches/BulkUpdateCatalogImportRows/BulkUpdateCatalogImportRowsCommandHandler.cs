@@ -259,9 +259,14 @@ public sealed class BulkUpdateCatalogImportRowsCommandHandler
                 item.StockQuantity,
                 item.Characteristics,
                 item.ManufacturerId,
+                CharacteristicOrigins: item.CharacteristicOrigins,
                 ProductTypeId: productTypeId,
-                ProductTypeResolutionSource: "Manual",
-                ProductTypeResolutionConfidence: 1.0000m);
+                ProductTypeResolutionSource: item.PreserveProductTypeResolution
+                    ? previousDataByRowId[row.Id].ProductTypeResolutionSource
+                    : "Manual",
+                ProductTypeResolutionConfidence: item.PreserveProductTypeResolution
+                    ? previousDataByRowId[row.Id].ProductTypeResolutionConfidence
+                    : 1.0000m);
 
             var validationResult = _rowValidator.Validate(
                 data,

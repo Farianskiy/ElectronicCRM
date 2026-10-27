@@ -10,8 +10,11 @@ using ElectronicService.Core.Catalog.Assistant.DictionarySuggestions.Abstraction
 using ElectronicService.Core.Catalog.ImportBatches.Analysis;
 using ElectronicService.Core.Catalog.Recognition.Abstractions;
 using ElectronicService.Core.Catalog.Recognition.Learning;
+using ElectronicService.Domain.Catalog.Characteristics;
 using ElectronicService.Domain.Catalog.ImportBatches;
+using ElectronicService.Domain.Catalog.Products;
 using ElectronicService.Domain.Catalog.Recognition;
+using ElectronicService.Domain.Catalog.ValueObjects;
 using ElectronicService.Domain.Common;
 using ElectronicService.Domain.Users.Enums;
 using ElectronicService.Infrastructure.IntegrationTests.Data;
@@ -34,6 +37,114 @@ namespace ElectronicService.Infrastructure.IntegrationTests.Catalog;
 public sealed class CatalogRecognitionLearningTests(PostgreSqlFixture fixture)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    [Fact]
+    public async Task MixedImportCreatesMissingProductAndUpdatesOnlyExistingCharacteristics()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var db = fixture.CreateDbContext();
+        var (graph, reviewer) = await SeedGraphAsync(db, ct);
+        var existingArticle = $"MIXED-EXISTING-{Guid.NewGuid():N}";
+        var newArticle = $"MIXED-NEW-{Guid.NewGuid():N}";
+        var existing = Product.Create(
+            existingArticle,
+            "Исходное название",
+            graph.ProductType.Id,
+            graph.Manufacturer.Id,
+            Money.Create(125m).Value,
+            StockQuantity.Create(4).Value).Value;
+        Assert.True(existing.SetCharacteristic(
+            graph.ProductType,
+            graph.Definition,
+            CharacteristicValue.CreateNumber(10m).Value).IsSuccess);
+        db.Products.Add(existing);
+
+        var batch = CatalogImportBatch.Create(
+            reviewer,
+            "mixed-create-and-update.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            [1],
+            CatalogImportMode.CreateMissingAndUpdateCharacteristics).Value;
+        var existingData = new CatalogImportNormalizedRowData(
+            "Название из Excel не должно примениться",
+            existingArticle,
+            graph.Manufacturer.Name,
+            999m,
+            999,
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [graph.Definition.Id.ToString()] = "25"
+            },
+            ManufacturerId: graph.Manufacturer.Id,
+            ProductTypeId: graph.ProductType.Id);
+        var newData = new CatalogImportNormalizedRowData(
+            "Новый товар",
+            newArticle,
+            graph.Manufacturer.Name,
+            75m,
+            6,
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [graph.Definition.Id.ToString()] = "16"
+            },
+            ManufacturerId: graph.Manufacturer.Id,
+            ProductTypeId: graph.ProductType.Id);
+        db.CatalogImportBatches.Add(batch);
+        db.CatalogImportRows.AddRange(
+            CatalogImportRow.Create(
+                batch.Id,
+                2,
+                CatalogImportRowStatus.Valid,
+                "{}",
+                JsonSerializer.Serialize(existingData, JsonOptions),
+                "[]",
+                "[]").Value,
+            CatalogImportRow.Create(
+                batch.Id,
+                3,
+                CatalogImportRowStatus.Valid,
+                "{}",
+                JsonSerializer.Serialize(newData, JsonOptions),
+                "[]",
+                "[]").Value);
+        Assert.True(batch.RegisterAnalysisResult(2, 2, 0, false).IsSuccess);
+        await db.SaveChangesAsync(ct);
+
+        var applier = new CatalogImportBatchApplier(
+            db,
+            new CatalogImportRecognitionFeedbackFinalizer(
+                new CatalogRecognitionFeedbackRepository(db)),
+            NullLogger<CatalogImportBatchApplier>.Instance);
+        var result = await applier.ApplyAsync(
+            batch,
+            reviewer,
+            UserType.Technical,
+            ct);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Message : null);
+        Assert.Equal(1, result.Value.CreatedProductsCount);
+        Assert.Equal(1, result.Value.UpdatedProductsCount);
+
+        var updated = await db.Products
+            .Include(product => product.Characteristics)
+            .SingleAsync(product => product.Id == existing.Id, ct);
+        Assert.Equal("Исходное название", updated.Name.Value);
+        Assert.Equal(125m, updated.Price.Amount);
+        Assert.Equal(4, updated.StockQuantity.Value);
+        Assert.Equal(
+            25m,
+            Assert.Single(updated.Characteristics).Value.NumberValue);
+
+        var created = await db.Products
+            .Include(product => product.Characteristics)
+            .SingleAsync(product => product.Article.Value == newArticle, ct);
+        Assert.Equal("Новый товар", created.Name.Value);
+        Assert.Equal(75m, created.Price.Amount);
+        Assert.Equal(6, created.StockQuantity.Value);
+        Assert.Equal(
+            16m,
+            Assert.Single(created.Characteristics).Value.NumberValue);
+    }
 
     [Fact]
     public async Task StartupAndRestartDrainBothQueuesPastDeferredPagesWithoutDuplicatingEvidence()

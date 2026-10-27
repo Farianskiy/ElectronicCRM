@@ -68,6 +68,8 @@ public sealed class
             value.RowsCount,
             value.ValidRowsCount,
             value.ErrorRowsCount,
+            value.PlannedCreateProductsCount,
+            value.PlannedUpdateProductsCount,
             value.CreatedAtUtc,
             value.UpdatedAtUtc,
             value.SubmittedAtUtc,

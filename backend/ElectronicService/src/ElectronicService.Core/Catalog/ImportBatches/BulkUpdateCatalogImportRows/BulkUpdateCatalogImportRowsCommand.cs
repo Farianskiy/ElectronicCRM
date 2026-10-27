@@ -1,3 +1,5 @@
+using ElectronicService.Core.Catalog.ImportBatches.Analysis;
+
 namespace ElectronicService.Core.Catalog.ImportBatches.BulkUpdateCatalogImportRows;
 
 public sealed record BulkUpdateCatalogImportRowsCommand(
@@ -15,4 +17,6 @@ public sealed record BulkUpdateCatalogImportRowItem(
     Guid? ManufacturerId,
     decimal? Price,
     int? StockQuantity,
-    IReadOnlyDictionary<string, string> Characteristics);
+    IReadOnlyDictionary<string, string> Characteristics,
+    IReadOnlyDictionary<string, CatalogImportCharacteristicValueOrigin>? CharacteristicOrigins = null,
+    bool PreserveProductTypeResolution = false);

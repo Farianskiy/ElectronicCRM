@@ -3,6 +3,7 @@ import type {
   CatalogImportReviewQueueStatus,
   CatalogImportRowProblemKind,
   CatalogImportRowFilterStatus,
+  CatalogImportRowKnowledgeState,
 } from "./types";
 
 const root = ["catalog-import-batches"] as const;
@@ -101,6 +102,7 @@ export const catalogImportQueryKeys = {
   issueCode: string | null,
   problemKind: CatalogImportRowProblemKind | null,
   manufacturerGroupKey: string | null,
+  knowledgeState: CatalogImportRowKnowledgeState | null,
   page: number,
   pageSize: number,
 ) =>
@@ -113,6 +115,7 @@ export const catalogImportQueryKeys = {
   issueCode,
   problemKind,
   manufacturerGroupKey,
+  knowledgeState,
   page,
   pageSize,
 ] as const,

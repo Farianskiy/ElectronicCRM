@@ -20,6 +20,9 @@ public sealed class CatalogRecognitionFeedback : AggregateRoot
 
     public const int ReviewerRoleMaxLength = 100;
 
+    public const int EvidenceSnapshotMaxLength = 32000;
+    public const int AnalogyStaleReasonMaxLength = 1000;
+
     private CatalogRecognitionFeedback(
         Guid id,
         string productName,
@@ -48,7 +51,8 @@ public sealed class CatalogRecognitionFeedback : AggregateRoot
         string? reviewerRole,
         DateTime createdAtUtc,
         DateTime? finalizedAtUtc,
-        bool isTrainingEligible)
+        bool isTrainingEligible,
+        string? evidenceSnapshotJson)
         : base(id)
     {
         ProductName = productName;
@@ -78,6 +82,7 @@ public sealed class CatalogRecognitionFeedback : AggregateRoot
         CreatedAtUtc = createdAtUtc;
         FinalizedAtUtc = finalizedAtUtc;
         IsTrainingEligible = isTrainingEligible;
+        EvidenceSnapshotJson = evidenceSnapshotJson;
     }
 
     private CatalogRecognitionFeedback()
@@ -143,6 +148,13 @@ public sealed class CatalogRecognitionFeedback : AggregateRoot
     public DateTime? FinalizedAtUtc { get; private set; }
 
     public bool IsTrainingEligible { get; private set; }
+
+    public string? EvidenceSnapshotJson { get; private set; }
+    public int AnalogyDisplayCount { get; private set; }
+    public int AnalogyStaleCount { get; private set; }
+    public DateTime? AnalogyLastShownAtUtc { get; private set; }
+    public DateTime? AnalogyDecisionRecordedAtUtc { get; private set; }
+    public string? AnalogyLastStaleReason { get; private set; }
     public DateTime? ExcludedAtUtc { get; private set; }
     public Guid? ExcludedByUserId { get; private set; }
     public string? ExclusionReason { get; private set; }
@@ -182,7 +194,8 @@ public sealed class CatalogRecognitionFeedback : AggregateRoot
         Guid? recognitionProfileId,
         string? modelVersion,
         Guid? importBatchId,
-        Guid? importRowId)
+        Guid? importRowId,
+        string? evidenceSnapshotJson = null)
     {
         if (string.IsNullOrWhiteSpace(productName))
         {
@@ -227,6 +240,8 @@ public sealed class CatalogRecognitionFeedback : AggregateRoot
         var trimmedSuggestedNormalizedValue = NormalizeOptionalValue(suggestedNormalizedValue);
         var trimmedSuggestedSource = NormalizeOptionalValue(suggestedSource);
         var trimmedModelVersion = NormalizeOptionalValue(modelVersion);
+        var trimmedEvidenceSnapshotJson = NormalizeOptionalValue(
+            evidenceSnapshotJson);
 
         if (trimmedProductName.Length > ProductNameMaxLength)
         {
@@ -266,6 +281,14 @@ public sealed class CatalogRecognitionFeedback : AggregateRoot
         if (trimmedModelVersion is not null && trimmedModelVersion.Length > ModelVersionMaxLength)
         {
             return GeneralErrors.ValueIsTooLong(nameof(modelVersion), ModelVersionMaxLength);
+        }
+
+        if (trimmedEvidenceSnapshotJson is not null
+            && trimmedEvidenceSnapshotJson.Length > EvidenceSnapshotMaxLength)
+        {
+            return GeneralErrors.ValueIsTooLong(
+                nameof(evidenceSnapshotJson),
+                EvidenceSnapshotMaxLength);
         }
 
         if (suggestedConfidence.HasValue && (suggestedConfidence.Value < 0m || suggestedConfidence.Value > 1m))
@@ -353,7 +376,7 @@ public sealed class CatalogRecognitionFeedback : AggregateRoot
                 decisionResult.Error);
         }
 
-        return new CatalogRecognitionFeedback(
+        var feedback = new CatalogRecognitionFeedback(
             Guid.CreateVersion7(),
             trimmedProductName,
             trimmedNormalizedProductName,
@@ -381,7 +404,144 @@ public sealed class CatalogRecognitionFeedback : AggregateRoot
             reviewerRole: null,
             DateTime.UtcNow,
             finalizedAtUtc: null,
-            isTrainingEligible: false);
+            isTrainingEligible: false,
+            trimmedEvidenceSnapshotJson);
+
+        if (feedbackType == CatalogRecognitionFeedbackType.Shown)
+        {
+            feedback.AnalogyDisplayCount = 1;
+            feedback.AnalogyLastShownAtUtc = feedback.CreatedAtUtc;
+        }
+
+        return feedback;
+    }
+
+    public bool MatchesAnalogyObservation(
+        string normalizedProductName,
+        string suggestedNormalizedValue,
+        string modelVersion,
+        string evidenceSnapshotJson)
+    {
+        return FeedbackType == CatalogRecognitionFeedbackType.Shown
+            && string.Equals(
+                NormalizedProductName,
+                normalizedProductName,
+                StringComparison.Ordinal)
+            && string.Equals(
+                SuggestedNormalizedValue,
+                suggestedNormalizedValue,
+                StringComparison.Ordinal)
+            && string.Equals(ModelVersion, modelVersion, StringComparison.Ordinal)
+            && string.Equals(
+                EvidenceSnapshotJson,
+                evidenceSnapshotJson,
+                StringComparison.Ordinal);
+    }
+
+    public UnitResult<DomainError> RefreshAnalogyObservation(
+        string productName,
+        string normalizedProductName,
+        Guid manufacturerId,
+        Guid productTypeId,
+        string productTypeCodeSnapshot,
+        string suggestedRawValue,
+        string suggestedNormalizedValue,
+        decimal suggestedConfidence,
+        string suggestedSource,
+        string modelVersion,
+        string evidenceSnapshotJson,
+        string staleReason)
+    {
+        if (!IsPending || IsFinalized)
+        {
+            return UnitResult.Failure(GeneralErrors.ValueIsInvalid(nameof(Status)));
+        }
+
+        var normalizedStaleReason = NormalizeOptionalValue(staleReason);
+        if (normalizedStaleReason is null
+            || normalizedStaleReason.Length > AnalogyStaleReasonMaxLength)
+        {
+            return UnitResult.Failure(
+                GeneralErrors.ValueIsInvalid(nameof(staleReason)));
+        }
+
+        var replacement = Create(
+            productName,
+            normalizedProductName,
+            manufacturerId,
+            productTypeId,
+            productTypeCodeSnapshot,
+            CharacteristicDefinitionId,
+            CharacteristicCodeSnapshot,
+            suggestedRawValue,
+            suggestedNormalizedValue,
+            suggestedConfidence,
+            suggestedSource,
+            spanStart: null,
+            spanLength: null,
+            CatalogRecognitionFeedbackType.Shown,
+            finalNormalizedValue: null,
+            dictionaryTermId: null,
+            recognitionProfileId: null,
+            modelVersion,
+            ImportBatchId,
+            ImportRowId,
+            evidenceSnapshotJson);
+
+        if (replacement.IsFailure)
+        {
+            return UnitResult.Failure(replacement.Error);
+        }
+
+        var value = replacement.Value;
+        ProductName = value.ProductName;
+        NormalizedProductName = value.NormalizedProductName;
+        ManufacturerId = value.ManufacturerId;
+        ProductTypeId = value.ProductTypeId;
+        ProductTypeCodeSnapshot = value.ProductTypeCodeSnapshot;
+        SuggestedRawValue = value.SuggestedRawValue;
+        SuggestedNormalizedValue = value.SuggestedNormalizedValue;
+        SuggestedConfidence = value.SuggestedConfidence;
+        SuggestedSource = value.SuggestedSource;
+        ModelVersion = value.ModelVersion;
+        EvidenceSnapshotJson = value.EvidenceSnapshotJson;
+        FeedbackType = CatalogRecognitionFeedbackType.Shown;
+        FinalNormalizedValue = null;
+        AnalogyDisplayCount++;
+        AnalogyStaleCount++;
+        AnalogyLastShownAtUtc = DateTime.UtcNow;
+        AnalogyDecisionRecordedAtUtc = null;
+        AnalogyLastStaleReason = normalizedStaleReason;
+        return UnitResult.Success<DomainError>();
+    }
+
+    public UnitResult<DomainError> RecordAnalogyDecision(
+        CatalogRecognitionFeedbackType feedbackType,
+        string? finalNormalizedValue,
+        string evidenceSnapshotJson)
+    {
+        if (FeedbackType != CatalogRecognitionFeedbackType.Shown
+            || AnalogyDisplayCount <= 0)
+        {
+            return UnitResult.Failure(GeneralErrors.ValueIsInvalid(nameof(FeedbackType)));
+        }
+
+        if (string.IsNullOrWhiteSpace(evidenceSnapshotJson)
+            || evidenceSnapshotJson.Trim().Length > EvidenceSnapshotMaxLength)
+        {
+            return UnitResult.Failure(
+                GeneralErrors.ValueIsInvalid(nameof(evidenceSnapshotJson)));
+        }
+
+        var update = UpdatePendingDecision(feedbackType, finalNormalizedValue);
+        if (update.IsFailure)
+        {
+            return update;
+        }
+
+        EvidenceSnapshotJson = evidenceSnapshotJson.Trim();
+        AnalogyDecisionRecordedAtUtc = DateTime.UtcNow;
+        return UnitResult.Success<DomainError>();
     }
 
     public UnitResult<DomainError> SetConfirmedSpan(int start, int length)
@@ -550,13 +710,17 @@ public sealed class CatalogRecognitionFeedback : AggregateRoot
                     CharacteristicValueMaxLength));
         }
 
-        if (feedbackType == CatalogRecognitionFeedbackType.Rejected && trimmedFinalNormalizedValue is not null)
+        if ((feedbackType == CatalogRecognitionFeedbackType.Rejected
+                || feedbackType == CatalogRecognitionFeedbackType.Shown)
+            && trimmedFinalNormalizedValue is not null)
         {
             return Result.Failure<string?, DomainError>(
                 GeneralErrors.ValueIsInvalid(nameof(finalNormalizedValue)));
         }
 
-        if (feedbackType != CatalogRecognitionFeedbackType.Rejected && trimmedFinalNormalizedValue is null)
+        if (feedbackType != CatalogRecognitionFeedbackType.Rejected
+            && feedbackType != CatalogRecognitionFeedbackType.Shown
+            && trimmedFinalNormalizedValue is null)
         {
             return Result.Failure<string?, DomainError>(
                 GeneralErrors.ValueIsRequired(nameof(finalNormalizedValue)));

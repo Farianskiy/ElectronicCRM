@@ -31,6 +31,12 @@ public sealed class ElectronicDbContext : DbContext
 
     public DbSet<ProductAlias> ProductAliases => Set<ProductAlias>();
 
+    public DbSet<CatalogProductAnalogyConfiguration> CatalogProductAnalogyConfigurations =>
+        Set<CatalogProductAnalogyConfiguration>();
+
+    public DbSet<CatalogProductAnalogyEvaluationReport> CatalogProductAnalogyEvaluationReports =>
+        Set<CatalogProductAnalogyEvaluationReport>();
+
     public DbSet<ComponentNeedDefinition> ComponentNeedDefinitions =>
         Set<ComponentNeedDefinition>();
 

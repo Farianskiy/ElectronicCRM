@@ -27,6 +27,7 @@ import {
   updateCatalogPriceCalculationCard,
 } from "@/features/catalogPriceCalculations/api/catalogPriceCalculationEditorApi";
 import { exportCatalogPriceCalculation } from "@/features/catalogPriceCalculations/api/exportCatalogPriceCalculation";
+import { MultiProductSearchWorkspace } from "@/features/catalogPriceCalculations/ui/MultiProductSearchWorkspace";
 import { getProductComponentCompatibility } from "@/features/componentCompatibility/api/getProductComponentCompatibility";
 import { getCatalogProductTypes } from "@/features/catalogMetadata/api/getCatalogProductTypes";
 import { CreateCatalogProductDialog } from "@/features/catalogProducts/ui/CreateCatalogProductDialog";
@@ -42,7 +43,6 @@ import type {
   CatalogPriceCalculationLineComponent,
   CatalogPriceCalculationLineComponentSupplyStatus,
   CatalogPriceCalculationManufacturerDiscount,
-  CatalogPriceCalculationProductSearchItem,
   CatalogPriceCalculationStatus,
 } from "@/features/catalogPriceCalculations/model/types";
 import type { CreateCatalogProductResponse } from "@/features/catalogProducts/model/types";
@@ -51,8 +51,6 @@ import { formatDate, formatPrice } from "@/shared/lib/formatters";
 import { AppButton } from "@/shared/ui/AppButton";
 import { AppInput } from "@/shared/ui/AppInput";
 import { PageWorkspace } from "@/shared/ui/PageWorkspace";
-
-const productSearchPageSize = 20;
 
 interface MissingCatalogProductDraft {
   article: string;
@@ -250,88 +248,6 @@ function StatusBadge({ status }: { status: CatalogPriceCalculationStatus }) {
     >
       {getStatusLabel(status)}
     </span>
-  );
-}
-
-function ProductSearchRow({
-  product,
-  currency,
-  isAdding,
-  onAdd,
-}: {
-  product: CatalogPriceCalculationProductSearchItem;
-  currency: string;
-  isAdding: boolean;
-  onAdd: (productId: string, quantity: number) => void;
-}) {
-  const [quantity, setQuantity] = useState("1");
-  const isAvailable = product.priceStatus === "Available";
-  const parsedQuantity = Number(quantity.replace(",", "."));
-  const unavailableReason =
-    product.priceStatus === "ActivePriceAmbiguous"
-      ? "Найдено несколько активных цен"
-      : "Нет активной цены";
-
-  return (
-    <tr className="bg-[var(--app-panel)] align-top">
-      <td className="px-4 py-4">
-        <p className="font-medium text-[var(--app-text)]">{product.name}</p>
-
-        <p className="mt-1 text-xs text-[var(--app-muted)]">
-          {product.article}
-        </p>
-      </td>
-
-      <td className="px-4 py-4 text-[var(--app-muted)]">
-        {product.manufacturerName}
-      </td>
-
-      <td className="whitespace-nowrap px-4 py-4 tabular-nums text-[var(--app-text)]">
-        {product.basePriceAmount === null
-          ? "—"
-          : formatPrice(product.basePriceAmount, currency)}
-        <p className="mt-1 text-xs font-normal text-[var(--app-muted)]">
-          {product.priceListRowId ? "Из активного прайса" : "Из карточки каталога"}
-        </p>
-      </td>
-
-      <td className="whitespace-nowrap px-4 py-4 tabular-nums text-[var(--app-muted)]">
-        {product.mrcPriceAmount === null || product.mrcPriceAmount === undefined
-          ? "—"
-          : formatPrice(product.mrcPriceAmount, currency)}
-      </td>
-
-      <td className="px-4 py-4">
-        {isAvailable ? (
-          <div className="flex min-w-[190px] items-center gap-2">
-            <AppInput
-              type="number"
-              min="0.001"
-              step="0.001"
-              value={quantity}
-              aria-label={`Количество ${product.name} в проекте`}
-              disabled={isAdding}
-              onChange={(event) => setQuantity(event.target.value)}
-              className="w-24"
-            />
-            <AppButton
-              type="button"
-              variant="primary"
-              size="sm"
-              loading={isAdding}
-              disabled={!Number.isFinite(parsedQuantity) || parsedQuantity <= 0}
-              onClick={() => onAdd(product.productId, parsedQuantity)}
-            >
-              Добавить
-            </AppButton>
-          </div>
-        ) : (
-          <span className="inline-flex max-w-56 rounded-xl border border-[var(--app-warning-border)] bg-[var(--app-warning-soft)] px-3 py-2 text-xs font-medium leading-5 text-[var(--app-warning)]">
-            {unavailableReason}
-          </span>
-        )}
-      </td>
-    </tr>
   );
 }
 
@@ -1612,9 +1528,6 @@ export default function CatalogPriceCalculationPage() {
 
   const calculationId = params.calculationId ?? "";
 
-  const [search, setSearch] = useState("");
-  const [appliedSearch, setAppliedSearch] = useState("");
-  const [searchPage, setSearchPage] = useState(1);
   const [projectImportFile, setProjectImportFile] = useState<File | null>(null);
   const [importPreviewSection, setImportPreviewSection] = useState<
     "positions" | "components" | "characteristics"
@@ -1671,23 +1584,6 @@ export default function CatalogPriceCalculationPage() {
     compatibilityReadinessFailed ||
     unresolvedRequiredComponentDecisions.length > 0;
 
-  const productsQuery = useQuery({
-    queryKey: catalogPriceCalculationQueryKeys.products(
-      calculationId,
-      appliedSearch,
-      searchPage,
-      productSearchPageSize,
-    ),
-    queryFn: () =>
-      searchCatalogPriceCalculationProducts({
-        calculationId,
-        search: appliedSearch,
-        page: searchPage,
-        pageSize: productSearchPageSize,
-      }),
-    enabled: calculationId.length > 0 && editable && appliedSearch.length > 0,
-    placeholderData: (previousData) => previousData,
-  });
 
   async function refreshCalculation(): Promise<void> {
     await Promise.all([
@@ -1913,15 +1809,6 @@ export default function CatalogPriceCalculationPage() {
     completeMutation.error ??
     cardMutation.error ??
     exportMutation.error;
-
-  const searchTotalPages = Math.max(1, productsQuery.data?.totalPages ?? 0);
-
-  function handleSearch(event: FormEvent<HTMLFormElement>): void {
-    event.preventDefault();
-
-    setAppliedSearch(search.trim());
-    setSearchPage(1);
-  }
 
   function handleImportPreview(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
@@ -2956,150 +2843,32 @@ export default function CatalogPriceCalculationPage() {
       )}
 
       {editable && (
-        <section
-          aria-labelledby="product-search-title"
-          className="rounded-3xl border border-[var(--app-border)] bg-[var(--app-panel)] p-5 sm:p-6"
-        >
-          <h2
-            id="product-search-title"
-            className="text-xl font-semibold text-[var(--app-text)]"
-          >
-            Добавить товар
-          </h2>
-
-          <p className="mt-2 text-sm text-[var(--app-muted)]">
-            Поиск выполняется по всему каталогу. Если для товара есть одна
-            актуальная цена в прайсе, используется она; иначе расчёт возьмёт
-            цену из карточки товара.
-          </p>
-
-          <form
-            onSubmit={handleSearch}
-            className="mt-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]"
-          >
-            <AppInput
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Артикул или наименование товара"
-            />
-
-            <AppButton
-              type="submit"
-              variant="primary"
-              disabled={search.trim().length === 0}
-            >
-              Найти
-            </AppButton>
-          </form>
-
-          {productsQuery.isError && (
-            <div
-              role="alert"
-              className="mt-4 rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-4 text-sm text-[var(--app-danger)]"
-            >
-              {getApiErrorMessage(
-                productsQuery.error,
-                "Не удалось выполнить поиск товаров.",
-              )}
-            </div>
+        <MultiProductSearchWorkspace
+          key={calculationId}
+          calculationId={calculationId}
+          currency={calculation.currency}
+          existingProductIds={new Set(
+            calculation.lines.map((line) => line.productId),
           )}
-
-          {productsQuery.isLoading ? (
-            <p role="status" className="mt-5 text-sm text-[var(--app-muted)]">
-              Ищем товары...
-            </p>
-          ) : productsQuery.data && productsQuery.data.items.length > 0 ? (
-            <>
-              <div className="mt-5 overflow-x-auto rounded-2xl border border-[var(--app-border)]">
-                <table className="w-full min-w-[850px] border-collapse text-left text-sm">
-                  <thead className="bg-[var(--app-surface)] text-[var(--app-muted)]">
-                    <tr>
-                      <th className="px-4 py-3 font-medium">Товар</th>
-                      <th className="px-4 py-3 font-medium">Производитель</th>
-                      <th className="px-4 py-3 font-medium">Базовая цена</th>
-                      <th className="px-4 py-3 font-medium">МРЦ</th>
-                      <th className="px-4 py-3 font-medium">Действие</th>
-                    </tr>
-                  </thead>
-
-                  <tbody className="divide-y divide-[var(--app-border)]">
-                    {productsQuery.data.items.map((product) => (
-                      <ProductSearchRow
-                        key={product.productId}
-                        product={product}
-                        currency={calculation.currency}
-                        isAdding={
-                          addLineMutation.isPending &&
-                          addLineMutation.variables?.productId ===
-                            product.productId
-                        }
-                        onAdd={handleAdd}
-                      />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <nav className="mt-4 flex items-center justify-between">
-                <AppButton
-                  type="button"
-                  variant="secondary"
-                  disabled={searchPage <= 1 || productsQuery.isFetching}
-                  onClick={() =>
-                    setSearchPage((current) => Math.max(1, current - 1))
-                  }
-                >
-                  Назад
-                </AppButton>
-
-                <p className="text-sm text-[var(--app-muted)]">
-                  Страница {searchPage} из {searchTotalPages}
-                </p>
-
-                <AppButton
-                  type="button"
-                  variant="secondary"
-                  disabled={
-                    searchPage >= searchTotalPages || productsQuery.isFetching
-                  }
-                  onClick={() =>
-                    setSearchPage((current) =>
-                      Math.min(searchTotalPages, current + 1),
-                    )
-                  }
-                >
-                  Вперёд
-                </AppButton>
-              </nav>
-            </>
-          ) : appliedSearch.length > 0 && productsQuery.isSuccess ? (
-            <div className="mt-5 flex flex-col gap-3 rounded-2xl border border-dashed border-[var(--app-border-strong)] p-5 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm text-[var(--app-muted)]">
-                В каталоге подходящие товары не найдены.
-              </p>
-              {canEditProducts && (
-                <AppButton
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  onClick={() =>
-                    setMissingProductDraft({
-                      article: appliedSearch,
-                      name: appliedSearch,
-                      manufacturerName: null,
-                      kind: "MainProduct",
-                      priceAmount: 0,
-                      projectQuantity: 1,
-                      source: "search",
-                    })
-                  }
-                >
-                  Добавить товар в каталог
-                </AppButton>
-              )}
-            </div>
-          ) : null}
-        </section>
+          canCreateProducts={canEditProducts}
+          addingProductId={
+            addLineMutation.isPending
+              ? (addLineMutation.variables?.productId ?? null)
+              : null
+          }
+          onAdd={handleAdd}
+          onCreateProduct={(productSearch) =>
+            setMissingProductDraft({
+              article: productSearch,
+              name: productSearch,
+              manufacturerName: null,
+              kind: "MainProduct",
+              priceAmount: 0,
+              projectQuantity: 1,
+              source: "search",
+            })
+          }
+        />
       )}
 
       {editable && manufacturers.length > 0 && (

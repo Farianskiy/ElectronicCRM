@@ -18,25 +18,29 @@ public sealed class UpdateCatalogImportRowCommandHandler
     private readonly IUserRepository _userRepository;
     private readonly ICatalogImportRowValidator _rowValidator;
     private readonly ICatalogImportRecognitionFeedbackCollector _recognitionFeedbackCollector;
+    private readonly CatalogImportAnalogyDecisionService _analogyDecisionService;
 
     public UpdateCatalogImportRowCommandHandler(
         ICatalogImportBatchRepository importBatchRepository,
         ICatalogProductMetadataRepository metadataRepository,
         IUserRepository userRepository,
         ICatalogImportRowValidator rowValidator,
-        ICatalogImportRecognitionFeedbackCollector recognitionFeedbackCollector)
+        ICatalogImportRecognitionFeedbackCollector recognitionFeedbackCollector,
+        CatalogImportAnalogyDecisionService analogyDecisionService)
     {
         ArgumentNullException.ThrowIfNull(importBatchRepository);
         ArgumentNullException.ThrowIfNull(metadataRepository);
         ArgumentNullException.ThrowIfNull(userRepository);
         ArgumentNullException.ThrowIfNull(rowValidator);
         ArgumentNullException.ThrowIfNull(recognitionFeedbackCollector);
+        ArgumentNullException.ThrowIfNull(analogyDecisionService);
 
         _importBatchRepository = importBatchRepository;
         _metadataRepository = metadataRepository;
         _userRepository = userRepository;
         _rowValidator = rowValidator;
         _recognitionFeedbackCollector = recognitionFeedbackCollector;
+        _analogyDecisionService = analogyDecisionService;
     }
 
     public async Task<Result<UpdateCatalogImportRowResult, DomainError>> Handle(
@@ -204,6 +208,29 @@ public sealed class UpdateCatalogImportRowCommandHandler
         }
 
         var effectiveData = feedbackCollectionResult.Value.Data;
+
+        if (command.AnalogyDecisions is { Count: > 0 })
+        {
+            var analogyDecisionResult = await _analogyDecisionService
+                .ApplyAsync(
+                    batch.Id,
+                    row.Id,
+                    productType,
+                    characteristicDefinitions,
+                    previousData,
+                    effectiveData,
+                    command.AnalogyDecisions,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            if (analogyDecisionResult.IsFailure)
+            {
+                return Result.Failure<UpdateCatalogImportRowResult, DomainError>(
+                    analogyDecisionResult.Error);
+            }
+
+            effectiveData = analogyDecisionResult.Value;
+        }
 
         var normalizedDataJson = JsonSerializer.Serialize(
             effectiveData,

@@ -55,6 +55,8 @@ public sealed record ComponentCompatibilityRuleResult(
     Guid ComponentProductId,
     string ComponentArticle,
     string ComponentName,
+    Guid ComponentManufacturerId,
+    string ComponentManufacturerName,
     Guid MainProductTypeId,
     Guid? NeedDefinitionId,
     string? NeedCode,

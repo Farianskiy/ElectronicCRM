@@ -8,7 +8,6 @@ import { getCatalogProductTypeCharacteristics } from "@/features/catalogMetadata
 import { getCatalogProductTypes } from "@/features/catalogMetadata/api/getCatalogProductTypes";
 import type {
   CatalogCharacteristicDataType,
-  CatalogProductTypeCharacteristicMetadata,
 } from "@/features/catalogMetadata/model/types";
 import { getApiErrorMessage } from "@/shared/api/getApiErrorMessage";
 import { AppSelect } from "@/shared/ui/AppSelect";
@@ -19,6 +18,11 @@ import { updateCatalogImportRow } from "../../api/updateCatalogImportRow";
 import { confirmCatalogImportTrainingExample } from "../../api/confirmCatalogImportTrainingExample";
 import { catalogImportConfirmedSpansQueryKey } from "../../api/getCatalogImportRowConfirmedSpans";
 import { CatalogImportConfirmedSpanEditor } from "./CatalogImportConfirmedSpanEditor";
+import { CatalogImportCharacteristicGrid } from "./CatalogImportCharacteristicGrid";
+import { ProductAnalogiesPreviewPanel } from "@/features/catalogProductAnalogies/ui/ProductAnalogiesPreviewPanel";
+import type {
+  CatalogProductAnalogyCharacteristicProposal,
+} from "@/features/catalogProductAnalogies/model/types";
 import type { CatalogImportConfirmedSpan } from "../../model/types";
 import { catalogImportQueryKeys } from "../../model/queryKeys";
 import type {
@@ -120,16 +124,6 @@ function parseNullableInteger(
   };
 }
 
-function getCharacteristicLabel(
-  characteristic: CatalogProductTypeCharacteristicMetadata,
-): string {
-  const unit = characteristic.unit ? `, ${characteristic.unit}` : "";
-
-  return characteristic.isRequired
-    ? `${characteristic.name}${unit} · обязательная`
-    : `${characteristic.name}${unit}`;
-}
-
 function normalizeCharacteristicValue(
   value: string,
   dataType: CatalogCharacteristicDataType,
@@ -182,6 +176,17 @@ export function CatalogImportRowEditor({
     useState<TrainingConfirmationFailure | null>(null);
   const [confirmedSpans, setConfirmedSpans] = useState<
     Record<string, CatalogImportConfirmedSpan>
+  >({});
+  const [confirmTrainingOnSave, setConfirmTrainingOnSave] = useState(false);
+  const [analogyDecisions, setAnalogyDecisions] = useState<
+    Record<
+      string,
+      {
+        decision: "Accepted" | "Rejected";
+        reason?: string;
+        feedbackId?: string | null;
+      }
+    >
   >({});
 
   const productTypesQuery = useQuery({
@@ -304,6 +309,7 @@ export function CatalogImportRowEditor({
 
     onSuccess: async (result) => {
       setConfirmedSpans({});
+      setAnalogyDecisions({});
       setTrainingConfirmationFailure(result.trainingFailure);
 
       await Promise.all([
@@ -364,6 +370,55 @@ export function CatalogImportRowEditor({
     saveMutation.reset();
   }
 
+  function applyAnalogyCharacteristicProposal(
+    proposal: CatalogProductAnalogyCharacteristicProposal,
+  ): void {
+    const characteristic = characteristics.find(
+      (item) => item.code === proposal.characteristicCode,
+    );
+
+    if (!characteristic) {
+      setFormErrors([
+        `Характеристика ${proposal.characteristicCode} отсутствует в выбранном типе товара.`,
+      ]);
+      return;
+    }
+
+    handleCharacteristicChange(characteristic.id, proposal.proposedValue);
+    setAnalogyDecisions((current) => ({
+      ...current,
+      [characteristic.id]: {
+        decision: "Accepted",
+        feedbackId: proposal.feedbackId,
+      },
+    }));
+  }
+
+  function rejectAnalogyCharacteristicProposal(
+    proposal: CatalogProductAnalogyCharacteristicProposal,
+    reason: string,
+  ): void {
+    const characteristic = characteristics.find(
+      (item) => item.code === proposal.characteristicCode,
+    );
+
+    if (!characteristic) {
+      setFormErrors([
+        `Характеристика ${proposal.characteristicCode} отсутствует в выбранном типе товара.`,
+      ]);
+      return;
+    }
+
+    setAnalogyDecisions((current) => ({
+      ...current,
+      [characteristic.id]: {
+        decision: "Rejected",
+        reason,
+        feedbackId: proposal.feedbackId,
+      },
+    }));
+  }
+
   function saveRow(confirmTrainingExamples: boolean): void {
     const errors: string[] = [];
 
@@ -419,6 +474,14 @@ export function CatalogImportRowEditor({
       stockQuantity: parsedStockQuantity.value,
       characteristics: requestCharacteristics,
       confirmedSpans,
+      analogyDecisions: Object.entries(analogyDecisions).map(
+        ([characteristicDefinitionId, decision]) => ({
+          characteristicDefinitionId,
+          decision: decision.decision,
+          reason: decision.reason ?? null,
+          feedbackId: decision.feedbackId ?? null,
+        }),
+      ),
     };
 
     setFormErrors([]);
@@ -428,7 +491,11 @@ export function CatalogImportRowEditor({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
-    saveRow(false);
+    saveRow(
+      confirmTrainingOnSave &&
+        trainingExamplesCount > 0 &&
+        canConfirmTrainingExamples,
+    );
   }
 
   const trainingExamplesCount = Object.keys(confirmedSpans).length;
@@ -437,31 +504,30 @@ export function CatalogImportRowEditor({
     !access.isError &&
     access.hasPermission("DictionariesManage");
 
+  const analogyKnownCharacteristics = Object.fromEntries(
+    characteristics
+      .map((characteristic) => [
+        characteristic.code,
+        characteristicValues[characteristic.id]?.trim() ?? "",
+      ])
+      .filter(([, value]) => value.length > 0),
+  );
+
   return (
     <form
       onSubmit={handleSubmit}
       className="grid min-w-0 gap-5 rounded-2xl border border-[var(--app-accent-border)] bg-[var(--app-panel)] p-4 text-[var(--app-text)] sm:p-5"
     >
-      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+      <div>
         <div>
-          <h3 className="text-lg font-semibold text-[var(--app-text)]">
-            Редактирование строки {row.rowNumber}
+          <h3 className="font-semibold text-[var(--app-text)]">
+            Основные данные товара
           </h3>
 
           <p className="mt-1 text-sm text-[var(--app-muted)]">
-            После сохранения строка будет повторно проверена backend.
+            Измените только неверные значения. После сохранения строка будет проверена повторно.
           </p>
         </div>
-
-        <AppButton
-          type="button"
-          size="sm"
-          variant="secondary"
-          disabled={saveMutation.isPending}
-          onClick={onCancel}
-        >
-          Закрыть
-        </AppButton>
       </div>
 
       {metadataError && (
@@ -492,6 +558,7 @@ export function CatalogImportRowEditor({
             onChange={(event) => {
               setName(event.target.value);
               setConfirmedSpans({});
+              setAnalogyDecisions({});
               setFormErrors([]);
               setTrainingConfirmationFailure(null);
               saveMutation.reset();
@@ -512,6 +579,7 @@ export function CatalogImportRowEditor({
             disabled={isBusy}
             onChange={(event) => {
               setArticle(event.target.value);
+              setAnalogyDecisions({});
               setFormErrors([]);
               saveMutation.reset();
             }}
@@ -531,6 +599,7 @@ export function CatalogImportRowEditor({
             onChange={(value) => {
               setManufacturerId(value);
               setConfirmedSpans({});
+              setAnalogyDecisions({});
               setFormErrors([]);
               setTrainingConfirmationFailure(null);
               saveMutation.reset();
@@ -569,6 +638,7 @@ export function CatalogImportRowEditor({
               setProductTypeId(value);
               setCharacteristicValues({});
               setConfirmedSpans({});
+              setAnalogyDecisions({});
               setFormErrors([]);
               setTrainingConfirmationFailure(null);
               saveMutation.reset();
@@ -636,21 +706,101 @@ export function CatalogImportRowEditor({
             Для выбранного типа характеристики не определены.
           </p>
         ) : (
-          <div className="mt-5 grid gap-4 xl:grid-cols-2">
-            {characteristics.map((characteristic) => (
-              <CharacteristicInput
-                key={characteristic.id}
-                characteristic={characteristic}
-                value={characteristicValues[characteristic.id] ?? ""}
-                disabled={isBusy}
-                onChange={(value) =>
-                  handleCharacteristicChange(characteristic.id, value)
-                }
-              />
-            ))}
-          </div>
+          <CatalogImportCharacteristicGrid
+            characteristics={characteristics}
+            values={characteristicValues}
+            origins={row.data.characteristicOrigins ?? {}}
+            disabled={isBusy}
+            onChange={handleCharacteristicChange}
+          />
         )}
       </section>
+
+      {canConfirmTrainingExamples && (
+        <>
+          {Object.keys(analogyDecisions).length > 0 && (
+            <section className="rounded-2xl border border-teal-500/25 bg-teal-500/[0.06] p-5">
+              <h3 className="font-semibold text-teal-100">
+                Решения по предложениям аналогов
+              </h3>
+              <p className="mt-2 text-sm text-slate-400">
+                Эти решения ещё не записаны. Они сохранятся вместе со строкой.
+              </p>
+              <div className="mt-4 grid gap-3">
+                {Object.entries(analogyDecisions).map(
+                  ([characteristicId, decision]) => {
+                    const characteristic = characteristics.find(
+                      (item) => item.id === characteristicId,
+                    );
+
+                    return (
+                      <div
+                        key={characteristicId}
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/20 p-3"
+                      >
+                        <div>
+                          <p className="text-sm font-medium text-white">
+                            {characteristic?.name ?? characteristicId}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-400">
+                            {decision.decision === "Accepted"
+                              ? "Предложение принято; изменённое значение будет сохранено как исправление."
+                              : `Предложение отклонено: ${decision.reason}`}
+                          </p>
+                        </div>
+                        <AppButton
+                          size="sm"
+                          variant="ghost"
+                          onClick={() =>
+                            setAnalogyDecisions((current) => {
+                              const next = { ...current };
+                              delete next[characteristicId];
+                              return next;
+                            })
+                          }
+                        >
+                          Отменить решение
+                        </AppButton>
+                      </div>
+                    );
+                  },
+                )}
+              </div>
+            </section>
+          )}
+
+          <details className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-panel-strong)]">
+            <summary className="cursor-pointer list-none px-5 py-4 marker:hidden">
+              <h3 className="font-semibold text-[var(--app-text)]">
+                Предложения похожих товаров
+              </h3>
+              <p className="mt-1 text-sm text-[var(--app-muted)]">
+                Откройте, чтобы сравнить строку с товарами каталога и принять отдельные предложения.
+              </p>
+            </summary>
+            <div className="border-t border-[var(--app-border)] p-4">
+              <ProductAnalogiesPreviewPanel
+                key={JSON.stringify({
+                  name,
+                  article,
+                  manufacturerId,
+                  productTypeId,
+                  analogyKnownCharacteristics,
+                })}
+                productName={name}
+                article={article}
+                manufacturerId={manufacturerId || null}
+                productTypeId={productTypeId || null}
+                knownCharacteristics={analogyKnownCharacteristics}
+                importBatchId={batchId}
+                importRowId={row.rowId}
+                onApplyCharacteristicProposal={applyAnalogyCharacteristicProposal}
+                onRejectCharacteristicProposal={rejectAnalogyCharacteristicProposal}
+              />
+            </div>
+          </details>
+        </>
+      )}
 
       <CatalogImportConfirmedSpanEditor
         batchId={batchId}
@@ -708,7 +858,29 @@ export function CatalogImportRowEditor({
         </div>
       )}
 
-      <div className="flex flex-col-reverse gap-3 border-t border-[var(--app-border)] pt-4 sm:flex-row sm:justify-end">
+      <div className="grid gap-3 border-t border-[var(--app-border)] pt-4 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center">
+        {canConfirmTrainingExamples ? (
+          <label className="flex items-start gap-3 rounded-xl bg-[var(--app-surface)] p-3 text-sm text-[var(--app-text)]">
+            <input
+              type="checkbox"
+              checked={confirmTrainingOnSave}
+              disabled={isBusy || trainingExamplesCount === 0}
+              onChange={(event) => setConfirmTrainingOnSave(event.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-[var(--app-accent-strong)]"
+            />
+            <span>
+              Использовать размеченные исправления для обучения
+              <span className="mt-1 block text-xs text-[var(--app-muted)]">
+                {trainingExamplesCount > 0
+                  ? `Будет подтверждено примеров: ${trainingExamplesCount}`
+                  : "Сначала добавьте разметку в блоке обучения выше."}
+              </span>
+            </span>
+          </label>
+        ) : (
+          <span />
+        )}
+
         <AppButton
           type="button"
           variant="secondary"
@@ -720,98 +892,15 @@ export function CatalogImportRowEditor({
 
         <AppButton
           type="submit"
-          variant="secondary"
+          variant="primary"
           loading={saveMutation.isPending}
           disabled={isBusy || Boolean(metadataError)}
         >
           {saveMutation.isPending
             ? "Сохраняем и проверяем..."
-            : "Сохранить строку"}
-        </AppButton>
-
-        <AppButton
-          type="button"
-          variant="primary"
-          loading={saveMutation.isPending}
-          disabled={
-            isBusy ||
-            Boolean(metadataError) ||
-            trainingExamplesCount === 0 ||
-            !canConfirmTrainingExamples
-          }
-          onClick={() => saveRow(true)}
-        >
-          {saveMutation.isPending
-            ? "Сохраняем и подтверждаем..."
-            : `Сохранить и подтвердить для обучения (${trainingExamplesCount})`}
+            : "Сохранить и перейти дальше"}
         </AppButton>
       </div>
     </form>
-  );
-}
-
-function CharacteristicInput({
-  characteristic,
-  value,
-  disabled,
-  onChange,
-}: {
-  characteristic: CatalogProductTypeCharacteristicMetadata;
-  value: string;
-  disabled: boolean;
-  onChange: (value: string) => void;
-}) {
-  const label = getCharacteristicLabel(characteristic);
-
-  if (characteristic.dataType === "Boolean") {
-    return (
-      <div className="grid content-start gap-2">
-        <span className="text-sm font-medium text-[var(--app-text)]">
-          {label}
-        </span>
-
-        <AppSelect
-          ariaLabel={label}
-          value={value}
-          disabled={disabled}
-          onChange={onChange}
-          options={[
-            {
-              value: "",
-              label: "Не указано",
-            },
-            {
-              value: "true",
-              label: "Да",
-            },
-            {
-              value: "false",
-              label: "Нет",
-            },
-          ]}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <label className="grid content-start gap-2">
-      <span className="text-sm font-medium text-[var(--app-text)]">
-        {label}
-      </span>
-
-      <AppInput
-        type="text"
-        inputMode={characteristic.dataType === "Number" ? "decimal" : "text"}
-        value={value}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={
-          characteristic.dataType === "Number"
-            ? "Введите число"
-            : "Введите значение"
-        }
-      />
-    </label>
   );
 }

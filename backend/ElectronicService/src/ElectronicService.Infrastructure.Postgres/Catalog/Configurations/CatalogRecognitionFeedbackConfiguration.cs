@@ -256,6 +256,28 @@ internal sealed class CatalogRecognitionFeedbackConfiguration : IEntityTypeConfi
             .HasColumnName("is_training_eligible")
             .IsRequired();
 
+        builder.Property(feedback => feedback.EvidenceSnapshotJson)
+            .HasColumnName("evidence_snapshot_json")
+            .HasMaxLength(CatalogRecognitionFeedback.EvidenceSnapshotMaxLength);
+
+        builder.Property(feedback => feedback.AnalogyDisplayCount)
+            .HasColumnName("analogy_display_count")
+            .IsRequired();
+
+        builder.Property(feedback => feedback.AnalogyStaleCount)
+            .HasColumnName("analogy_stale_count")
+            .IsRequired();
+
+        builder.Property(feedback => feedback.AnalogyLastShownAtUtc)
+            .HasColumnName("analogy_last_shown_at_utc");
+
+        builder.Property(feedback => feedback.AnalogyDecisionRecordedAtUtc)
+            .HasColumnName("analogy_decision_recorded_at_utc");
+
+        builder.Property(feedback => feedback.AnalogyLastStaleReason)
+            .HasColumnName("analogy_last_stale_reason")
+            .HasMaxLength(CatalogRecognitionFeedback.AnalogyStaleReasonMaxLength);
+
         builder.Ignore(feedback => feedback.IsPending);
 
         builder.Ignore(feedback => feedback.IsFinalized);

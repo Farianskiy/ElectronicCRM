@@ -90,6 +90,75 @@ public sealed class RuleBasedCatalogAssistantMessageParserTests
         Assert.Equal("КОНТАКТОР", result.Search);
     }
 
+    [Fact]
+    public async Task ParseAsyncTreatsGenericVoltmeterPhraseAsTextInsteadOfSpecificCharacteristic()
+    {
+        var parser = CreateParser(
+        [
+            CreateTerm(
+                "переключатель",
+                "ProductType",
+                null,
+                "CAM_SWITCH"),
+            CreateTerm(
+                "для вольтметра",
+                "Characteristic",
+                "SWITCH_APPLICATION",
+                "ЛИНЕЙНОЕ НАПРЯЖЕНИЕ")
+        ]);
+
+        var result = await parser.ParseAsync(
+            "переключатель для вольтметра",
+            null,
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal("ВОЛЬТМЕТРА", result.Search);
+        Assert.Equal("CAM_SWITCH", result.ProductTypeCode);
+        Assert.Empty(result.Characteristics);
+    }
+
+    [Fact]
+    public async Task ParseAsyncKeepsExplicitVoltmeterVoltageKindAsCharacteristic()
+    {
+        var parser = CreateParser(
+        [
+            CreateTerm(
+                "для вольтметра линейное напряжение",
+                "Characteristic",
+                "SWITCH_APPLICATION",
+                "ЛИНЕЙНОЕ НАПРЯЖЕНИЕ")
+        ]);
+
+        var result = await parser.ParseAsync(
+            "переключатель для вольтметра линейное напряжение",
+            null,
+            TestContext.Current.CancellationToken);
+
+        Assert.Null(result.Search);
+        var characteristic = Assert.Single(result.Characteristics);
+        Assert.Equal("SWITCH_APPLICATION", characteristic.Code);
+        Assert.Equal("ЛИНЕЙНОЕ НАПРЯЖЕНИЕ", characteristic.Value);
+    }
+
+    [Theory]
+    [InlineData("корпус ВРУ 2000 800 600", "КОРПУС ВРУ 2000 800 600")]
+    [InlineData("корпу вру 2000 800 600", "КОРПУС ВРУ 2000 800 600")]
+    [InlineData("ВРУ 2000x800x600", "ВРУ 2000 800 600")]
+    public async Task ParseAsyncBuildsSearchFromCabinetNameAndDimensions(
+        string message,
+        string expectedSearch)
+    {
+        var parser = CreateParser([]);
+
+        var result = await parser.ParseAsync(
+            message,
+            null,
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(expectedSearch, result.Search);
+        Assert.Null(result.Clarification);
+    }
+
     private static RuleBasedCatalogAssistantMessageParser CreateParser(
         IReadOnlyCollection<CatalogDictionaryTermResult> terms,
         ICatalogAssistantUnknownTermResolver? unknownTermResolver = null)

@@ -42,11 +42,16 @@ public sealed class CatalogImportRecognitionFeedbackFinalizer : ICatalogImportRe
 
         foreach (var feedback in pendingFeedback)
         {
+            var isAnalogyFeedback = string.Equals(
+                feedback.SuggestedSource,
+                CatalogImportAnalogyDecisionService.AnalogySuggestedSource,
+                StringComparison.Ordinal);
+
             var finalizationResult = feedback.Finalize(
                 CatalogRecognitionLabelQuality.Strong,
                 reviewedByUserId,
                 reviewerType.ToString(),
-                isTrainingEligible: true);
+                isTrainingEligible: !isAnalogyFeedback);
 
             if (finalizationResult.IsFailure)
             {
