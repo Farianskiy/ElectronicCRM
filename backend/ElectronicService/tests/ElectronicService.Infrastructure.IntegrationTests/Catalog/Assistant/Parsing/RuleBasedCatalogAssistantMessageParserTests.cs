@@ -162,6 +162,34 @@ public sealed class RuleBasedCatalogAssistantMessageParserTests
         Assert.Null(result.Clarification);
     }
 
+    [Theory]
+    [InlineData("корпус ВРУ 2000 600 450", "SCHMP_CABINET", "FLOOR_STANDING_CABINET")]
+    [InlineData("корпус ЩО 2000 600 450", "SCHMP_CABINET", "FLOOR_STANDING_CABINET")]
+    [InlineData("корпус ШНС 2000 600 450", "SCHMP_CABINET", "FLOOR_STANDING_CABINET")]
+    [InlineData("корпус КЛ 2000 600 450", "SCHMP_CABINET", "FLOOR_STANDING_CABINET")]
+    [InlineData("корпус ЩМП 800 600 250", "FLOOR_STANDING_CABINET", "SCHMP_CABINET")]
+    public async Task ParseAsyncPrefersExplicitCabinetFamilyOverGenericDictionaryType(
+        string message,
+        string learnedProductType,
+        string expectedProductType)
+    {
+        var parser = CreateParser(
+        [
+            CreateTerm(
+                "корпус",
+                "ProductType",
+                null,
+                learnedProductType)
+        ]);
+
+        var result = await parser.ParseAsync(
+            message,
+            null,
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(expectedProductType, result.ProductTypeCode);
+    }
+
     private static RuleBasedCatalogAssistantMessageParser CreateParser(
         IReadOnlyCollection<CatalogDictionaryTermResult> terms,
         ICatalogAssistantUnknownTermResolver? unknownTermResolver = null)

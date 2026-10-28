@@ -121,6 +121,12 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser : ICatalogAss
             }
         }
 
+        // An explicit cabinet family is more precise than a learned generic
+        // dictionary term such as "КОРПУС". Without this override an
+        // approved generic term can incorrectly classify a ВРУ cabinet as ЩМП.
+        productTypeCode = ResolveExplicitCabinetProductType(normalizedMessage)
+            ?? productTypeCode;
+
         var recognitionResult = await _productNameRecognitionService
                 .RecognizeAsync(
                     new CatalogProductNameRecognitionRequest(message),
@@ -321,6 +327,25 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser : ICatalogAss
         }
 
         return string.Join(' ', searchTerms);
+    }
+
+    private static string? ResolveExplicitCabinetProductType(
+        string normalizedMessage)
+    {
+        if (ContainsWholeTerm(normalizedMessage, "ВРУ")
+            || ContainsWholeTerm(normalizedMessage, "ЩО")
+            || ContainsWholeTerm(normalizedMessage, "ШНС")
+            || ContainsWholeTerm(normalizedMessage, "КЛ"))
+        {
+            return "FLOOR_STANDING_CABINET";
+        }
+
+        if (ContainsWholeTerm(normalizedMessage, "ЩМП"))
+        {
+            return "SCHMP_CABINET";
+        }
+
+        return null;
     }
 
     private static string? ExtractSearchToken(
