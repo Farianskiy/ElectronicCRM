@@ -177,7 +177,7 @@ export function CatalogImportRowEditor({
   const [confirmedSpans, setConfirmedSpans] = useState<
     Record<string, CatalogImportConfirmedSpan>
   >({});
-  const [confirmTrainingOnSave, setConfirmTrainingOnSave] = useState(false);
+  const [confirmTrainingOnSave, setConfirmTrainingOnSave] = useState(true);
   const [analogyDecisions, setAnalogyDecisions] = useState<
     Record<
       string,
@@ -872,8 +872,8 @@ export function CatalogImportRowEditor({
               Использовать размеченные исправления для обучения
               <span className="mt-1 block text-xs text-[var(--app-muted)]">
                 {trainingExamplesCount > 0
-                  ? `Будет подтверждено примеров: ${trainingExamplesCount}`
-                  : "Сначала добавьте разметку в блоке обучения выше."}
+                  ? `Сохранение строки сразу подтвердит примеры: ${trainingExamplesCount}. Повторно открывать строку не потребуется.`
+                  : "Выделите фрагмент и свяжите его с характеристикой. После этого подтверждение выполнится вместе с сохранением."}
               </span>
             </span>
           </label>
@@ -898,7 +898,9 @@ export function CatalogImportRowEditor({
         >
           {saveMutation.isPending
             ? "Сохраняем и проверяем..."
-            : "Сохранить и перейти дальше"}
+            : confirmTrainingOnSave && trainingExamplesCount > 0
+              ? `Сохранить и подтвердить примеры (${trainingExamplesCount})`
+              : "Сохранить и перейти дальше"}
         </AppButton>
       </div>
     </form>

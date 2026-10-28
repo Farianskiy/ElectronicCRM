@@ -15,6 +15,7 @@ public sealed record PreviewCatalogImportExampleFillRowResult(
     int RowNumber,
     string ProductName,
     string State,
+    string? Reason,
     IReadOnlyCollection<PreviewCatalogImportExampleFillProposalResult> Proposals,
     IReadOnlyCollection<PreviewCatalogImportExampleFillConflictResult> Conflicts);
 

@@ -50,7 +50,7 @@ function isBatchRequest(message: string): boolean {
       message,
     );
   const explicitSegments = message
-    .split(/\r?\n|[;/]/u)
+    .split(/\r?\n|;/u)
     .map((segment) => segment.trim())
     .filter(Boolean);
 
@@ -477,7 +477,7 @@ export default function CatalogAssistantPage() {
                 id="assistant-message"
                 value={message}
                 onChange={(event) => setMessage(event.target.value)}
-                placeholder="Напишите или произнесите запрос"
+                placeholder="Например: корпус ВРУ 2000/600/450 2 шт"
                 className="min-h-28 rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-slate-100 outline-none placeholder:text-slate-600 focus:border-teal-400"
               />
 
@@ -490,6 +490,12 @@ export default function CatalogAssistantPage() {
                 }}
               />
             </div>
+
+            <p className="text-xs text-slate-500">
+              Количество указывайте через «шт». Несколько позиций разделяйте
+              новой строкой или точкой с запятой. Символ «/» считается частью
+              наименования.
+            </p>
           </div>
 
           <div className="grid gap-4 md:grid-cols-3">

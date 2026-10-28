@@ -118,6 +118,18 @@ export function CatalogImportRowListItem({
             {productTypeResolutionLabel}
           </p>
         )}
+
+        {errorCount > 0 && row.issues[0] && (
+          <p className="mt-2 line-clamp-2 text-xs leading-5 text-[var(--app-danger)]">
+            {row.issues[0].message}
+          </p>
+        )}
+
+        {errorCount === 0 && warningCount > 0 && row.warnings[0] && (
+          <p className="mt-2 line-clamp-2 text-xs leading-5 text-[var(--app-warning)]">
+            {row.warnings[0].message}
+          </p>
+        )}
       </button>
     </article>
   );

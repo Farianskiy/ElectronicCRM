@@ -15,6 +15,7 @@ public sealed record CatalogImportExampleFillSample(
     Guid ProductTypeId,
     Guid CharacteristicDefinitionId,
     string CharacteristicName,
+    string? CharacteristicUnit,
     string ProductName,
     string RawValue,
     string NormalizedValue);

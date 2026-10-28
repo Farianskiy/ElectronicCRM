@@ -1531,8 +1531,8 @@ export function CatalogImportRowsPreview({
           )}
         </div>
       ) : (
-        <div className="mt-4 grid min-w-0 gap-4 xl:grid-cols-[minmax(320px,0.78fr)_minmax(0,1.22fr)] xl:items-start">
-          <section className="min-w-0 overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-panel)]">
+        <div className="mt-4 grid min-w-0 gap-4 xl:grid-cols-[minmax(320px,0.78fr)_minmax(0,1.22fr)] xl:items-stretch">
+          <section className="min-w-0 overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-panel)] xl:flex xl:flex-col">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-3">
               <label className="flex items-center gap-2 text-sm font-medium text-[var(--app-text)]">
                 <input
@@ -1556,7 +1556,7 @@ export function CatalogImportRowsPreview({
               </span>
             </div>
 
-            <div className="max-h-[72vh] overflow-y-auto">
+            <div className="max-h-[72vh] overflow-y-auto xl:min-h-0 xl:max-h-none xl:flex-1">
               {items.map((row) => {
                 const rowProductType = productTypesQuery.data?.find(
                   (item) => item.id === row.data.productTypeId,
@@ -1600,7 +1600,7 @@ export function CatalogImportRowsPreview({
             </div>
           </section>
 
-          <section className="min-w-0 xl:sticky xl:top-4">
+          <section className="min-w-0 xl:sticky xl:top-4 xl:self-start">
             {activeRow ? (
               <div className="grid gap-3">
                 <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-3">
@@ -1641,14 +1641,35 @@ export function CatalogImportRowsPreview({
                 </div>
 
                 {canEditRows ? (
-                  <CatalogImportRowEditor
-                    key={`${activeRow.rowId}-${activeRow.status}`}
-                    batchId={batchId}
-                    defaultProductTypeId={productTypeId}
-                    row={activeRow}
-                    onCancel={() => setActiveRowId(null)}
-                    onSaved={handleActiveRowSaved}
-                  />
+                  <div className="grid gap-3">
+                    {(activeRow.issues.length > 0 || activeRow.warnings.length > 0) && (
+                      <div className="grid gap-3 xl:grid-cols-2">
+                        {activeRow.issues.length > 0 && (
+                          <IssueCollection
+                            title="Что нужно исправить"
+                            items={activeRow.issues}
+                            type="error"
+                          />
+                        )}
+                        {activeRow.warnings.length > 0 && (
+                          <IssueCollection
+                            title="Что нужно проверить"
+                            items={activeRow.warnings}
+                            type="warning"
+                          />
+                        )}
+                      </div>
+                    )}
+
+                    <CatalogImportRowEditor
+                      key={`${activeRow.rowId}-${activeRow.status}`}
+                      batchId={batchId}
+                      defaultProductTypeId={productTypeId}
+                      row={activeRow}
+                      onCancel={() => setActiveRowId(null)}
+                      onSaved={handleActiveRowSaved}
+                    />
+                  </div>
                 ) : (
                   <CatalogImportRowDetails row={activeRow} />
                 )}

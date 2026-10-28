@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using ClosedXML.Excel;
 using ElectronicService.Core.Catalog.Dictionaries.GetTerms;
@@ -405,6 +406,55 @@ public sealed class CatalogImportPipelineTests
             issue => string.Equals(
                 issue.Code,
                 "characteristic.required",
+                StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(1000)]
+    [InlineData(1250)]
+    [InlineData(1600)]
+    public void NumericCharacteristicIgnoresExcelThousandsFormatting(
+        decimal ratedCurrent)
+    {
+        var productType = TestDataFactory.CreateProductType(
+            "POWER_CIRCUIT_BREAKER",
+            "Силовой автомат");
+        var definition = TestDataFactory.CreateCharacteristicDefinition();
+        TestDataFactory.AddCharacteristic(productType, definition, isRequired: true);
+
+        using var workbook = new XLWorkbook();
+        var worksheet = workbook.AddWorksheet("Товары");
+        worksheet.Cell(1, 1).Value = "Артикул";
+        worksheet.Cell(1, 2).Value = "Наименование";
+        worksheet.Cell(1, 3).Value = "Номинальный ток, А";
+        worksheet.Cell(2, 1).Value = $"NM8N-{ratedCurrent}";
+        worksheet.Cell(2, 2).Value = $"Авт. выкл. NM8N 3P {ratedCurrent}А";
+        worksheet.Cell(2, 3).Value = ratedCurrent;
+        worksheet.Cell(2, 3).Style.NumberFormat.Format = "#,##0.####";
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+
+        var result = new CatalogImportWorkbookAnalyzer().Analyze(
+            Guid.NewGuid(),
+            stream.ToArray(),
+            productType,
+            [definition],
+            new ManufacturerResolutionIndex([], []),
+            [],
+            TestContext.Current.CancellationToken);
+
+        Assert.True(result.IsSuccess);
+        var row = Assert.Single(result.Value.Rows);
+        var data = DeserializeData(row);
+        Assert.Equal(
+            ratedCurrent.ToString(CultureInfo.InvariantCulture),
+            data.Characteristics[definition.Id.ToString()]);
+        Assert.DoesNotContain(
+            DeserializeIssues(row.IssuesJson),
+            issue => string.Equals(
+                issue.Code,
+                "characteristic.invalid",
                 StringComparison.Ordinal));
     }
 

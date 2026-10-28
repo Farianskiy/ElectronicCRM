@@ -284,22 +284,28 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser : ICatalogAss
         var normalizedMessage = NormalizeText(message);
         var searchTerms = new List<string>();
 
-        if (CabinetWordRegex().IsMatch(normalizedMessage))
-        {
-            // "КОРПУ" is a frequent unfinished/typo form entered by users.
-            // Normalize it here instead of turning a useful request into an
-            // empty search or asking about every remaining word separately.
-            searchTerms.Add("КОРПУС");
-        }
+        var hasVruMarker = ContainsWholeTerm(normalizedMessage, "ВРУ");
+        var hasShchmpMarker = ContainsWholeTerm(normalizedMessage, "ЩМП");
 
-        if (ContainsWholeTerm(normalizedMessage, "ВРУ"))
+        if (hasVruMarker)
         {
             searchTerms.Add("ВРУ");
         }
 
-        if (ContainsWholeTerm(normalizedMessage, "ЩМП"))
+        if (hasShchmpMarker)
         {
             searchTerms.Add("ЩМП");
+        }
+
+        if (!hasVruMarker
+            && !hasShchmpMarker
+            && CabinetWordRegex().IsMatch(normalizedMessage))
+        {
+            // "КОРПУ" is a frequent unfinished/typo form entered by users.
+            // For a known cabinet family (for example, ВРУ), requiring the generic
+            // word "КОРПУС" would incorrectly exclude products whose names
+            // contain only the family and dimensions.
+            searchTerms.Add("КОРПУС");
         }
 
         var width = match.Groups["width"].Value;
@@ -730,7 +736,7 @@ public sealed partial class RuleBasedCatalogAssistantMessageParser : ICatalogAss
     };
 
     [GeneratedRegex(
-    @"(?<!\d)(?<width>\d{2,4})(?:\s*[XХ×*]\s*|\s+)(?<height>\d{2,4})(?:(?:\s*[XХ×*]\s*|\s+)(?<depth>\d{2,4}))?(?!\d)",
+    @"(?<!\d)(?<width>\d{2,4})(?:\s*[XХ×*/]\s*|\s+)(?<height>\d{2,4})(?:(?:\s*[XХ×*/]\s*|\s+)(?<depth>\d{2,4}))?(?!\d)",
     RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
     RegexTimeoutMilliseconds)]
     private static partial Regex CabinetDimensionsRegex();

@@ -814,7 +814,8 @@ export interface BulkUpdateCatalogImportRowsResponse {
 export type CatalogImportExampleFillRowState =
   | "Ready"
   | "Review"
-  | "Conflict";
+  | "Conflict"
+  | "Unmatched";
 
 export interface PreviewCatalogImportExampleFillRequest {
   expectedVersion: number;
@@ -847,6 +848,7 @@ export interface CatalogImportExampleFillRow {
   rowNumber: number;
   productName: string;
   state: CatalogImportExampleFillRowState;
+  reason?: string | null;
   proposals: CatalogImportExampleFillProposal[];
   conflicts: CatalogImportExampleFillConflict[];
 }

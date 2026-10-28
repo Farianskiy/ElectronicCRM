@@ -55,4 +55,32 @@ public sealed class CatalogImportExampleFillTokenMatcherTests
 
         Assert.Equal(-1, result);
     }
+
+    [Theory]
+    [InlineData("Авт. выкл. NM8N-1600H 3P 1000А 100кА", "1000", "А")]
+    [InlineData("Авт. выкл. NM8N-1600H 3P 1250A 100kA", "1250", "А")]
+    [InlineData("Авт. выкл. NM8N-1600Q 3P 1600А 70кА", "1600", "А")]
+    public void FindStartMatchesNumericValueImmediatelyFollowedByItsUnit(
+        string productName,
+        string rawValue,
+        string unit)
+    {
+        var result = CatalogImportExampleFillTokenMatcher.FindStart(
+            productName,
+            rawValue,
+            unit);
+
+        Assert.True(result >= 0);
+    }
+
+    [Fact]
+    public void FindStartDoesNotTreatFrameNumberAsRatedCurrent()
+    {
+        var result = CatalogImportExampleFillTokenMatcher.FindStart(
+            "Авт. выкл. NM8N-1600H 3P 1250А",
+            "1600",
+            "А");
+
+        Assert.Equal(-1, result);
+    }
 }

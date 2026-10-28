@@ -59,6 +59,7 @@ public sealed class CatalogImportExampleFillReader : ICatalogImportExampleFillRe
                 item.Example.ProductTypeId,
                 item.Example.CharacteristicDefinitionId,
                 item.Definition.Name,
+                item.Definition.Unit,
                 item.Example.ProductName,
                 item.Example.RawValue,
                 item.Example.NormalizedValue))

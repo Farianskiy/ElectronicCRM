@@ -176,22 +176,56 @@ public sealed class PreviewCatalogImportExampleFillQueryHandler
                     CatalogImportErrors.InvalidImportJson(nameof(CatalogImportRow.NormalizedDataJson)));
             }
 
-            if (string.IsNullOrWhiteSpace(data.Name)
-                || data.ManufacturerId is not Guid manufacturerId
-                || data.ProductTypeId is not Guid productTypeId
-                || !samplesByScope.TryGetValue((manufacturerId, productTypeId), out var scopedSamples))
+            if (string.IsNullOrWhiteSpace(data.Name))
             {
+                resultRows.Add(CreateUnmatchedRow(
+                    row,
+                    string.Empty,
+                    "Не указано наименование товара."));
                 continue;
             }
 
-            var matchedSamples = scopedSamples
+            if (data.ManufacturerId is not Guid manufacturerId)
+            {
+                resultRows.Add(CreateUnmatchedRow(
+                    row,
+                    data.Name,
+                    "Не определён производитель. Примеры применяются только внутри одного производителя."));
+                continue;
+            }
+
+            if (data.ProductTypeId is not Guid productTypeId)
+            {
+                resultRows.Add(CreateUnmatchedRow(
+                    row,
+                    data.Name,
+                    "Не определён тип товара. Примеры применяются только внутри одного типа товара."));
+                continue;
+            }
+
+            if (!samplesByScope.TryGetValue(
+                    (manufacturerId, productTypeId),
+                    out var scopedSamples))
+            {
+                resultRows.Add(CreateUnmatchedRow(
+                    row,
+                    data.Name,
+                    "Среди выбранных строк нет подтверждённых примеров для этого производителя и типа товара."));
+                continue;
+            }
+
+            var applicableSamples = scopedSamples
                 .Where(sample => sample.SourceRowId != row.Id)
+                .ToArray();
+
+            var matchedSamples = applicableSamples
                 .Select(sample => new
                 {
                     Sample = sample,
                     MatchStart = CatalogImportExampleFillTokenMatcher.FindStart(
                         data.Name,
-                        sample.RawValue)
+                        sample.RawValue,
+                        sample.CharacteristicUnit)
                 })
                 .Where(item => item.MatchStart >= 0)
                 .GroupBy(item => item.Sample.CharacteristicDefinitionId)
@@ -199,6 +233,15 @@ public sealed class PreviewCatalogImportExampleFillQueryHandler
 
             if (matchedSamples.Length == 0)
             {
+                var reason = applicableSamples.Length == 0 &&
+                    exampleRowIds.Contains(row.Id)
+                    ? "Строка выбрана как источник примера и не заполняется по собственному примеру."
+                    : BuildNoMatchReason(applicableSamples);
+
+                resultRows.Add(CreateUnmatchedRow(
+                    row,
+                    data.Name,
+                    reason));
                 continue;
             }
 
@@ -275,6 +318,10 @@ public sealed class PreviewCatalogImportExampleFillQueryHandler
 
             if (proposals.Count == 0 && conflicts.Count == 0)
             {
+                resultRows.Add(CreateUnmatchedRow(
+                    row,
+                    data.Name,
+                    "Подходящие фрагменты найдены, но соответствующие характеристики уже заполнены теми же значениями."));
                 continue;
             }
 
@@ -293,6 +340,7 @@ public sealed class PreviewCatalogImportExampleFillQueryHandler
                 row.RowNumber,
                 data.Name,
                 state,
+                null,
                 proposals,
                 conflicts));
         }
@@ -300,6 +348,7 @@ public sealed class PreviewCatalogImportExampleFillQueryHandler
         var readyRowsCount = resultRows.Count(row => string.Equals(row.State, "Ready", StringComparison.Ordinal));
         var reviewRowsCount = resultRows.Count(row => string.Equals(row.State, "Review", StringComparison.Ordinal));
         var conflictRowsCount = resultRows.Count(row => string.Equals(row.State, "Conflict", StringComparison.Ordinal));
+        var unmatchedRowsCount = resultRows.Count(row => string.Equals(row.State, "Unmatched", StringComparison.Ordinal));
 
         return Result.Success<PreviewCatalogImportExampleFillResult, DomainError>(
             new PreviewCatalogImportExampleFillResult(
@@ -309,7 +358,7 @@ public sealed class PreviewCatalogImportExampleFillQueryHandler
                 readyRowsCount,
                 reviewRowsCount,
                 conflictRowsCount,
-                rows.Count - resultRows.Count,
+                unmatchedRowsCount,
                 resultRows));
     }
 
@@ -349,6 +398,42 @@ public sealed class PreviewCatalogImportExampleFillQueryHandler
         return characteristics
             .FirstOrDefault(item => string.Equals(item.Key, key, StringComparison.OrdinalIgnoreCase))
             .Value;
+    }
+
+    private static PreviewCatalogImportExampleFillRowResult CreateUnmatchedRow(
+        CatalogImportRow row,
+        string productName,
+        string reason)
+    {
+        return new PreviewCatalogImportExampleFillRowResult(
+            row.Id,
+            row.RowNumber,
+            productName,
+            "Unmatched",
+            reason,
+            [],
+            []);
+    }
+
+    private static string BuildNoMatchReason(
+        CatalogImportExampleFillSample[] samples)
+    {
+        if (samples.Length == 0)
+        {
+            return "Нет другого подтверждённого примера, который можно применить к этой строке.";
+        }
+
+        var fragments = samples
+            .Select(sample => sample.RawValue.Trim())
+            .Where(value => value.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(4)
+            .Select(value => $"«{value}»")
+            .ToArray();
+
+        return fragments.Length == 0
+            ? "В наименовании не найдено ни одного подтверждённого фрагмента."
+            : $"В наименовании не найдены подтверждённые фрагменты: {string.Join(", ", fragments)}.";
     }
 
 }

@@ -9,6 +9,7 @@ import { previewCatalogImportExampleFill } from "../../api/previewCatalogImportE
 import { catalogImportQueryKeys } from "../../model/queryKeys";
 import type {
   CatalogImportExampleFillRow,
+  CatalogImportExampleFillRowState,
   CatalogImportRow,
   PreviewCatalogImportExampleFillResponse,
 } from "../../model/types";
@@ -30,6 +31,10 @@ function getStateLabel(row: CatalogImportExampleFillRow): string {
     return "Нужно проверить";
   }
 
+  if (row.state === "Unmatched") {
+    return "Не найдено";
+  }
+
   return "Есть конфликт";
 }
 
@@ -40,6 +45,10 @@ function getStateClasses(row: CatalogImportExampleFillRow): string {
 
   if (row.state === "Review") {
     return "border-[var(--app-warning-border)] bg-[var(--app-warning-soft)] text-[var(--app-warning)]";
+  }
+
+  if (row.state === "Unmatched") {
+    return "border-[var(--app-border)] bg-[var(--app-panel-strong)] text-[var(--app-muted)]";
   }
 
   return "border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] text-[var(--app-danger)]";
@@ -58,6 +67,9 @@ export function CatalogImportExampleFillPreview({
   const [selectedTargetIds, setSelectedTargetIds] = useState<Set<string>>(
     () => new Set(),
   );
+  const [resultFilter, setResultFilter] = useState<
+    CatalogImportExampleFillRowState | "All"
+  >("All");
 
   const previewMutation = useMutation({
     mutationFn: () =>
@@ -68,6 +80,7 @@ export function CatalogImportExampleFillPreview({
       }),
     onSuccess: (result) => {
       setPreview(result);
+      setResultFilter("All");
       setSelectedTargetIds(
         new Set(
           result.rows
@@ -117,6 +130,9 @@ export function CatalogImportExampleFillPreview({
 
   const isBusy = previewMutation.isPending || applyMutation.isPending;
   const selectedCount = selectedTargetIds.size;
+  const visibleRows = preview?.rows.filter(
+    (row) => resultFilter === "All" || row.state === resultFilter,
+  ) ?? [];
 
   function toggleTarget(rowId: string): void {
     setSelectedTargetIds((currentIds) => {
@@ -212,14 +228,39 @@ export function CatalogImportExampleFillPreview({
             </div>
           </dl>
 
-          {preview.rows.length === 0 ? (
+          <div className="mt-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-3 text-xs leading-5 text-[var(--app-muted)]">
+            <p><strong className="text-[var(--app-text)]">Готово</strong> — значение подтверждают минимум два разных примера; такие строки выбраны автоматически.</p>
+            <p><strong className="text-[var(--app-text)]">Проверить</strong> — найден только один пример; строку можно выбрать вручную.</p>
+            <p><strong className="text-[var(--app-text)]">Конфликт</strong> — найдено несколько значений или в строке уже сохранено другое значение.</p>
+            <p><strong className="text-[var(--app-text)]">Без совпадений</strong> — ниже показана конкретная причина для каждой строки.</p>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            {([
+              ["All", `Все · ${preview.targetRowsCount}`],
+              ["Ready", `Готово · ${preview.readyRowsCount}`],
+              ["Review", `Проверить · ${preview.reviewRowsCount}`],
+              ["Conflict", `Конфликты · ${preview.conflictRowsCount}`],
+              ["Unmatched", `Без совпадений · ${preview.unmatchedRowsCount}`],
+            ] as const).map(([value, label]) => (
+              <AppButton
+                key={value}
+                size="sm"
+                variant={resultFilter === value ? "primary" : "secondary"}
+                onClick={() => setResultFilter(value)}
+              >
+                {label}
+              </AppButton>
+            ))}
+          </div>
+
+          {visibleRows.length === 0 ? (
             <p className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4 text-sm text-[var(--app-muted)]">
-              В наименованиях остальных строк не найдено подтверждённых
-              фрагментов из выбранных примеров.
+              В выбранной группе строк нет.
             </p>
           ) : (
             <div className="mt-4 grid max-h-[52vh] gap-3 overflow-y-auto pr-1">
-              {preview.rows.map((row) => {
+              {visibleRows.map((row) => {
                 const canSelect =
                   row.state !== "Conflict" && row.proposals.length > 0;
 
@@ -249,8 +290,14 @@ export function CatalogImportExampleFillPreview({
                           </span>
                         </div>
                         <p className="mt-1 break-words text-sm text-[var(--app-text)]">
-                          {row.productName}
+                          {row.productName || "Наименование не указано"}
                         </p>
+
+                        {row.reason && (
+                          <p className="mt-2 rounded-lg border border-[var(--app-border)] bg-[var(--app-panel)] p-2.5 text-xs leading-5 text-[var(--app-muted)]">
+                            {row.reason}
+                          </p>
+                        )}
 
                         {row.proposals.length > 0 && (
                           <div className="mt-3 grid gap-2">

@@ -975,13 +975,30 @@ public sealed class CatalogImportWorkbookAnalyzer
                 candidate =>
                     candidate.SourceColumnNumber,
                 candidate =>
-                    worksheet
-                        .Cell(
+                    ReadSourceCellValue(
+                        worksheet.Cell(
                             rowNumber,
-                            candidate
-                                .SourceColumnNumber)
-                        .GetFormattedString()
-                        .Trim());
+                            candidate.SourceColumnNumber)));
+    }
+
+    private static string ReadSourceCellValue(IXLCell cell)
+    {
+        /*
+         * Формат ячейки отвечает только за отображение в Excel. Например,
+         * числовое значение 1250 с форматом "#,##0.####" ClosedXML может
+         * представить как "1,250.". Такой текст нельзя использовать как
+         * исходное значение характеристики: разделитель тысяч начинает
+         * выглядеть как десятичный разделитель.
+         */
+        if (cell.DataType == XLDataType.Number &&
+            cell.TryGetValue<decimal>(out var numericValue))
+        {
+            return numericValue.ToString(
+                "0.############################",
+                CultureInfo.InvariantCulture);
+        }
+
+        return cell.GetFormattedString().Trim();
     }
 
     private static CatalogImportManufacturerResolutionSummary BuildManufacturerResolutionSummary(List<ManufacturerResolutionSample> samples)

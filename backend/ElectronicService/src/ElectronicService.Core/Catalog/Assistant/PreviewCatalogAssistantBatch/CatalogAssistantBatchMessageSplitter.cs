@@ -42,7 +42,7 @@ public static partial class CatalogAssistantBatchMessageSplitter
     private static List<string> SplitByExplicitSeparators(string message)
     {
         return message
-            .Split(['\r', '\n', ';', '/'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Split(['\r', '\n', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Where(segment => !string.IsNullOrWhiteSpace(segment))
             .ToList();
     }
@@ -62,7 +62,7 @@ public static partial class CatalogAssistantBatchMessageSplitter
         foreach (var quantityMatch in quantityMatches)
         {
             var length = quantityMatch.Index + quantityMatch.Length - startIndex;
-            var line = segment.Substring(startIndex, length).Trim(' ', ',', ';', '/');
+            var line = segment.Substring(startIndex, length).Trim(' ', ',', ';');
 
             if (line.Length > 0)
             {
@@ -72,7 +72,7 @@ public static partial class CatalogAssistantBatchMessageSplitter
             startIndex = quantityMatch.Index + quantityMatch.Length;
         }
 
-        var remainder = segment[startIndex..].Trim(' ', ',', ';', '/');
+        var remainder = segment[startIndex..].Trim(' ', ',', ';');
 
         if (remainder.Length > 0)
         {
@@ -97,7 +97,7 @@ public static partial class CatalogAssistantBatchMessageSplitter
                 quantity = parsedQuantity;
             }
 
-            itemText = string.Concat(sourceText.AsSpan(0, quantityMatch.Index), sourceText.AsSpan(quantityMatch.Index + quantityMatch.Length)).Trim(' ', ',', ';', '/');
+            itemText = string.Concat(sourceText.AsSpan(0, quantityMatch.Index), sourceText.AsSpan(quantityMatch.Index + quantityMatch.Length)).Trim(' ', ',', ';');
         }
 
         var searchText = string.IsNullOrWhiteSpace(commonText)

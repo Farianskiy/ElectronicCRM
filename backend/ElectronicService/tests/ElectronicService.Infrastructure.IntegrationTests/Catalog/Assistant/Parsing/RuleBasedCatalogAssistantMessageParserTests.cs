@@ -141,9 +141,12 @@ public sealed class RuleBasedCatalogAssistantMessageParserTests
     }
 
     [Theory]
-    [InlineData("корпус ВРУ 2000 800 600", "КОРПУС ВРУ 2000 800 600")]
-    [InlineData("корпу вру 2000 800 600", "КОРПУС ВРУ 2000 800 600")]
+    [InlineData("корпус ВРУ 2000 800 600", "ВРУ 2000 800 600")]
+    [InlineData("корпу вру 2000 800 600", "ВРУ 2000 800 600")]
     [InlineData("ВРУ 2000x800x600", "ВРУ 2000 800 600")]
+    [InlineData("корпус ВРУ 2000/800/600", "ВРУ 2000 800 600")]
+    [InlineData("корпус вру 2000 600 450", "ВРУ 2000 600 450")]
+    [InlineData("корпус 2000 800 600", "КОРПУС 2000 800 600")]
     public async Task ParseAsyncBuildsSearchFromCabinetNameAndDimensions(
         string message,
         string expectedSearch)
